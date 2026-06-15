@@ -1,0 +1,61 @@
+name: 🐛 버그 리포트
+description: 버그나 오류를 발견했을 때 사용하는 템플릿입니다.
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        버그를 발견해 주셔서 감사합니다! 아래 내용을 최대한 자세히 작성해 주세요. 🙏
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 🔍 버그 설명
+      description: 어떤 버그가 발생했나요? 명확하고 간결하게 설명해 주세요.
+      placeholder: 버그에 대해 설명해 주세요...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 📋 재현 방법
+      description: 버그를 재현할 수 있는 단계를 작성해 주세요.
+      placeholder: |
+        1. '...' 페이지로 이동
+        2. '...' 버튼 클릭
+        3. '...' 입력
+        4. 에러 발생
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: ✅ 기대했던 동작
+      description: 어떻게 동작해야 한다고 생각하셨나요?
+      placeholder: 정상적으로는 어떻게 동작해야 하나요?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: ❌ 실제 동작
+      description: 실제로 어떻게 동작했나요?
+      placeholder: 실제로 발생한 결과를 설명해 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 📸 스크린샷 (선택사항)
+      description: 문제를 보여주는 스크린샷이 있다면 첨부해 주세요.
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 💬 추가 정보
+      description: 버그와 관련된 추가적인 정보나 맥락이 있다면 작성해 주세요.
