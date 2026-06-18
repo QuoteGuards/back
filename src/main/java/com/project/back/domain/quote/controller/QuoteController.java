@@ -30,8 +30,8 @@ public class QuoteController {
     private final QuoteService quoteService;
     private final UserRepository userRepository;
 
-    //견적 임시저장
-    @PostMapping("/draft")
+    //임시저장
+    @PostMapping
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> saveDraft(
             @AuthenticationPrincipal String userId,
             @RequestBody @Valid QuoteCreateRequest request) {
@@ -47,9 +47,9 @@ public class QuoteController {
         return ResponseEntity.ok(ApiResponse.success("임시저장되었습니다.", QuoteDetailResponse.from(quote)));
     }
 
-    //작성완료 제출
-    @PostMapping("/{quoteId}/submit")
-    public ResponseEntity<ApiResponse<QuoteDetailResponse>> submit(
+     //견적 작성 완료
+    @PostMapping("/{quoteId}/complete")
+    public ResponseEntity<ApiResponse<QuoteDetailResponse>> complete(
             @AuthenticationPrincipal String userId,
             @PathVariable Long quoteId) {
 
@@ -58,7 +58,7 @@ public class QuoteController {
     }
 
     //견적 수정 (DRAFT / REVISING 상태만 가능)
-    @PutMapping("/{quoteId}")
+    @PatchMapping("/{quoteId}")
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> update(
             @AuthenticationPrincipal String userId,
             @PathVariable Long quoteId,
@@ -76,7 +76,7 @@ public class QuoteController {
     }
 
     //내 견적 목록 (다중 조건 검색)
-    @GetMapping
+    @GetMapping("/me")
     public ResponseEntity<ApiResponse<List<QuoteListResponse>>> getMyQuotes(
             @AuthenticationPrincipal String userId,
             @RequestParam(required = false) QuoteStatus status,
@@ -95,7 +95,7 @@ public class QuoteController {
         return ResponseEntity.ok(ApiResponse.success(result));
     }
 
-    //견적 상세 조회 (고객용 - 원가/이익률 제외)
+    //견적 상세 조회
     @GetMapping("/{quoteId}")
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> getDetail(
             @AuthenticationPrincipal String userId,
@@ -105,8 +105,8 @@ public class QuoteController {
         return ResponseEntity.ok(ApiResponse.success(QuoteDetailResponse.from(quote)));
     }
 
-    //내부 검토 조회 (원가/이익률 포함)
-    @GetMapping("/{quoteId}/internal")
+     //내부 견적 분석 조회 (원가/이익률 포함)
+    @GetMapping("/{quoteId}/internal-analysis")
     public ResponseEntity<ApiResponse<QuoteInternalAnalysisResponse>> getInternal(
             @AuthenticationPrincipal String userId,
             @PathVariable Long quoteId) {
@@ -115,7 +115,7 @@ public class QuoteController {
         return ResponseEntity.ok(ApiResponse.success(QuoteInternalAnalysisResponse.from(quote)));
     }
 
-    //최근 견적 재사용
+     //최근 견적 재사용
     @PostMapping("/{quoteId}/reuse")
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> reuse(
             @AuthenticationPrincipal String userId,
@@ -125,7 +125,7 @@ public class QuoteController {
         return ResponseEntity.ok(ApiResponse.success("견적이 재사용되었습니다.", QuoteDetailResponse.from(quote)));
     }
 
-    //만료 견적 재작성 (버전 증가)
+     //만료 견적 재작성 (버전 증가)
     @PostMapping("/{quoteId}/rewrite")
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> rewrite(
             @AuthenticationPrincipal String userId,
