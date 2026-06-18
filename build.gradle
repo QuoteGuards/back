@@ -19,18 +19,59 @@ repositories {
 }
 
 dependencies {
+    // ── Core ────────────────────────────────────────
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
-    compileOnly 'org.projectlombok:lombok'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // ── Database ─────────────────────────────────────
     runtimeOnly 'com.mysql:mysql-connector-j'
+
+    // ── dotenv (.env 파일 읽기) ───────────────────────
+    implementation 'me.paulschwarz:spring-dotenv:4.0.0'
+
+    // ── QueryDSL ────────────────────────
+    // ※ Spring Boot 4.1.0 / Jakarta EE 환경
+    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+
+    // ── MyBatis (통계/집계 쿼리) ──────────
+    implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
+
+    // ── JWT (Jackson 3 충돌 방지 위해 Gson 사용) ──
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-gson:0.12.6'
+    runtimeOnly 'com.google.code.gson:gson'
+
+    // ── Lombok ───────────────────────────────────────
+    compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
-    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
-    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+
+    // ── Test ─────────────────────────────────────────
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
     testCompileOnly 'org.projectlombok:lombok'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// QueryDSL Q클래스 생성 경로 설정
+def querydslDir = layout.buildDirectory.dir('generated/sources/annotationProcessor/java/main')
+
+sourceSets {
+    main {
+        java {
+            srcDirs += [querydslDir]
+        }
+    }
+}
+
+tasks.named('clean') {
+    delete querydslDir
 }
 
 tasks.named('test') {
