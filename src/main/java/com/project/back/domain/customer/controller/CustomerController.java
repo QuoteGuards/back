@@ -26,7 +26,7 @@ public class CustomerController {
 
     //고객 검색 (견적 작성 화면 자동완성용)
     @GetMapping("/search")
-    public ResponseEntity<ApiResponse<List<CustomerSearchResponse>>> search(
+    public ResponseEntity<ApiResponse<List<CustomerSearchResponse>>> searchCustomers(
             @AuthenticationPrincipal String userId,
             @RequestParam String name) {
 
@@ -40,7 +40,7 @@ public class CustomerController {
 
     //고객 상세 조회
     @GetMapping("/{customerId}")
-    public ResponseEntity<ApiResponse<CustomerDetailResponse>> getDetail(
+    public ResponseEntity<ApiResponse<CustomerDetailResponse>> getCustomerDetail(
             @AuthenticationPrincipal String userId,
             @PathVariable Long customerId) {
 
@@ -50,7 +50,7 @@ public class CustomerController {
 
     //신규 고객 등록
     @PostMapping
-    public ResponseEntity<ApiResponse<CustomerDetailResponse>> create(
+    public ResponseEntity<ApiResponse<CustomerDetailResponse>> createCustomer(
             @AuthenticationPrincipal String userId,
             @RequestBody @Valid CustomerCreateRequest request) {
 
@@ -68,9 +68,10 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success("고객이 등록되었습니다.", CustomerDetailResponse.from(customer)));
     }
 
+
     //고객 정보 수정
     @PutMapping("/{customerId}")
-    public ResponseEntity<ApiResponse<CustomerDetailResponse>> update(
+    public ResponseEntity<ApiResponse<CustomerDetailResponse>> updateCustomer(
             @AuthenticationPrincipal String userId,
             @PathVariable Long customerId,
             @RequestBody @Valid CustomerCreateRequest request) {
