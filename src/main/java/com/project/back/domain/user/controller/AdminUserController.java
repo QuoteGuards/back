@@ -67,10 +67,10 @@ public class AdminUserController {
      */
     @PatchMapping("/{userId}/approve")
     public ResponseEntity<ApiResponse<UserDetailResponse>> approveUser(
-            @AuthenticationPrincipal String requesterId,
+            @AuthenticationPrincipal Long requesterId,
             @PathVariable Long userId
     ) {
-        UserDetailResponse result = userManagementService.approveUser(Long.parseLong(requesterId), userId);
+        UserDetailResponse result = userManagementService.approveUser(requesterId, userId);
         return ResponseEntity.ok(ApiResponse.success("사용자 승인이 완료되었습니다.", result));
     }
 
@@ -103,11 +103,11 @@ public class AdminUserController {
      */
     @PatchMapping("/{userId}/role")
     public ResponseEntity<ApiResponse<UserDetailResponse>> changeUserRole(
-            @AuthenticationPrincipal String requesterId,
+            @AuthenticationPrincipal Long requesterId,
             @PathVariable Long userId,
             @Valid @RequestBody ChangeUserRoleRequest request
     ) {
-        UserDetailResponse result = userManagementService.changeUserRole(Long.parseLong(requesterId), userId, request);
+        UserDetailResponse result = userManagementService.changeUserRole(requesterId, userId, request);
         return ResponseEntity.ok(ApiResponse.success("사용자 권한이 변경되었습니다.", result));
     }
 
@@ -116,10 +116,10 @@ public class AdminUserController {
      */
     @PatchMapping("/{userId}/suspend")
     public ResponseEntity<ApiResponse<UserDetailResponse>> suspendUser(
-            @AuthenticationPrincipal String requesterId,
+            @AuthenticationPrincipal Long requesterId,
             @PathVariable Long userId
     ) {
-        UserDetailResponse result = userManagementService.suspendUser(Long.parseLong(requesterId), userId);
+        UserDetailResponse result = userManagementService.suspendUser(requesterId, userId);
         return ResponseEntity.ok(ApiResponse.success("사용자가 비활성화되었습니다.", result));
     }
 

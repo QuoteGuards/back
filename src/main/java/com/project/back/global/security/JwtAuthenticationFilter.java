@@ -44,7 +44,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token)) {
             try {
                 if (jwtTokenProvider.validateToken(token)) {    // 토큰 검증 성공 시
-                    String userId = jwtTokenProvider.getSubject(token);
+                    String subject = jwtTokenProvider.getSubject(token);
+                    Long userId = Long.parseLong(subject);
                     String role = jwtTokenProvider.getRole(token);
 
                     UsernamePasswordAuthenticationToken authentication =    // Authentication 발급
