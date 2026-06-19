@@ -25,7 +25,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
 
-    // ── Database ─────────────────────────────────────
+    compileOnly 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     // ── dotenv (.env 파일 읽기) ───────────────────────
@@ -41,19 +41,21 @@ dependencies {
     // ── MyBatis (통계/집계 쿼리) ──────────
     implementation 'org.mybatis.spring.boot:mybatis-spring-boot-starter:3.0.4'
 
-    // ── JWT (Jackson 3 충돌 방지 위해 Gson 사용) ──
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // JWT - Jackson 3 충돌 방지를 위해 Gson 사용
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-gson:0.12.6'
     runtimeOnly 'com.google.code.gson:gson'
 
-    // ── Lombok ───────────────────────────────────────
-    compileOnly 'org.projectlombok:lombok'
-    annotationProcessor 'org.projectlombok:lombok'
-
-    // ── Test ─────────────────────────────────────────
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-security-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webmvc-test'
+
     testCompileOnly 'org.projectlombok:lombok'
     testAnnotationProcessor 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
