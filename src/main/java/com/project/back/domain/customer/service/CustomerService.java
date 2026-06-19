@@ -3,6 +3,8 @@ package com.project.back.domain.customer.service;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.customer.repository.CustomerRepository;
 import com.project.back.domain.user.entity.User;
+import com.project.back.global.exception.CustomException;
+import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,7 +31,7 @@ public class CustomerService {
     // 고객 단건 조회
     public Customer getCustomer(Long customerId) {
         return customerRepository.findById(customerId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 고객입니다. id=" + customerId));
+                .orElseThrow(() -> new CustomException(ErrorCode.CUSTOMER_NOT_FOUND));
     }
 
     // 견적 작성 시 신규 고객 등록

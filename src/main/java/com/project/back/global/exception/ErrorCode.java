@@ -20,6 +20,15 @@ public enum ErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "JWT_001", "유효하지 않은 토큰입니다."),
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "JWT_002", "만료된 토큰입니다."),
 
+    // Quote
+    QUOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "QUOTE_001", "존재하지 않는 견적입니다."),
+    QUOTE_NOT_EDITABLE(HttpStatus.BAD_REQUEST, "QUOTE_002", "수정 가능한 상태가 아닙니다."),
+    QUOTE_NOT_EXPIRED(HttpStatus.BAD_REQUEST, "QUOTE_003", "만료된 견적만 재작성할 수 있습니다."),
+    QUOTE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "QUOTE_004", "본인이 작성한 견적만 접근할 수 있습니다."),
+
+    // Customer
+    CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "CUSTOMER_001", "존재하지 않는 고객입니다."),
+
     // Common
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "입력값이 유효하지 않습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_999", "서버 내부 오류가 발생했습니다.");

@@ -12,6 +12,8 @@ import com.project.back.domain.quote.repository.QuoteApprovalReasonRepository;
 import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.user.entity.User;
+import com.project.back.global.exception.CustomException;
+import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -190,7 +192,7 @@ public class QuoteService {
         validateOwner(expired, requester);
 
         if (expired.getStatus() != QuoteStatus.EXPIRED) {
-            throw new IllegalStateException("만료된 견적만 재작성할 수 있습니다.");
+            throw new CustomException(ErrorCode.QUOTE_NOT_EXPIRED);
         }
 
         Long originalId = expired.getOriginalQuote() != null
@@ -246,25 +248,25 @@ public class QuoteService {
 
     private Customer getCustomerOrThrow(Long customerId) {
         return customerRepository.findById(customerId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 고객입니다. id=" + customerId));
+                .orElseThrow(() -> new CustomException(ErrorCode.CUSTOMER_NOT_FOUND));
     }
 
     private Quote getQuoteWithDetailsOrThrow(Long quoteId) {
         return quoteRepository.findByIdWithDetails(quoteId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 견적입니다. id=" + quoteId));
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
     }
 
     // 작성자 본인 여부 검증
     private void validateOwner(Quote quote, User requester) {
         if (!quote.getCreatedBy().getId().equals(requester.getId())) {
-            throw new IllegalStateException("본인이 작성한 견적만 접근할 수 있습니다.");
+            throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
         }
     }
 
     // 수정 가능 상태 검증 (DRAFT or REVISING)
     private void validateEditable(Quote quote) {
         if (quote.getStatus() != QuoteStatus.DRAFT && quote.getStatus() != QuoteStatus.REVISING) {
-            throw new IllegalStateException("수정 가능한 상태가 아닙니다. 현재 상태: " + quote.getStatus());
+            throw new CustomException(ErrorCode.QUOTE_NOT_EDITABLE);
         }
     }
 
