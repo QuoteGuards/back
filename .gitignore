@@ -42,6 +42,7 @@ out/
 .env
 application-local.yml
 application-secret.yml
+application.properties
 
 # ── 컴파일된 파일 ──
 *.class
