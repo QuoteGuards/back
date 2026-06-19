@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -53,7 +54,20 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
                         .requestMatchers("/api/admin/users/**").hasRole("SUPER_ADMIN")
+
+                        // 승인 요청 (영업사원만)
+                        .requestMatchers(HttpMethod.POST, "/api/quotes/*/approval-requests").hasRole("SALES_STAFF")
+                        .requestMatchers(HttpMethod.POST, "/api/quotes/*/resubmit").hasRole("SALES_STAFF")
+
+                        // 승인 이력/사유 조회 (인증된 사용자 전체)
+                        .requestMatchers(HttpMethod.GET, "/api/quotes/*/approval-histories").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/quotes/*/approval-reasons").authenticated()
+
+                        // 관리자 전용
                         .requestMatchers("/api/admin/approval-requests/**").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
+                        .requestMatchers("/api/admin/quotes/*/approve").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
+                        .requestMatchers("/api/admin/quotes/*/reject").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
+                        .requestMatchers("/api/admin/users/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/admin/dashboard/**").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/dashboard/me").authenticated()
                         .anyRequest().authenticated()

@@ -1,0 +1,29 @@
+package com.project.back.domain.approval.dto.response;
+
+import com.project.back.domain.approval.entity.QuoteApprovalReason;
+import lombok.Builder;
+import lombok.Getter;
+
+import java.time.LocalDateTime;
+
+@Getter
+@Builder
+public class ApprovalReasonResponse {
+
+    private Long id;
+    private Long quoteId;
+    private String reasonType;
+    private String reasonMessage;
+    private LocalDateTime createdAt;
+
+    // Entity → DTO 변환 메서드
+    public static ApprovalReasonResponse from(QuoteApprovalReason entity) {
+        return ApprovalReasonResponse.builder()
+                .id(entity.getId())
+                .quoteId(entity.getQuoteId())
+                .reasonType(entity.getReasonType().name())
+                .reasonMessage(entity.getReasonMessage())
+                .createdAt(entity.getCreatedAt())
+                .build();
+    }
+}
