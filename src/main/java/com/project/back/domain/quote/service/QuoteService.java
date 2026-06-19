@@ -3,6 +3,7 @@ package com.project.back.domain.quote.service;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.customer.repository.CustomerRepository;
 import com.project.back.domain.discount.entity.DiscountPolicy;
+import com.project.back.domain.training.service.TrainingService;
 import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.global.enums.QuoteStatus;
 import com.project.back.domain.quote.entity.Quote;
@@ -37,13 +38,9 @@ public class QuoteService {
     private final CustomerRepository customerRepository;
     private final QuoteCalculationService calculationService;
     private final ApprovalCheckService approvalCheckService;
+    private final TrainingService trainingService;
 
-    // ── 견적 작성 (임시저장 / 작성완료) ─────────────────
-
-    /**
-     * 견적 신규 작성 (임시저장)
-     * status = DRAFT, 금액 계산만 수행, 승인 판단 없음
-     */
+    //견적 신규 작성 (임시저장 / 작성완료)
     @Transactional
     public Quote saveDraft(User createdBy,
                            Long customerId,
@@ -52,6 +49,7 @@ public class QuoteService {
                            LocalDate validUntil,
                            List<QuoteItemCommand> itemCommands) {
 
+        validateTrainingCompleted(createdBy.getId());
         Customer customer = getCustomerOrThrow(customerId);
         DiscountPolicy policy = resolveDiscountPolicy(discountPolicyId);
 
@@ -76,12 +74,10 @@ public class QuoteService {
         return quote;
     }
 
-    /**
-     * 견적 작성완료 제출
-     * 승인 필요 여부 판단 → ApprovalReasonType 저장 → 상태 전이
-     */
+    //견적 작성완료 제출
     @Transactional
     public Quote submitQuote(Long quoteId, User requester) {
+        validateTrainingCompleted(requester.getId());
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
 
@@ -269,6 +265,13 @@ public class QuoteService {
     private void validateEditable(Quote quote) {
         if (quote.getStatus() != QuoteStatus.DRAFT && quote.getStatus() != QuoteStatus.REVISING) {
             throw new CustomException(ErrorCode.QUOTE_NOT_EDITABLE);
+        }
+    }
+
+    //교육 완료 검증
+    private void validateTrainingCompleted(Long userId) {
+        if (!trainingService.isTrainingCompleted(userId)) {
+            throw new CustomException(ErrorCode.TRAINING_NOT_COMPLETED);
         }
     }
 
