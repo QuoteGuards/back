@@ -88,7 +88,7 @@ public class CategoryService {
 
         // 연결된 제품이 있으면 삭제 불가
         long productCount = productRepository.countByCategoryId(id);
-        if (productCount > 0) {
+        if (productCount > MAX_DEPTH) {
             throw new CustomException(ErrorCode.CATEGORY_HAS_PRODUCTS);
         }
 
