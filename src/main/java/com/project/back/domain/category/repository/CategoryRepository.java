@@ -1,6 +1,6 @@
-package com.project.back.category.repository;
+package com.project.back.domain.category.repository;
 
-import com.project.back.category.entity.Category;
+import com.project.back.domain.category.entity.Category;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

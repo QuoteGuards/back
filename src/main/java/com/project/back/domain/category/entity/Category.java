@@ -1,4 +1,4 @@
-package com.project.back.category.entity;
+package com.project.back.domain.category.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -7,7 +7,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 @Entity
@@ -62,5 +61,20 @@ public class Category {
     @UpdateTimestamp
     @Column(nullable = false)
     private LocalDateTime updatedAt;
+
+
+    public void update(String name, String slug, int sortOrder) {
+        this.name = name;
+        this.slug = slug;
+        this.sortOrder = sortOrder;
+    }
+
+    public void deactivate() {
+        this.isActive = false;
+    }
+
+    public void activate() {
+        this.isActive = true;
+    }
 
 }
