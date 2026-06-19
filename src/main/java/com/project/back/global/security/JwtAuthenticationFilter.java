@@ -44,7 +44,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(token)) {
             try {
                 if (jwtTokenProvider.validateToken(token)) {    // 토큰 검증 성공 시
-                    String userId = jwtTokenProvider.getSubject(token);
+                    String subject = jwtTokenProvider.getSubject(token);
+                    Long userId = Long.parseLong(subject);
                     String role = jwtTokenProvider.getRole(token);
 
                     UsernamePasswordAuthenticationToken authentication =    // Authentication 발급
@@ -55,7 +56,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                             );
                     SecurityContextHolder.getContext().setAuthentication(authentication);   // 시큐리티 임시 저장소에 저장
                 }
-            } catch (CustomException e) {
+            } catch (CustomException | NumberFormatException e) {
                 log.warn("JWT authentication failed: {}", e.getMessage());
                 SecurityContextHolder.clearContext();
             }

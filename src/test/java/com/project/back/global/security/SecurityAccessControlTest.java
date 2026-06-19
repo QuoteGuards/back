@@ -1,6 +1,7 @@
 package com.project.back.global.security;
 
 import com.project.back.domain.auth.service.AuthService;
+import com.project.back.domain.user.service.UserManagementService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -35,6 +36,9 @@ class SecurityAccessControlTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private UserManagementService userManagementService;
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;

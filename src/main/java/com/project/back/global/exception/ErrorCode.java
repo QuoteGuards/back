@@ -17,6 +17,12 @@ public enum ErrorCode {
     USER_SUSPENDED(HttpStatus.FORBIDDEN, "AUTH_006", "정지된 계정입니다. 관리자에게 문의하세요."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "AUTH_007", "접근 권한이 없습니다."),
 
+    // User Management
+    USER_NOT_PENDING(HttpStatus.BAD_REQUEST, "USER_001", "승인 대기 중인 사용자만 승인/반려할 수 있습니다."),
+    CANNOT_MODIFY_SELF(HttpStatus.BAD_REQUEST, "USER_002", "자기 자신의 권한 변경 또는 비활성화는 불가합니다."),
+    USER_NOT_APPROVED(HttpStatus.BAD_REQUEST, "USER_003", "APPROVED 상태가 아닌 사용자는 비활성화할 수 없습니다."),
+    USER_NOT_SUSPENDED(HttpStatus.BAD_REQUEST, "USER_004", "SUSPENDED 상태가 아닌 사용자는 재활성화할 수 없습니다."),
+
     // JWT
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "JWT_001", "유효하지 않은 토큰입니다."),
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "JWT_002", "만료된 토큰입니다."),
