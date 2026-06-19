@@ -1,6 +1,7 @@
 package com.project.back.domain.quote.entity;
 
-import com.project.back.domain.discount.entity.DiscountPolicy;
+import om.p
+
 import com.project.back.global.enums.QuoteStatus;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.user.entity.User;
@@ -8,38 +9,31 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.utilimport ava.util.List;
 
 @Entity
 @Table(name = "quotes")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
 public class Quote {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "discount_policy_id")
-    private DiscountPolicy discountPolicy;
+    @GeneratedValue(strategy = GenerationType.IDEN     priate Long id;
+     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "discount_policy_id")     priate DiscountPolicy discountPolicy;
 
     @Column(name = "quote_number", nullable = false, unique = true, length = 50)
     private String quoteNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "customer_id", nullable = false)
-    private Customer customer;
+    @JoinColumn(name
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "created_by", nullable = false)
+     @ManyToOne(fetch=FetchType.LAZY)@JoinColumn(name="created_by", nullable = false)
     private User createdBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -47,17 +41,21 @@ public class Quote {
     private Quote originalQuote;
 
     @Column(name = "version_no", nullable = false)
-    @Builder.Default
-    private Integer versionNo = 1;
+    @Builder.Default    private Integer versionNo = 1;
 
     @Column(name = "is_latest", nullable = false)
     @Builder.Default
     private Boolean isLatest = true;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 30)
-    @Builder.Default
+    @Column(name = "status", nullable = false, leng    @Bulder.Default
     private QuoteStatus status = QuoteStatus.DRAFT;
+@Column(name = "sued_date")
+    private LocalDate issue
+
+        @Coumn( private LocalDat alidUntil;
+    @Column(name = "delivery_term", length = 100)
+    private String deliveryTerm;
 
     @Column(name = "subtotal", nullable = false, precision = 18, scale = 2)
     @Builder.Default
@@ -98,9 +96,6 @@ public class Quote {
     @Column(name = "internal_memo", columnDefinition = "TEXT")
     private String internalMemo;
 
-    @Column(name = "valid_until")
-    private LocalDate validUntil;
-
     @Column(name = "submitted_at")
     private LocalDateTime submittedAt;
 
@@ -129,14 +124,25 @@ public class Quote {
     @Builder.Default
     private List<QuoteApprovalReason> approvalReasons = new ArrayList<>();
 
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
+    }
+
     public void updateCalculation(BigDecimal subtotal, BigDecimal discountAmount,
                                   BigDecimal supplyAmount, BigDecimal taxAmount,
                                   BigDecimal totalAmount, BigDecimal totalCostAmount,
                                   BigDecimal expectedProfitAmount, BigDecimal profitRate) {
         this.subtotal = subtotal;
-        this.discountAmount = discountAmount;
-        this.supplyAmount = supplyAmount;
-        this.taxAmount = taxAmount;
+            ountAmount;
+            Amount;
+            ;
         this.totalAmount = totalAmount;
         this.totalCostAmount = totalCostAmount;
         this.expectedProfitAmount = expectedProfitAmount;
@@ -175,5 +181,11 @@ public class Quote {
 
     public void markAsNotLatest() {
         this.isLatest = false;
+    }
+
+    public void addItem(QuoteItem item) {
+        items.add(item);
+       
+
     }
 }

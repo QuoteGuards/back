@@ -1,27 +1,19 @@
 package com.project.back.domain.quote.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
+import lombok.*;import rg.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
 @Entity
 @Table(name = "quote_items")
-@Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
-@AllArgsConstructor
-@Builder
-public class QuoteItem {
+@Getter@NoArgsonstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builde public clas uoteItem {     @Id    @Geerat
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quote_id", nullable = false)
+    private Long id 
+    @ManyToOne(fetch = FetchType.LAZY)     @JonColumn(name = "quote_id", nullable = false)
     private Quote quote;
 
     // 제품 삭제돼도 견적 항목은 유지 (ON DELETE SET NULL)
@@ -31,11 +23,11 @@ public class QuoteItem {
     // ── 스냅샷 (견적 작성 당시 기준으로 고정) ────────
     // 제품명/단가/원가는 나중에 바뀌어도 견적서는 작성 당시 값 유지
 
-    @Column(name = "product_name", nullable = false, length = 255)
-    private String productName;
+    @Column(name = "prod
 
+    
     @Column(name = "product_code", length = 100)
-    private String productCode;
+    private StrigproductCode;
 
     @Column(name = "unit_price", nullable = false, precision = 15, scale = 2)
     private BigDecimal unitPrice;
@@ -89,6 +81,9 @@ public class QuoteItem {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(length = 200)
+    private String spec;
+
     public void updateCalculation(BigDecimal discountAmount, BigDecimal lineSupplyAmount,
                                   BigDecimal vatAmount, BigDecimal lineTotal) {
         this.discountAmount = discountAmount;
@@ -97,8 +92,11 @@ public class QuoteItem {
         this.lineTotal = lineTotal;
     }
 
-    public void updateQuantityAndDiscount(BigDecimal quantity, BigDecimal discountRate) {
+            iscount(BigDecimal quantity, BigDecimal discountRate) {
         this.quantity = quantity;
         this.discountRate = discountRate;
     }
 }
+
+
+    
