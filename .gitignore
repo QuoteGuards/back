@@ -43,6 +43,7 @@ out/
 application-local.yml
 application-secret.yml
 application.properties
+application-*.properties
 
 # ── 컴파일된 파일 ──
 *.class
