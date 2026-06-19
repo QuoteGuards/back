@@ -1,6 +1,6 @@
 package com.project.back.domain.auth.controller;
 
-import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import com.project.back.domain.auth.dto.response.LoginResponse;
 import com.project.back.domain.auth.dto.response.SignUpResponse;
 import com.project.back.domain.auth.service.AuthService;
@@ -33,7 +33,7 @@ class AuthControllerTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private ObjectMapper objectMapper;
+    private JsonMapper objectMapper;
 
     @MockitoBean
     private AuthService authService;
