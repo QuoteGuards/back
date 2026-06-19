@@ -3,6 +3,8 @@ package com.project.back.domain.customer.service;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.customer.repository.CustomerRepository;
 import com.project.back.domain.user.entity.User;
+import com.project.back.global.exception.CustomException;
+import com.project.back.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -82,8 +84,9 @@ class CustomerServiceTest {
             when(customerRepository.findById(999L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> customerService.getCustomer(999L))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("존재하지 않는 고객입니다");
+                    .isInstanceOf(CustomException.class)
+                    .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                            .isEqualTo(ErrorCode.CUSTOMER_NOT_FOUND));
         }
     }
 

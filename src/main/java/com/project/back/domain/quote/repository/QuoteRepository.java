@@ -22,9 +22,13 @@ public interface QuoteRepository extends JpaRepository<Quote, Long>, QuoteReposi
     @Query("SELECT DISTINCT q FROM Quote q " +
             "JOIN FETCH q.customer " +
             "LEFT JOIN FETCH q.items " +
-            "LEFT JOIN FETCH q.approvalReasons " +
             "WHERE q.id = :id")
     Optional<Quote> findByIdWithDetails(@Param("id") Long id);
+
+    @Query("SELECT DISTINCT q FROM Quote q " +
+            "LEFT JOIN FETCH q.approvalReasons " +
+            "WHERE q.id = :id")
+    Optional<Quote> findByIdWithApprovalReasons(@Param("id") Long id);
 
     // 원본 견적 기준 버전 이력 조회 (재사용/재작성 이력)
     List<Quote> findByOriginalQuoteIdOrderByVersionNoAsc(Long originalQuoteId);

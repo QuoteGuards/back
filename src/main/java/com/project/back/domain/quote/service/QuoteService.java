@@ -252,8 +252,10 @@ public class QuoteService {
     }
 
     private Quote getQuoteWithDetailsOrThrow(Long quoteId) {
-        return quoteRepository.findByIdWithDetails(quoteId)
+        Quote quote = quoteRepository.findByIdWithDetails(quoteId)
                 .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+        quoteRepository.findByIdWithApprovalReasons(quoteId);
+        return quote;
     }
 
     // 작성자 본인 여부 검증
