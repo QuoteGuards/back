@@ -15,6 +15,7 @@ public enum ErrorCode {
     USER_PENDING(HttpStatus.FORBIDDEN, "AUTH_004", "승인 대기 중인 계정입니다. 관리자 승인 후 이용 가능합니다."),
     USER_REJECTED(HttpStatus.FORBIDDEN, "AUTH_005", "거절된 계정입니다. 관리자에게 문의하세요."),
     USER_SUSPENDED(HttpStatus.FORBIDDEN, "AUTH_006", "정지된 계정입니다. 관리자에게 문의하세요."),
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "AUTH_007", "접근 권한이 없습니다."),
 
     // JWT
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "JWT_001", "유효하지 않은 토큰입니다."),

@@ -1,18 +1,15 @@
 package com.project.back.global.security;
 
-import tools.jackson.databind.ObjectMapper;
-import com.project.back.global.common.ApiResponse;
 import com.project.back.global.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.MediaType;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 
 /**
  * [JWT 인증 예외 처리기]
@@ -25,20 +22,15 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    private final ObjectMapper objectMapper;
+    private final SecurityErrorResponseWriter securityErrorResponseWriter;
 
+    // 토큰 검증에 실패하거나 토큰 없이 보호된 API에 접근하면 스프링 시큐리티가 이 commence 메서드를 강제로 호출
     @Override
-    public void commence(   // 토큰 검증에 실패하거나 토큰 없이 보호된 API에 접근하면 스프링 시큐리티가 이 commence 메서드를 강제로 호출
-            HttpServletRequest request,
-            HttpServletResponse response,
-            AuthenticationException authException
+    public void commence(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull AuthenticationException authException
     ) throws IOException {
-        ErrorCode errorCode = ErrorCode.INVALID_TOKEN;
-        response.setStatus(errorCode.getHttpStatus().value());
-        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
-
-        ApiResponse<Void> apiResponse = ApiResponse.fail(errorCode.getCode(), errorCode.getMessage());
-        response.getWriter().write(objectMapper.writeValueAsString(apiResponse));
+        securityErrorResponseWriter.write(response, ErrorCode.INVALID_TOKEN);
     }
 }

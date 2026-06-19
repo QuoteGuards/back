@@ -183,6 +183,7 @@ class AuthServiceTest {
 
     private User buildUser(UserStatus status) {
         return User.builder()
+                .id(1L)
                 .email("user@example.com")
                 .password("encodedPassword")
                 .name("테스터")
