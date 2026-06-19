@@ -11,6 +11,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -51,10 +52,10 @@ class SecurityAccessControlTest {
         void signUp_noAuth_permitted() throws Exception {
             mockMvc.perform(post("/api/auth/signup"))
                     .andExpect(result -> {
-                        int status = result.getResponse().getStatus();
                         // 401/403이 아니면 보안 통과 (400은 validation 실패, 허용됨)
-                        assert status != 401 : "signup should not return 401";
-                        assert status != 403 : "signup should not return 403";
+                        int status = result.getResponse().getStatus();
+                        assertThat(status).as("signup should not return 401").isNotEqualTo(401);
+                        assertThat(status).as("signup should not return 403").isNotEqualTo(403);
                     });
         }
 
@@ -64,8 +65,8 @@ class SecurityAccessControlTest {
             mockMvc.perform(post("/api/auth/login"))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
-                        assert status != 401 : "login should not return 401";
-                        assert status != 403 : "login should not return 403";
+                        assertThat(status).as("login should not return 401").isNotEqualTo(401);
+                        assertThat(status).as("login should not return 403").isNotEqualTo(403);
                     });
         }
     }
@@ -150,8 +151,8 @@ class SecurityAccessControlTest {
             mockMvc.perform(get("/api/admin/users/1"))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
-                        assert status != 401 : "SUPER_ADMIN should not get 401";
-                        assert status != 403 : "SUPER_ADMIN should not get 403";
+                        assertThat(status).as("SUPER_ADMIN should not get 401").isNotEqualTo(401);
+                        assertThat(status).as("SUPER_ADMIN should not get 403").isNotEqualTo(403);
                     });
         }
     }
@@ -170,6 +171,7 @@ class SecurityAccessControlTest {
         void approvalRequests_salesStaff_returns403() throws Exception {
             mockMvc.perform(get("/api/admin/approval-requests"))
                     .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.status").value("fail"))
                     .andExpect(jsonPath("$.code").value("AUTH_007"));
         }
 
@@ -180,8 +182,8 @@ class SecurityAccessControlTest {
             mockMvc.perform(get("/api/admin/approval-requests"))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
-                        assert status != 401 : "SALES_MANAGER should not get 401";
-                        assert status != 403 : "SALES_MANAGER should not get 403";
+                        assertThat(status).as("SALES_MANAGER should not get 401").isNotEqualTo(401);
+                        assertThat(status).as("SALES_MANAGER should not get 403").isNotEqualTo(403);
                     });
         }
 
@@ -192,7 +194,8 @@ class SecurityAccessControlTest {
             mockMvc.perform(get("/api/admin/approval-requests"))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
-                        assert status != 401 && status != 403;
+                        assertThat(status).isNotEqualTo(401);
+                        assertThat(status).isNotEqualTo(403);
                     });
         }
     }
@@ -207,6 +210,7 @@ class SecurityAccessControlTest {
         void adminDashboard_salesStaff_returns403() throws Exception {
             mockMvc.perform(get("/api/admin/dashboard/stats"))
                     .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.status").value("fail"))
                     .andExpect(jsonPath("$.code").value("AUTH_007"));
         }
 
@@ -217,7 +221,8 @@ class SecurityAccessControlTest {
             mockMvc.perform(get("/api/admin/dashboard/stats"))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
-                        assert status != 401 && status != 403;
+                        assertThat(status).isNotEqualTo(401);
+                        assertThat(status).isNotEqualTo(403);
                     });
         }
     }
@@ -237,8 +242,8 @@ class SecurityAccessControlTest {
             mockMvc.perform(get("/api/dashboard/me"))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
-                        assert status != 401 : "authenticated user should not get 401";
-                        assert status != 403 : "authenticated user should not get 403";
+                        assertThat(status).as("authenticated user should not get 401").isNotEqualTo(401);
+                        assertThat(status).as("authenticated user should not get 403").isNotEqualTo(403);
                     });
         }
 
@@ -249,7 +254,8 @@ class SecurityAccessControlTest {
             mockMvc.perform(get("/api/dashboard/me"))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
-                        assert status != 401 && status != 403;
+                        assertThat(status).isNotEqualTo(401);
+                        assertThat(status).isNotEqualTo(403);
                     });
         }
     }
