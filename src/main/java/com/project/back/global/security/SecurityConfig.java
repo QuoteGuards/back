@@ -53,6 +53,13 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
+
+                        // 사용자 통계 조회 (본인)
+                        .requestMatchers(HttpMethod.GET, "/api/users/me/stats").authenticated()
+
+                        // 관리자 사용자별 통계 조회 (SALES_MANAGER, SUPER_ADMIN) - 더 넓은 /api/admin/users/** 규칙보다 먼저 등록
+                        .requestMatchers(HttpMethod.GET, "/api/admin/users/*/stats").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
+
                         .requestMatchers("/api/admin/users/**").hasRole("SUPER_ADMIN")
 
                         // 승인 요청 (영업사원만)
