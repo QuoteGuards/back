@@ -36,8 +36,7 @@ public class QuotePdfGenerator {
     private static final DeviceRgb COLOR_TEXT_MUTED    = new DeviceRgb(0x88, 0x87, 0x80);
     private static final DeviceRgb COLOR_TEXT_BODY     = new DeviceRgb(0x2C, 0x2C, 0x2A);
 
-    private static final DateTimeFormatter DATE_FMT  = DateTimeFormatter.ofPattern("yyyy년 M월 d일");
-    private static final NumberFormat      NUMBER_FMT = NumberFormat.getInstance(Locale.KOREA);
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy년 M월 d일");
 
     public byte[] generate(QuotePdfData.QuoteInfo quote) throws IOException {
         try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -287,11 +286,11 @@ public class QuotePdfGenerator {
     }
 
     private String formatMoney(BigDecimal amount) {
-        return NUMBER_FMT.format(amount.longValue());
+        return NumberFormat.getInstance(Locale.KOREA).format(amount);
     }
 
     private String formatMoneyWon(BigDecimal amount) {
-        return "₩ " + NUMBER_FMT.format(amount.longValue());
+        return "₩ " + NumberFormat.getInstance(Locale.KOREA).format(amount);
     }
 
     private PdfFont loadFont(String path) throws IOException {
