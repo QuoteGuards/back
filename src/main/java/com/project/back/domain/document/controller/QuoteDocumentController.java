@@ -3,6 +3,8 @@ package com.project.back.domain.document.controller;
 import com.project.back.domain.document.dto.QuotePdfData;
 import com.project.back.domain.document.dto.QuotePdfRequest;
 import com.project.back.domain.document.service.QuoteDocumentService;
+import com.project.back.global.exception.CustomException;
+import com.project.back.global.exception.ErrorCode;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
@@ -24,9 +26,15 @@ public class QuoteDocumentController {
     @PostMapping("/quotes/pdf")
     public ResponseEntity<byte[]> downloadQuotePdf(
             @Valid @RequestBody QuotePdfRequest request
-    ) throws IOException {
+    ) {
 
-        QuotePdfData.DocumentResult result = quoteDocumentService.generatePdf(request);
+        QuotePdfData.DocumentResult result;
+
+        try {
+                result = quoteDocumentService.generatePdf(request);
+        } catch (IOException e) {
+                throw new CustomException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
