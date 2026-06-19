@@ -1,18 +1,19 @@
 package com.project.back.domain.quote.entity;
 
-import om.p
-
-import com.project.back.global.enums.QuoteStatus;
+import com.project.back.domain.discount.entity.DiscountPolicy;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.user.entity.User;
+import com.project.back.global.enums.QuoteStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.utilimport ava.util.List;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "quotes")
@@ -23,17 +24,28 @@ import java.utilimport ava.util.List;
 public class Quote {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDEN     priate Long id;
-     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "discount_policy_id")     priate DiscountPolicy discountPolicy;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "discount_policy_id")
+    private DiscountPolicy discountPolicy;
 
     @Column(name = "quote_number", nullable = false, unique = true, length = 50)
     private String quoteNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name
+    @JoinColumn(name = "customer_id", nullable = false)
+    private Customer customer;
 
-     @ManyToOne(fetch=FetchType.LAZY)@JoinColumn(name="created_by", nullable = false)
+    @Embedded
+    private QuoteCustomer quoteCustomer;
+
+    @Embedded
+    private QuoteCompany quoteCompany;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", nullable = false)
     private User createdBy;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -41,19 +53,24 @@ public class Quote {
     private Quote originalQuote;
 
     @Column(name = "version_no", nullable = false)
-    @Builder.Default    private Integer versionNo = 1;
+    @Builder.Default
+    private Integer versionNo = 1;
 
     @Column(name = "is_latest", nullable = false)
     @Builder.Default
     private Boolean isLatest = true;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, leng    @Bulder.Default
+    @Column(name = "status", nullable = false, length = 30)
+    @Builder.Default
     private QuoteStatus status = QuoteStatus.DRAFT;
-@Column(name = "sued_date")
-    private LocalDate issue
 
-        @Coumn( private LocalDat alidUntil;
+    @Column(name = "issued_date")
+    private LocalDate issuedDate;
+
+    @Column(name = "valid_until")
+    private LocalDate validUntil;
+
     @Column(name = "delivery_term", length = 100)
     private String deliveryTerm;
 
@@ -140,9 +157,9 @@ public class Quote {
                                   BigDecimal totalAmount, BigDecimal totalCostAmount,
                                   BigDecimal expectedProfitAmount, BigDecimal profitRate) {
         this.subtotal = subtotal;
-            ountAmount;
-            Amount;
-            ;
+        this.discountAmount = discountAmount;
+        this.supplyAmount = supplyAmount;
+        this.taxAmount = taxAmount;
         this.totalAmount = totalAmount;
         this.totalCostAmount = totalCostAmount;
         this.expectedProfitAmount = expectedProfitAmount;
@@ -185,7 +202,6 @@ public class Quote {
 
     public void addItem(QuoteItem item) {
         items.add(item);
-       
-
+        item.assignQuote(this);
     }
 }

@@ -1,59 +1,48 @@
 package com.project.back.domain.quote.repository;
 
-import om.p
-
 import com.project.back.domain.quote.entity.Quote;
-import com.project.back.domain.user.entity.User;import org.springframework.data.jpa.repository.JpaRepository;
+import com.project.back.domain.user.entity.User;
+import com.project.back.global.enums.QuoteStatus;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query
+import org.springframework.data.repository.query.Param;
+
 import java.util.List;
 import java.util.Optional;
 
 public interface QuoteRepository extends JpaRepository<Quote, Long>, QuoteRepositoryCustom {
 
-    // 내 견적 목록 (상태별 필터, 최신 버전만)
     List<Quote> findByCreatedByIdAndStatusAndIsLatestTrueOrderByCreatedAtDesc(
-           
+            Long userId, QuoteStatus status);
 
+    List<Quote> findByCreatedByIdAndIsLatestTrueOrderByCreatedAtDesc(Long userId);
 
+    List<Quote> findByCreatedByOrderByCreatedAtDesc(User createdBy);
 
-        List<Quote> findByCreatedBy
-        
-                         조회
+    List<Quote> findByOriginalQuoteIdOrderByVersionNoAsc(Long originalQuoteId);
 
-                "JOIN FETCH
-                "LEFT JOIN FETCH q.items " +
+    Optional<Quote> findByQuoteNumber(String quoteNumber);
 
-        Optional<Qu
-        
-                        SELECT DISTINCT q FROM Quo
-                        "LEFT JOIN FETCH q.approvalR
-                        "WHERE q.id = :id")
-        Optional<Quote> findByIdWithApprovalReasons(@Param("id") L
+    Optional<Quote> findByQuoteNumberAndCreatedBy(String quoteNumber, User createdBy);
 
-        // 원본 견적 기준 버전 이력 조회 (재사용/재작성 이력)
-                        te> findByOriginalQuoteIdOrderByVersio
-                        
-        // 견적번호로 조회 (중복 방지 체크용)
+    boolean existsByQuoteNumber(String quoteNumber);
 
-        
-        // 만료 처리 대상 조회 (배치 또는 스케줄러용)
+    @Query("SELECT DISTINCT q FROM Quote q " +
+            "JOIN FETCH q.customer " +
+            "LEFT JOIN FETCH q.items " +
+            "WHERE q.id = :id")
+    Optional<Quote> findByIdWithDetails(@Param("id") Long id);
 
-                "WHERE q.validU
-                "AND q.status IN :statuses")
+    @Query("SELECT DISTINCT q FROM Quote q " +
+            "LEFT JOIN FETCH q.approvalReasons " +
+            "WHERE q.id = :id")
+    Optional<Quote> findByIdWithApprovalReasons(@Param("id") Long id);
 
-        
-        List<Quote> findByCreatedByOrderB
-                        
-                        <Quote> findByQuoteNumber(St
-            Opt
+    @Query("SELECT q FROM Quote q " +
+            "WHERE q.validUntil < CURRENT_DATE " +
+            "AND q.status IN :statuses")
+    List<Quote> findExpiredQuotes(@Param("statuses") List<QuoteStatus> statuses);
 
-        
-
-                Optional<String> findMaxQuoteNumberByPrefix(@Param("prefix") Str
-
-                
-
-                
-
-                
+    @Query("SELECT MAX(q.quoteNumber) FROM Quote q WHERE q.quoteNumber LIKE :prefix%")
+    Optional<String> findMaxQuoteNumberByPrefix(@Param("prefix") String prefix);
+}

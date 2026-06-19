@@ -1,7 +1,6 @@
 package com.project.back.domain.quote.service;
 
-import om.p
-
+import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.customer.repository.CustomerRepository;
 import com.project.back.domain.discount.entity.DiscountPolicy;
 import com.project.back.domain.quote.dto.response.QuoteDetailResponse;
@@ -41,11 +40,14 @@ public class QuoteService {
     private final QuoteApprovalReasonRepository approvalReasonRepository;
     private final CustomerRepository customerRepository;
     private final QuoteCalculationService calculationService;
-    priate fin     priv      @Transactional
+    private final ApprovalCheckService approvalCheckService;
+    private final TrainingService trainingService;
 
+    @Transactional
     public Quote saveDraft(User createdBy,
                            Long customerId,
-                           Long discountPolicyId,                          String internalMemo,
+                           Long discountPolicyId,
+                           String internalMemo,
                            LocalDate validUntil,
                            List<QuoteItemCommand> itemCommands) {
 
@@ -53,14 +55,14 @@ public class QuoteService {
         Customer customer = getCustomerOrThrow(customerId);
         DiscountPolicy policy = resolveDiscountPolicy(discountPolicyId);
 
-         Quote quote = Quote.builder()
+        Quote quote = Quote.builder()
                 .createdBy(createdBy)
                 .customer(customer)
-            licy(policy)
-            r(generateQuoteNumber(
-            mo(internalMemo)
-            (validUntil)
-            teStatus.DRAFT)
+                .discountPolicy(policy)
+                .quoteNumber(generateQuoteNumber())
+                .internalMemo(internalMemo)
+                .validUntil(validUntil)
+                .status(QuoteStatus.DRAFT)
                 .build();
 
         quoteRepository.save(quote);
@@ -87,7 +89,7 @@ public class QuoteService {
         if (approvalRequired) saveApprovalReasons(quote, reasons);
 
         quote.complete(approvalRequired);
-         return quote;
+        return quote;
     }
 
     @Transactional
@@ -101,7 +103,8 @@ public class QuoteService {
 
         quote.updateInfo(getCustomerOrThrow(customerId), internalMemo, validUntil);
 
-        quoteItemRepository.deleteByQList<QuoteItem> items = buildItems(quote, itemCommands);
+        quoteItemRepository.deleteByQuoteId(quoteId);
+        List<QuoteItem> items = buildItems(quote, itemCommands);
         quoteItemRepository.saveAll(items);
         calculationService.calculate(quote, items);
 
@@ -115,14 +118,14 @@ public class QuoteService {
 
     public Quote getQuoteDetail(Long quoteId, User requester) {
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
-         validateOwner(quote, requester);
+        validateOwner(quote, requester);
         return quote;
     }
-            
-            nalysis(Long quo
-            eWithDetailsOrThrow(
-            requester);
-            
+
+    public Quote getInternalAnalysis(Long quoteId, User requester) {
+        Quote quote = getQuoteWithDetailsOrThrow(quoteId);
+        validateOwner(quote, requester);
+        return quote;
     }
 
     @Transactional
@@ -131,23 +134,25 @@ public class QuoteService {
         validateOwner(source, requester);
 
         Quote newQuote = Quote.builder()
-                .createdBy(requester).customer(source.getCustomer())
+                .createdBy(requester)
+                .customer(source.getCustomer())
                 .discountPolicy(source.getDiscountPolicy())
                 .quoteNumber(generateQuoteNumber())
                 .internalMemo(source.getInternalMemo())
                 .validUntil(source.getValidUntil())
-                .status(QuoteStatus.DRAFT).build();
+                .status(QuoteStatus.DRAFT)
+                .build();
 
         quoteRepository.save(newQuote);
         List<QuoteItem> copiedItems = copyItems(newQuote,
                 quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(sourceQuoteId));
-         quoteItemRepository.saveAll(copiedItems);
-        calculationService.calculate(newQuote, cop
-            
-            
-            
-            
-            
+        quoteItemRepository.saveAll(copiedItems);
+        calculationService.calculate(newQuote, copiedItems);
+
+        return newQuote;
+    }
+
+    @Transactional
     public Quote rewriteExpiredQuote(Long expiredQuoteId, User requester) {
         Quote expired = getQuoteWithDetailsOrThrow(expiredQuoteId);
         validateOwner(expired, requester);
@@ -158,21 +163,25 @@ public class QuoteService {
         Long originalId = expired.getOriginalQuote() != null
                 ? expired.getOriginalQuote().getId() : expired.getId();
 
-         int nextVersion = quoteRepository.findByOriginalQuoteIdOrderByVersionNoAsc(originalId)
+        int nextVersion = quoteRepository.findByOriginalQuoteIdOrderByVersionNoAsc(originalId)
                 .stream().mapToInt(Quote::getVersionNo).max().orElse(expired.getVersionNo()) + 1;
 
         expired.markAsNotLatest();
 
         Quote originalQuote = expired.getOriginalQuote() != null ? expired.getOriginalQuote() : expired;
 
-         Quote newQuote = Quote.builder()
-                .createdBy(requester).customer(expired.getCustomer())
+        Quote newQuote = Quote.builder()
+                .createdBy(requester)
+                .customer(expired.getCustomer())
                 .discountPolicy(expired.getDiscountPolicy())
                 .quoteNumber(generateQuoteNumber())
                 .internalMemo(expired.getInternalMemo())
                 .validUntil(LocalDate.now().plusMonths(1))
-                .status(QuoteStatus.DRAFT).versionNo(nextVersion).isLatest(true)
-                .originalQuote(originalQuote).build();
+                .status(QuoteStatus.DRAFT)
+                .versionNo(nextVersion)
+                .isLatest(true)
+                .originalQuote(originalQuote)
+                .build();
 
         quoteRepository.save(newQuote);
         List<QuoteItem> copiedItems = copyItems(newQuote,
@@ -187,13 +196,12 @@ public class QuoteService {
     @Transactional
     public void expireOverdueQuotes() {
         quoteRepository.findExpiredQuotes(
-                Arrays.asList(QuoteStatus.APPROVAL_NOT_REQUIRED, QuoteStatus.APPROVED))
+                        Arrays.asList(QuoteStatus.APPROVAL_NOT_REQUIRED, QuoteStatus.APPROVED))
                 .forEach(Quote::expire);
     }
 
-    // 5번 팀원 추가: 견적번호로 조회
     public QuoteDetailResponse getQuote(String quoteNumber, Long userId) {
-         User user = findUser(userId);
+        User user = findUser(userId);
         Quote quote = quoteRepository.findByQuoteNumberAndCreatedBy(quoteNumber, user)
                 .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
         return QuoteDetailResponse.from(quote);
@@ -238,21 +246,24 @@ public class QuoteService {
     }
 
     private DiscountPolicy resolveDiscountPolicy(Long policyId) {
-        return null; // Todo: DiscountPolicy 레포지토리 구현되면 변경
+        return null;
     }
 
     private List<QuoteItem> buildItems(Quote quote, List<QuoteItemCommand> commands) {
         int[] order = {0};
         return commands.stream()
-                 .map(cmd -> QuoteItem.builder()
-                        .quote(quote).productId(cmd.productId())
-                        .productName(cmd.productName()).productCode(cmd.productCode())
+                .map(cmd -> QuoteItem.builder()
+                        .quote(quote)
+                        .productId(cmd.productId())
+                        .productName(cmd.productName())
+                        .productCode(cmd.productCode())
                         .unitPrice(cmd.unitPrice())
                         .costPrice(cmd.costPrice() != null ? cmd.costPrice() : BigDecimal.ZERO)
                         .quantity(cmd.quantity())
                         .discountRate(cmd.discountRate() != null ? cmd.discountRate() : BigDecimal.ZERO)
                         .vatApplicable(cmd.vatApplicable() != null ? cmd.vatApplicable() : true)
-                        .sortOrder(order[0]++).build())
+                        .sortOrder(order[0]++)
+                        .build())
                 .toList();
     }
 
@@ -260,19 +271,27 @@ public class QuoteService {
         int[] order = {0};
         return sourceItems.stream()
                 .map(src -> QuoteItem.builder()
-                        .quote(newQuote).productId(src.getProductId())
-                        .productName(src.getProductName()).productCode(src.getProductCode())
-                        .unitPrice(src.getUnitPrice()).costPrice(src.getCostPrice())
-                        .quantity(src.getQuantity()).discountRate(src.getDiscountRate())
-                        .vatApplicable(src.getVatApplicable()).sortOrder(order[0]++).build())
+                        .quote(newQuote)
+                        .productId(src.getProductId())
+                        .productName(src.getProductName())
+                        .productCode(src.getProductCode())
+                        .unitPrice(src.getUnitPrice())
+                        .costPrice(src.getCostPrice())
+                        .quantity(src.getQuantity())
+                        .discountRate(src.getDiscountRate())
+                        .vatApplicable(src.getVatApplicable())
+                        .sortOrder(order[0]++)
+                        .build())
                 .toList();
     }
 
     private void saveApprovalReasons(Quote quote, List<ApprovalReasonType> reasons) {
         approvalReasonRepository.saveAll(reasons.stream()
                 .map(reason -> QuoteApprovalReason.builder()
-                        .quote(quote).reasonType(reason)
-                        .reasonMessage(defaultMessage(reason, quote)).build())
+                        .quote(quote)
+                        .reasonType(reason)
+                        .reasonMessage(defaultMessage(reason, quote))
+                        .build())
                 .toList());
     }
 
@@ -280,7 +299,7 @@ public class QuoteService {
         return switch (reason) {
             case DISCOUNT_EXCEEDED -> "적용 할인율이 정책 허용치를 초과합니다.";
             case LOW_PROFIT -> String.format("이익률 %.2f%%가 최소 기준 미만입니다.", quote.getProfitRate());
-             case HIGH_AMOUNT -> String.format("견적 총금액 %,.0f원이 승인 기준금액을 초과합니다.",
+            case HIGH_AMOUNT -> String.format("견적 총금액 %,.0f원이 승인 기준금액을 초과합니다.",
                     quote.getTotalAmount().doubleValue());
         };
     }
@@ -295,9 +314,4 @@ public class QuoteService {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
-}    
-
-     
-    
-
-    
+}
