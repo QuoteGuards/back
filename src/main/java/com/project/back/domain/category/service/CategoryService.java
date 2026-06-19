@@ -30,10 +30,11 @@ public class CategoryService {
     //// 카테고리 crud
     // 전체 분류 트리로 조회(비활성화 포함)
     @Transactional(readOnly=true)
-    public List<CategoryTreeResponse> getCategoryTree(){
+    public List<CategoryTreeResponse> getCategoryList(){
         List<Category> all = categoryRepository.findAllWithParent();
         return buildTree(all);
     }
+
 
     // 특정 부모 분류의 활성된 자식들 목록(드릴다운)
     @Transactional(readOnly=true)

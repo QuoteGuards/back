@@ -11,22 +11,18 @@ import java.util.Optional;
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     //// 카테고리 관리 화면에서
-    // 전체 대분류 조회(활성, 비활성 모두 포함해서)
-    List<Category> findAllByParentIsNullOrderBySortOrder();
 
-    // 특정 부모 카테고리의 하위 카테고리 조회(활성, 비활성 모두 포함)
-    List<Category> findAllByParentIdOrderBySortOrder(Long parentId);
+    // 카테고리 조회
+    // 전체 카테고리를 한 번에 가져와서 Service에서 트리로 조립
+    // (분류 클릭시마다 호출을 막기 위해)
+    @Query("SELECT c FROM Category c LEFT JOIN FETCH c.parent ORDER BY c.depth, c.sortOrder")
+    List<Category> findAllWithParent();
 
     // slug 중복 검사 (카테고리 식별 코드 중복 검사)
     boolean existsBySlug(String slug);
 
     // 수정 시 본인 제외 slug 중복 검사
     boolean existsBySlugAndIdNot(String slug, Long id);
-
-    // 전체 카테고리를 한 번에 가져와서 Service에서 트리로 조립
-    // (분류 클릭시마다 호출을 막기 위해)
-    @Query("SELECT c FROM Category c LEFT JOIN FETCH c.parent ORDER BY c.depth, c.sortOrder")
-    List<Category> findAllWithParent();
 
     // 비활성화 처리 위해 자식 카테고리까지 한 번에 로딩
     @Query("""
@@ -47,6 +43,5 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
 
     ///  이 외 필요시 아래에 추가하기
-
 
 }
