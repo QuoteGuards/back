@@ -44,7 +44,7 @@ class JwtTokenProviderTest {
     @Test
     @DisplayName("만료된 토큰 - EXPIRED_TOKEN 예외")
     void parseExpiredToken() {
-        JwtTokenProvider expiredProvider = new JwtTokenProvider(SECRET, 0L); // 즉시 만료
+        JwtTokenProvider expiredProvider = new JwtTokenProvider(SECRET, -1L); // 과거 만료
         String token = expiredProvider.createAccessToken(1L, "user@example.com", "SALES_STAFF");
 
         assertThatThrownBy(() -> expiredProvider.parseToken(token))
