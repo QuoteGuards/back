@@ -27,6 +27,12 @@ public record QuotePdfRequest(
         String internalMemo
 
 ) {
+
+    @AssertTrue(message = "validUntil must be on or after issuedDate")
+    private boolean isValidDateRange() {
+        return issuedDate == null || validUntil == null || !validUntil.isBefore(issuedDate);
+    }
+
     public record CustomerRequest(
             @NotBlank String companyName,
             @NotBlank String contactName,
