@@ -36,6 +36,8 @@ public class AuthService {
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .name(request.getName())
+                .department(request.getDepartment())
+                .position(request.getPosition())
                 .phone(request.getPhone())
                 .build();
 
@@ -43,7 +45,7 @@ public class AuthService {
     }
 
     // 로그인
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(LoginRequest request) {
         // 1. 이메일로 유저 찾기
         User user = userRepository.findByEmail(request.getEmail())
@@ -57,7 +59,10 @@ public class AuthService {
         // 3. 유저 상태 검사 (정지된 유저인지, 승인 대기 유저인지 등)
         validateUserStatus(user.getStatus());
 
-        // 4. JWT 액세스 토큰 발행
+        // 4. 마지막 로그인 일시 기록
+        user.updateLastLoginAt();
+
+        // 5. JWT 액세스 토큰 발행
         String accessToken = jwtTokenProvider.createAccessToken(
                 user.getId(),
                 user.getEmail(),
