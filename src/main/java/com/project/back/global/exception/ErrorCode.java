@@ -40,6 +40,9 @@ public enum ErrorCode {
     TRAINING_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "TRAINING_001", "교육 콘텐츠를 찾을 수 없습니다."),
     TRAINING_NOT_COMPLETED(HttpStatus.FORBIDDEN, "TRAINING_002", "필수 교육을 이수해야 견적을 작성할 수 있습니다."),
 
+    // User Stats
+    USER_STATS_NOT_FOUND(HttpStatus.NOT_FOUND, "STATS_001", "해당 사용자의 통계 데이터가 없습니다."),
+
     // Common
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "입력값이 유효하지 않습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_999", "서버 내부 오류가 발생했습니다.");
