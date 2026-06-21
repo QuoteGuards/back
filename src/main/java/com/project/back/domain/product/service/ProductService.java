@@ -101,7 +101,10 @@ public class ProductService {
     // 제품 삭제
     @Transactional
     public void delete(Long productId) {
-        productRepository.delete(findById(productId));
+        Product product = findById(productId);
+        // 삭제 전에 즐겨찾기도 모두 삭제
+        productFavoriteRepository.deleteAllByProductId(productId);
+        productRepository.delete(product);
     }
 
     //// 영업사원
@@ -109,7 +112,7 @@ public class ProductService {
     public Page<ProductSearchResponse> searchProducts(
             Long categoryId, String keyword, Long userId, Pageable pageable) {
 
-        Set<Long> favoriteIds = productFavoriteRepository.findProductIdByUserId(userId);
+        Set<Long> favoriteIds = productFavoriteRepository.findProductIdsByUserId(userId);
 
         return productRepository.findAllWithFilters(categoryId, keyword, true, pageable)
                 .map(product -> ProductSearchResponse.of(
@@ -127,7 +130,6 @@ public class ProductService {
         boolean isFavorite = productFavoriteRepository.existsByUserIdAndProductId(userId, productId);
         return ProductSearchResponse.of(product, isFavorite);
     }
-
 
 
     private Product findById(Long productId) {

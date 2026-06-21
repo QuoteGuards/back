@@ -85,7 +85,8 @@ public class CategoryService {
     // 삭제
     @Transactional
     public void delete(Long id) {
-        Category category = findById(id);
+        Category category = categoryRepository.findWithChildrenById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
 
         // 연결된 제품이 있으면 삭제 불가
         long productCount = productRepository.countByCategoryId(id);
@@ -96,8 +97,14 @@ public class CategoryService {
 
         // 하위 카테고리에 연결된 제품도 확인
         boolean childHasProducts = category.getChildren().stream()
-                .anyMatch(child -> productRepository.countByCategoryId(child.getId()) > 0);
-        if (childHasProducts) {
+                .anyMatch(child -> {
+                    if (productRepository.countByCategoryId(child.getId()) > 0) return true;
+                    return child.getChildren().stream()
+                            .anyMatch(grandChild -> productRepository.countByCategoryId(grandChild.getId()) > 0);
+                });
+
+        // 하위 분류에 제품이 있으면 삭제 불가하게끔
+        if(childHasProducts) {
             throw new CustomException(ErrorCode.CATEGORY_HAS_PRODUCTS);
         }
 
