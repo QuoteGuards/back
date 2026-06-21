@@ -19,6 +19,7 @@ public class CategoryTreeResponse {
     private int depth;
     private int sortOrder;
     private boolean isActive;
+    private long productCount;
 
     @Builder.Default
     private List<CategoryTreeResponse> children = new ArrayList<>();
@@ -27,7 +28,7 @@ public class CategoryTreeResponse {
         this.children.add(child);
     }
 
-    public static CategoryTreeResponse from(Category category) {
+    public static CategoryTreeResponse from(Category category, long productCount) {
         return CategoryTreeResponse.builder()
                 .id(category.getId())
                 .parentId(category.getParent() != null ? category.getParent().getId() : null)
@@ -36,9 +37,7 @@ public class CategoryTreeResponse {
                 .depth(category.getDepth())
                 .sortOrder(category.getSortOrder())
                 .isActive(category.isActive())
+                .productCount(productCount)
                 .build();
     }
-
-
-
 }

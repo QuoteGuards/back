@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
     // 단순 crud
@@ -35,5 +37,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // 카테고리 삭제시에 연결되어 있는 제품 수 확인
     // 카테고리 로직에서 사용함
     long countByCategoryId(Long categoryId);
+
+    // 카테고리 목록 조회 시 각 카테고리의 제품 수 일괄 조회
+    @Query("SELECT p.category.id, COUNT(p) FROM Product p GROUP BY p.category.id")
+    List<Object[]> countGroupByCategoryId();
 
 }

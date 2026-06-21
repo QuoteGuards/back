@@ -1,6 +1,9 @@
 package com.project.back.domain.product.repository;
 
+import com.project.back.domain.product.entity.Product;
 import com.project.back.domain.product.entity.ProductFavorite;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -24,4 +27,8 @@ public interface ProductFavoriteRepository extends JpaRepository<ProductFavorite
     @Modifying
     @Query("DELETE FROM ProductFavorite pf WHERE pf.product.id = :productId")
     void deleteAllByProductId(@Param("productId") Long productId);
+
+    @Query(value = "SELECT pf.product FROM ProductFavorite pf JOIN FETCH pf.product.category WHERE pf.user.id = :userId AND pf.product.isActive = true",
+            countQuery = "SELECT COUNT(pf) FROM ProductFavorite pf WHERE pf.user.id = :userId AND pf.product.isActive = true")
+    Page<Product> findActiveProductsByUserId(@Param("userId") Long userId, Pageable pageable);
 }

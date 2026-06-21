@@ -125,6 +125,12 @@ public class ProductService {
     @Transactional
     public ProductSearchResponse getProductDetail(Long productId, Long userId) {
         Product product = findById(productId);
+
+        if (!product.isActive()) {
+            throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
+
+
         product.increaseViewCount();
 
         boolean isFavorite = productFavoriteRepository.existsByUserIdAndProductId(userId, productId);
