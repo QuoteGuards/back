@@ -6,6 +6,7 @@ import com.project.back.domain.category.dto.response.CategoryResponse;
 import com.project.back.domain.category.dto.response.CategoryTreeResponse;
 import com.project.back.domain.category.entity.Category;
 import com.project.back.domain.category.repository.CategoryRepository;
+import com.project.back.domain.product.repository.ProductRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ import java.util.Map;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
-    // private final ProductRepository productRepository;
+    private final ProductRepository productRepository;
 
     // 카테고리 깊이 최대 3(1=대분류,2=중분류,3=소분류)
     private static final int MAX_DEPTH=3;
@@ -88,7 +89,8 @@ public class CategoryService {
 
         // 연결된 제품이 있으면 삭제 불가
         long productCount = productRepository.countByCategoryId(id);
-        if (productCount > MAX_DEPTH) {
+        // 수정, max_depth는 카테고리 분류 확인할때 사용
+        if (productCount > 0) {
             throw new CustomException(ErrorCode.CATEGORY_HAS_PRODUCTS);
         }
 

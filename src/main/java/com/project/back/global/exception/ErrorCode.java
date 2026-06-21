@@ -33,6 +33,10 @@ public enum ErrorCode {
     CATEGORY_HAS_PRODUCTS(HttpStatus.CONFLICT, "CAT_003", "연결된 제품이 있어 삭제할 수 없습니다."),
     DUPLICATE_SLUG(HttpStatus.CONFLICT, "CAT_004", "이미 사용 중인 슬러그입니다."),
 
+    // Product
+    PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PROD_001", "제품을 찾을 수 없습니다."),
+    DUPLICATE_PRODUCT_CODE(HttpStatus.CONFLICT, "PROD_002", "이미 사용 중인 제품 코드입니다."),
+
     // Quote
     QUOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "QUOTE_001", "견적서를 찾을 수 없습니다."),
 

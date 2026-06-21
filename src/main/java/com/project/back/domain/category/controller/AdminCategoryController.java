@@ -53,7 +53,7 @@ public class AdminCategoryController {
 
     // 카테고리 활성화
     @PatchMapping("/{categoryId}/activate")
-    public ResponseEntity<ApiResponse<CategoryResponse>> activate(
+    public ResponseEntity<ApiResponse<Void>> activate(
             @PathVariable Long categoryId){
         categoryService.activate(categoryId);
         return ResponseEntity
@@ -62,7 +62,7 @@ public class AdminCategoryController {
 
     // 카테고리 비활성화
     @PatchMapping("/{categoryId}/deactivate")
-    public ResponseEntity<ApiResponse<CategoryResponse>> deactivate(
+    public ResponseEntity<ApiResponse<Void>> deactivate(
             @PathVariable Long categoryId){
         categoryService.deactivate(categoryId);
         return ResponseEntity
