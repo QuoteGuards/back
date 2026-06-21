@@ -5,12 +5,11 @@ import lombok.Builder;
 import lombok.Getter;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
-// 관리자용 제품 response
+// 영업사원용 제품 response
 @Getter
 @Builder
-public class ProductResponse {
+public class ProductSearchResponse {
 
     private Long id;
     private Long categoryId;
@@ -21,16 +20,12 @@ public class ProductResponse {
     private String spec;
     private String imageUrl;
     private BigDecimal unitPrice;
-    private BigDecimal costPrice;
     private String unit;
     private boolean vatApplicable;
-    private boolean isActive;
-    private int viewCount;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    private boolean isFavorite;
 
-    public static ProductResponse from(Product product) {
-        return ProductResponse.builder()
+    public static ProductSearchResponse of(Product product, boolean isFavorite) {
+        return ProductSearchResponse.builder()
                 .id(product.getId())
                 .categoryId(product.getCategory().getId())
                 .categoryName(product.getCategory().getName())
@@ -40,13 +35,9 @@ public class ProductResponse {
                 .spec(product.getSpec())
                 .imageUrl(product.getImageUrl())
                 .unitPrice(product.getUnitPrice())
-                .costPrice(product.getCostPrice())
                 .unit(product.getUnit())
                 .vatApplicable(product.isVatApplicable())
-                .isActive(product.isActive())
-                .viewCount(product.getViewCount())
-                .createdAt(product.getCreatedAt())
-                .updatedAt(product.getUpdatedAt())
+                .isFavorite(isFavorite)
                 .build();
     }
 }

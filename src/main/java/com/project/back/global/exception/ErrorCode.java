@@ -37,6 +37,10 @@ public enum ErrorCode {
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PROD_001", "제품을 찾을 수 없습니다."),
     DUPLICATE_PRODUCT_CODE(HttpStatus.CONFLICT, "PROD_002", "이미 사용 중인 제품 코드입니다."),
 
+    // Favorite
+    FAVORITE_ALREADY_EXISTS(HttpStatus.CONFLICT, "FAV_001", "이미 즐겨찾기한 제품입니다."),
+    FAVORITE_NOT_FOUND(HttpStatus.NOT_FOUND, "FAV_002", "즐겨찾기 내역을 찾을 수 없습니다."),
+
     // Quote
     QUOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "QUOTE_001", "견적서를 찾을 수 없습니다."),
 

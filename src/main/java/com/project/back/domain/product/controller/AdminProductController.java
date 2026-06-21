@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+// 관리자용
 @RestController
 @RequestMapping("/api/admin/products")
 @PreAuthorize("hasRole('SUPER_ADMIN')")

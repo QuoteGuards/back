@@ -5,7 +5,9 @@ import com.project.back.domain.category.repository.CategoryRepository;
 import com.project.back.domain.product.dto.request.ProductCreateRequest;
 import com.project.back.domain.product.dto.request.ProductUpdateRequest;
 import com.project.back.domain.product.dto.response.ProductResponse;
+import com.project.back.domain.product.dto.response.ProductSearchResponse;
 import com.project.back.domain.product.entity.Product;
+import com.project.back.domain.product.repository.ProductFavoriteRepository;
 import com.project.back.domain.product.repository.ProductRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
@@ -15,6 +17,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Set;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -22,7 +26,9 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
+    private final ProductFavoriteRepository productFavoriteRepository;
 
+    //// 최고 관리자
     // 제품 목록 조회
     public Page<ProductResponse> getProductList(Long categoryId, String keyword, Boolean isActive, Pageable pageable) {
         return productRepository.findAllWithFilters(categoryId, keyword, isActive, pageable)
@@ -97,6 +103,32 @@ public class ProductService {
     public void delete(Long productId) {
         productRepository.delete(findById(productId));
     }
+
+    //// 영업사원
+    // 영업사원 제품 목록 조회(활성화된 제품만 검색, 즐겨찾기 표시)
+    public Page<ProductSearchResponse> searchProducts(
+            Long categoryId, String keyword, Long userId, Pageable pageable) {
+
+        Set<Long> favoriteIds = productFavoriteRepository.findProductIdByUserId(userId);
+
+        return productRepository.findAllWithFilters(categoryId, keyword, true, pageable)
+                .map(product -> ProductSearchResponse.of(
+                        product,
+                        favoriteIds.contains(product.getId())
+                ));
+    }
+
+    // 영업사원용 제품 상세 조회 (viewCount 증가 + 즐겨찾기 여부)
+    @Transactional
+    public ProductSearchResponse getProductDetail(Long productId, Long userId) {
+        Product product = findById(productId);
+        product.increaseViewCount();
+
+        boolean isFavorite = productFavoriteRepository.existsByUserIdAndProductId(userId, productId);
+        return ProductSearchResponse.of(product, isFavorite);
+    }
+
+
 
     private Product findById(Long productId) {
         return productRepository.findById(productId)
