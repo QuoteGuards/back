@@ -33,7 +33,7 @@ public class QuoteController {
     // 견적작성 및 임시저장
     @PostMapping
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> createQuote(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @RequestBody @Valid QuoteCreateRequest request) {
 
         Quote quote = quoteService.saveDraft(
@@ -41,7 +41,9 @@ public class QuoteController {
                 request.customerId(),
                 request.discountPolicyId(),
                 request.internalMemo(),
+                request.issuedDate(),       // 추가
                 request.validUntil(),
+                request.deliveryTerm(),     // 추가
                 toCommands(request.items()));
         return ResponseEntity.ok(ApiResponse.success("임시저장되었습니다.", QuoteDetailResponse.from(quote)));
     }
@@ -49,7 +51,7 @@ public class QuoteController {
     // 견적 작성 완료 및 승인 필요 판단
     @PostMapping("/{quoteId}/complete")
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> completeQuote(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long quoteId) {
 
         Quote quote = quoteService.submitQuote(quoteId, getUser(userId));
@@ -59,7 +61,7 @@ public class QuoteController {
     // 견적 수정 (DRAFT / REVISING 상태만 가능)
     @PatchMapping("/{quoteId}")
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> updateQuote(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long quoteId,
             @RequestBody @Valid QuoteUpdateRequest request) {
 
@@ -68,7 +70,9 @@ public class QuoteController {
                 getUser(userId),
                 request.customerId(),
                 request.internalMemo(),
+                request.issuedDate(),       // 추가
                 request.validUntil(),
+                request.deliveryTerm(),     // 추가
                 toCommands(request.items()));
         return ResponseEntity.ok(ApiResponse.success("견적이 수정되었습니다.", QuoteDetailResponse.from(quote)));
     }
@@ -76,7 +80,7 @@ public class QuoteController {
     // 내 견적 목록 (다중 조건 검색)
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<List<QuoteListResponse>>> getMyQuotes(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @RequestParam(required = false) QuoteStatus status,
             @RequestParam(required = false) String customerName,
             @RequestParam(required = false) String quoteNumber,
@@ -84,7 +88,7 @@ public class QuoteController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
 
         List<QuoteListResponse> result = quoteService
-                .searchMyQuotes(Long.parseLong(userId), status, customerName, quoteNumber, from, to)
+                .searchMyQuotes(userId, status, customerName, quoteNumber, from, to)
                 .stream()
                 .map(QuoteListResponse::from)
                 .toList();
@@ -94,7 +98,7 @@ public class QuoteController {
     // 견적 상세 조회
     @GetMapping("/{quoteId}")
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> getQuoteDetail(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long quoteId) {
 
         Quote quote = quoteService.getQuoteDetail(quoteId, getUser(userId));
@@ -104,7 +108,7 @@ public class QuoteController {
     // 내부 견적 분석 조회 (원가/이익률 포함)
     @GetMapping("/{quoteId}/internal-analysis")
     public ResponseEntity<ApiResponse<QuoteInternalAnalysisResponse>> getInternalAnalysis(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long quoteId) {
 
         Quote quote = quoteService.getInternalAnalysis(quoteId, getUser(userId));
@@ -114,7 +118,7 @@ public class QuoteController {
     // 최근 견적 재사용
     @PostMapping("/{quoteId}/reuse")
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> reuseQuote(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long quoteId) {
 
         Quote quote = quoteService.reuseQuote(quoteId, getUser(userId));
@@ -124,15 +128,15 @@ public class QuoteController {
     // 만료 견적 재작성 (버전 증가)
     @PostMapping("/{quoteId}/rewrite")
     public ResponseEntity<ApiResponse<QuoteDetailResponse>> rewriteQuote(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long quoteId) {
 
         Quote quote = quoteService.rewriteExpiredQuote(quoteId, getUser(userId));
         return ResponseEntity.ok(ApiResponse.success("견적이 재작성되었습니다.", QuoteDetailResponse.from(quote)));
     }
 
-    private User getUser(String userId) {
-        return userRepository.findById(Long.parseLong(userId))
+    private User getUser(Long userId) {
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
     }
 
@@ -142,6 +146,7 @@ public class QuoteController {
                         i.productId(),
                         i.productName(),
                         i.productCode(),
+                        i.spec(),           // 추가
                         i.unitPrice(),
                         i.costPrice(),
                         i.quantity(),
@@ -150,10 +155,12 @@ public class QuoteController {
                 .toList();
     }
 
-    @GetMapping("/{quoteNumber}")
+    // 견적번호로 견적 조회 (PDF/문서 발행용)
+    // /{quoteId}/...와 경로 패턴 충돌 방지를 위해 /number/{quoteNumber}로 분리
+    @GetMapping("/number/{quoteNumber}")
     public ResponseEntity<QuoteDetailResponse> getQuote(
             @PathVariable String quoteNumber,
-            @AuthenticationPrincipal String userId) {
-        return ResponseEntity.ok(quoteService.getQuote(quoteNumber, Long.parseLong(userId)));
+            @AuthenticationPrincipal Long userId) {
+        return ResponseEntity.ok(quoteService.getQuote(quoteNumber, userId));
     }
 }

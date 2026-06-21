@@ -3,11 +3,15 @@ package com.project.back.domain.quote.service;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.customer.repository.CustomerRepository;
 import com.project.back.domain.discount.entity.DiscountPolicy;
+// 💡 TODO: [2번 팀원 리포지토리 완료 시 변경할 곳] 아래 임시 레포지토리 패키지 경로를 팀원의 실제 경로로 맞추거나 주석을 해제하세요.
+// import com.project.back.domain.discount.repository.DiscountPolicyRepository;
 import com.project.back.domain.quote.dto.response.QuoteDetailResponse;
 import com.project.back.domain.quote.entity.Quote;
-import com.project.back.domain.quote.entity.QuoteApprovalReason;
+import com.project.back.domain.approval.entity.QuoteApprovalReason;
 import com.project.back.domain.quote.entity.QuoteItem;
-import com.project.back.domain.quote.repository.QuoteApprovalReasonRepository;
+import com.project.back.domain.quote.entity.QuoteCustomer;
+import com.project.back.domain.quote.entity.QuoteCompany;
+import com.project.back.domain.approval.repository.QuoteApprovalReasonRepository;
 import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.training.service.TrainingService;
@@ -43,17 +47,40 @@ public class QuoteService {
     private final ApprovalCheckService approvalCheckService;
     private final TrainingService trainingService;
 
+    // 💡 TODO: [제품 팀원 리포지토리 완료 시 변경할 곳] 2번 팀원이 DiscountPolicyRepository를 주입할 수 있게 선언해주면 주석을 해제
+    // private final DiscountPolicyRepository discountPolicyRepository;
+
     @Transactional
     public Quote saveDraft(User createdBy,
                            Long customerId,
                            Long discountPolicyId,
                            String internalMemo,
+                           LocalDate issuedDate,
                            LocalDate validUntil,
+                           String deliveryTerm,
                            List<QuoteItemCommand> itemCommands) {
 
         validateTrainingCompleted(createdBy.getId());
         Customer customer = getCustomerOrThrow(customerId);
         DiscountPolicy policy = resolveDiscountPolicy(discountPolicyId);
+
+        //원본 고객 엔티티 데이터 복사 후 발행 시점 박제용 스냅샷 생성
+        QuoteCustomer customerSnapshot = QuoteCustomer.builder()
+                .companyName(customer.getCompanyName())
+                .contactName(customer.getContactName())
+                .email(customer.getEmail())
+                .phone(customer.getPhone())
+                .address(customer.getAddress())
+                .build();
+
+        //자사 정보 고정 스냅샷 생성
+        QuoteCompany companySnapshot = QuoteCompany.builder()
+                .name("QuoteGuard 주식회사")
+                .businessNumber("123-45-67890")
+                .email("sales-support@quoteguard.com")
+                .phone("02-555-1234")
+                .address("서울특별시 소프트구 21길 4년제빌딩 3층")
+                .build();
 
         Quote quote = Quote.builder()
                 .createdBy(createdBy)
@@ -61,8 +88,12 @@ public class QuoteService {
                 .discountPolicy(policy)
                 .quoteNumber(generateQuoteNumber())
                 .internalMemo(internalMemo)
+                .issuedDate(issuedDate)
                 .validUntil(validUntil)
+                .deliveryTerm(deliveryTerm)
                 .status(QuoteStatus.DRAFT)
+                .quoteCustomer(customerSnapshot)
+                .company(companySnapshot)
                 .build();
 
         quoteRepository.save(quote);
@@ -94,14 +125,19 @@ public class QuoteService {
 
     @Transactional
     public Quote updateQuote(Long quoteId, User requester, Long customerId,
-                             String internalMemo, LocalDate validUntil,
+                             String internalMemo,
+                             LocalDate issuedDate,
+                             LocalDate validUntil,
+                             String deliveryTerm,
                              List<QuoteItemCommand> itemCommands) {
 
+        validateTrainingCompleted(requester.getId());
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
         validateEditable(quote);
 
-        quote.updateInfo(getCustomerOrThrow(customerId), internalMemo, validUntil);
+        Customer customer = getCustomerOrThrow(customerId);
+        quote.updateInfo(customer, internalMemo, issuedDate, validUntil, deliveryTerm);
 
         quoteItemRepository.deleteByQuoteId(quoteId);
         List<QuoteItem> items = buildItems(quote, itemCommands);
@@ -130,6 +166,7 @@ public class QuoteService {
 
     @Transactional
     public Quote reuseQuote(Long sourceQuoteId, User requester) {
+        validateTrainingCompleted(requester.getId());
         Quote source = getQuoteWithDetailsOrThrow(sourceQuoteId);
         validateOwner(source, requester);
 
@@ -139,8 +176,12 @@ public class QuoteService {
                 .discountPolicy(source.getDiscountPolicy())
                 .quoteNumber(generateQuoteNumber())
                 .internalMemo(source.getInternalMemo())
+                .issuedDate(LocalDate.now())
                 .validUntil(source.getValidUntil())
+                .deliveryTerm(source.getDeliveryTerm())
                 .status(QuoteStatus.DRAFT)
+                .quoteCustomer(source.getQuoteCustomer()) // 삼룡님 변수명 싱크 완료
+                .company(source.getCompany())             // 삼룡님 변수명 싱크 완료
                 .build();
 
         quoteRepository.save(newQuote);
@@ -154,6 +195,7 @@ public class QuoteService {
 
     @Transactional
     public Quote rewriteExpiredQuote(Long expiredQuoteId, User requester) {
+        validateTrainingCompleted(requester.getId());
         Quote expired = getQuoteWithDetailsOrThrow(expiredQuoteId);
         validateOwner(expired, requester);
 
@@ -176,11 +218,15 @@ public class QuoteService {
                 .discountPolicy(expired.getDiscountPolicy())
                 .quoteNumber(generateQuoteNumber())
                 .internalMemo(expired.getInternalMemo())
+                .issuedDate(LocalDate.now())
                 .validUntil(LocalDate.now().plusMonths(1))
+                .deliveryTerm(expired.getDeliveryTerm())
                 .status(QuoteStatus.DRAFT)
                 .versionNo(nextVersion)
                 .isLatest(true)
                 .originalQuote(originalQuote)
+                .quoteCustomer(expired.getQuoteCustomer()) // 삼룡님 변수명 싱크 완료
+                .company(expired.getCompany())             // 삼룡님 변수명 싱크 완료
                 .build();
 
         quoteRepository.save(newQuote);
@@ -230,8 +276,9 @@ public class QuoteService {
     }
 
     private void validateTrainingCompleted(Long userId) {
-        if (!trainingService.isTrainingCompleted(userId))
+        if (!trainingService.isTrainingCompleted(userId)) {
             throw new CustomException(ErrorCode.TRAINING_NOT_COMPLETED);
+        }
     }
 
     private String generateQuoteNumber() {
@@ -245,7 +292,17 @@ public class QuoteService {
         return candidate;
     }
 
+    /**
+     * 💡 문제 ③ 해결 파트
+     */
     private DiscountPolicy resolveDiscountPolicy(Long policyId) {
+        // 💡 TODO: [2번 팀원 리포지토리 완료 시 변경할 곳]
+        // 2번 팀원이 DiscountPolicyRepository를 만들고 프로젝트를 합치면, 아래 'return null;' 주석을 해제하고 실제 DB 조회 코드를 활성화하세요.
+        /*
+        Long targetPolicyId = (policyId != null) ? policyId : 1L;
+        return discountPolicyRepository.findById(targetPolicyId)
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 할인 정책입니다."));
+        */
         return null;
     }
 
@@ -257,6 +314,7 @@ public class QuoteService {
                         .productId(cmd.productId())
                         .productName(cmd.productName())
                         .productCode(cmd.productCode())
+                        .spec(cmd.spec())
                         .unitPrice(cmd.unitPrice())
                         .costPrice(cmd.costPrice() != null ? cmd.costPrice() : BigDecimal.ZERO)
                         .quantity(cmd.quantity())
@@ -275,6 +333,7 @@ public class QuoteService {
                         .productId(src.getProductId())
                         .productName(src.getProductName())
                         .productCode(src.getProductCode())
+                        .spec(src.getSpec())
                         .unitPrice(src.getUnitPrice())
                         .costPrice(src.getCostPrice())
                         .quantity(src.getQuantity())
@@ -289,7 +348,7 @@ public class QuoteService {
         approvalReasonRepository.saveAll(reasons.stream()
                 .map(reason -> QuoteApprovalReason.builder()
                         .quote(quote)
-                        .reasonType(reason)
+                        .reasonType(QuoteApprovalReason.ReasonType.valueOf(reason.name()))
                         .reasonMessage(defaultMessage(reason, quote))
                         .build())
                 .toList());
@@ -306,6 +365,7 @@ public class QuoteService {
 
     public record QuoteItemCommand(
             Long productId, String productName, String productCode,
+            String spec,
             BigDecimal unitPrice, BigDecimal costPrice,
             BigDecimal quantity, BigDecimal discountRate, Boolean vatApplicable
     ) {}

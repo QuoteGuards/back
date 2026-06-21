@@ -18,6 +18,9 @@ public record QuoteItemRequest(
         @Size(max = 100)
         String productCode,
 
+        @Size(max = 200)
+        String spec,           // 추가
+
         @NotNull(message = "단가는 필수입니다.")
         @DecimalMin(value = "0", message = "단가는 0 이상이어야 합니다.")
         BigDecimal unitPrice,

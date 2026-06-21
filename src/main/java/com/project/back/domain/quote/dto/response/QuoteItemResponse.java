@@ -9,14 +9,15 @@ public record QuoteItemResponse(
         Long productId,
         String productName,
         String productCode,
+        String spec, //추가
         BigDecimal unitPrice,
         BigDecimal quantity,
         BigDecimal discountRate,
         BigDecimal discountAmount,
         boolean vatApplicable,
         BigDecimal vatAmount,
-        BigDecimal lineSupplyAmount,  // 소계 (VAT 제외)
-        BigDecimal lineTotal,         // 합계 (VAT 포함)
+        BigDecimal lineSupplyAmount,
+        BigDecimal lineTotal,
         int sortOrder
 ) {
     public static QuoteItemResponse from(QuoteItem item) {
@@ -25,6 +26,7 @@ public record QuoteItemResponse(
                 item.getProductId(),
                 item.getProductName(),
                 item.getProductCode(),
+                item.getSpec(), //추가
                 item.getUnitPrice(),
                 item.getQuantity(),
                 item.getDiscountRate(),

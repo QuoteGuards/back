@@ -23,8 +23,8 @@ public record QuoteListResponse(
         return new QuoteListResponse(
                 quote.getId(),
                 quote.getQuoteNumber(),
-                quote.getCustomer().getCompanyName(),
-                quote.getCustomer().getContactName(),
+                quote.getQuoteCustomer().getCompanyName(), // 추가
+                quote.getQuoteCustomer().getContactName(), // 추가
                 quote.getTotalAmount(),
                 quote.getStatus(),
                 quote.getApprovalRequired(),

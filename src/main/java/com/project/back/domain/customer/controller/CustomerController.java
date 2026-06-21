@@ -27,11 +27,11 @@ public class CustomerController {
     //고객 검색 (견적 작성 화면 자동완성용)
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<CustomerSearchResponse>>> searchCustomers(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @RequestParam String name) {
 
         List<CustomerSearchResponse> result = customerService
-                .searchByCompanyName(Long.parseLong(userId), name)
+                .searchByCompanyName(userId, name)
                 .stream()
                 .map(CustomerSearchResponse::from)
                 .toList();
@@ -41,7 +41,7 @@ public class CustomerController {
     //고객 상세 조회
     @GetMapping("/{customerId}")
     public ResponseEntity<ApiResponse<CustomerDetailResponse>> getCustomerDetail(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long customerId) {
 
         Customer customer = customerService.getCustomer(customerId);
@@ -51,7 +51,7 @@ public class CustomerController {
     //신규 고객 등록
     @PostMapping
     public ResponseEntity<ApiResponse<CustomerDetailResponse>> createCustomer(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @RequestBody @Valid CustomerCreateRequest request) {
 
         User user = getUser(userId);
@@ -68,11 +68,10 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success("고객이 등록되었습니다.", CustomerDetailResponse.from(customer)));
     }
 
-
     //고객 정보 수정
     @PutMapping("/{customerId}")
     public ResponseEntity<ApiResponse<CustomerDetailResponse>> updateCustomer(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long customerId,
             @RequestBody @Valid CustomerCreateRequest request) {
 
@@ -89,8 +88,8 @@ public class CustomerController {
         return ResponseEntity.ok(ApiResponse.success("고객 정보가 수정되었습니다.", CustomerDetailResponse.from(customer)));
     }
 
-    private User getUser(String userId) {
-        return userRepository.findById(Long.parseLong(userId))
+    private User getUser(Long userId) {
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
     }
 }

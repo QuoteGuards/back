@@ -1,6 +1,7 @@
 package com.project.back.domain.quote.entity;
 
 import com.project.back.domain.discount.entity.DiscountPolicy;
+import com.project.back.domain.approval.entity.QuoteApprovalReason;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.user.entity.User;
 import com.project.back.global.enums.QuoteStatus;
@@ -42,7 +43,7 @@ public class Quote {
     private QuoteCustomer quoteCustomer;
 
     @Embedded
-    private QuoteCompany quoteCompany;
+    private QuoteCompany company;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
@@ -166,10 +167,13 @@ public class Quote {
         this.profitRate = profitRate;
     }
 
-    public void updateInfo(Customer customer, String internalMemo, LocalDate validUntil) {
+    public void updateInfo(Customer customer, String internalMemo,
+                           LocalDate issuedDate, LocalDate validUntil, String deliveryTerm) {
         this.customer = customer;
         this.internalMemo = internalMemo;
+        this.issuedDate = issuedDate;
         this.validUntil = validUntil;
+        this.deliveryTerm = deliveryTerm;
     }
 
     public void complete(boolean approvalRequired) {
