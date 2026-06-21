@@ -32,14 +32,14 @@ public class GuideController {
     @PostMapping("/quote-writing/confirm")
     @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> confirmGuide(
-            @AuthenticationPrincipal String userId) {
+            @AuthenticationPrincipal Long userId) {
 
         trainingService.confirmGuide(getUser(userId));
         return ResponseEntity.ok(ApiResponse.success("가이드 확인이 완료되었습니다.", null));
     }
 
-    private User getUser(String userId) {
-        return userRepository.findById(Long.parseLong(userId))
+    private User getUser(Long userId) {
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
     }
 }

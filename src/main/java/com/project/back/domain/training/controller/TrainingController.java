@@ -35,7 +35,7 @@ public class TrainingController {
     @PatchMapping("/quote-writing/progress")
     @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> updateProgress(
-            @AuthenticationPrincipal String userId,
+            @AuthenticationPrincipal Long userId,
             @RequestBody @Valid TrainingProgressRequest request) {
 
         trainingService.updateProgress(
@@ -51,14 +51,14 @@ public class TrainingController {
     @GetMapping("/me/status")
     @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<TrainingStatusResponse>> getMyStatus(
-            @AuthenticationPrincipal String userId) {
+            @AuthenticationPrincipal Long userId) {
 
-        TrainingService.TrainingStatusResult result = trainingService.getMyTrainingStatus(Long.parseLong(userId));
+        TrainingService.TrainingStatusResult result = trainingService.getMyTrainingStatus(userId);
         return ResponseEntity.ok(ApiResponse.success(TrainingStatusResponse.from(result)));
     }
 
-    private User getUser(String userId) {
-        return userRepository.findById(Long.parseLong(userId))
+    private User getUser(Long userId) {
+        return userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
     }
 }
