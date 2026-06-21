@@ -1,5 +1,6 @@
 package com.project.back.domain.product.service;
 
+import com.project.back.domain.product.dto.response.ProductSearchResponse;
 import com.project.back.domain.product.entity.Product;
 import com.project.back.domain.product.entity.ProductFavorite;
 import com.project.back.domain.product.repository.ProductFavoriteRepository;
@@ -9,6 +10,8 @@ import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,5 +46,11 @@ public class ProductFavoriteService {
                 .orElseThrow(() -> new CustomException(ErrorCode.FAVORITE_NOT_FOUND));
 
         productFavoriteRepository.delete(favorite);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ProductSearchResponse> getFavorites(Long userId, Pageable pageable) {
+        return productFavoriteRepository.findActiveProductsByUserId(userId, pageable)
+                .map(product -> ProductSearchResponse.of(product, true));
     }
 }

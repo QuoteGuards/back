@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,10 +31,19 @@ public class CategoryService {
 
     //// 카테고리 crud
     // 전체 분류 트리로 조회(비활성화 포함)
-    @Transactional(readOnly=true)
-    public List<CategoryTreeResponse> getCategoryList(){
+
+    @Transactional(readOnly = true)
+    public List<CategoryTreeResponse> getCategoryList() {
         List<Category> all = categoryRepository.findAllWithParent();
-        return buildTree(all);
+
+        Map<Long, Long> countMap = productRepository.countGroupByCategoryId()
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
+
+        return buildTree(all, countMap);
     }
 
 
@@ -175,12 +185,13 @@ public class CategoryService {
 
 
     // 조회에서 트리구조로 만드는 메서드
-    private List<CategoryTreeResponse> buildTree(List<Category> all) {
+    private List<CategoryTreeResponse> buildTree(List<Category> all, Map<Long, Long> countMap) {
         Map<Long, CategoryTreeResponse> map = new LinkedHashMap<>();
         List<CategoryTreeResponse> roots = new ArrayList<>();
 
         for (Category c : all) {
-            CategoryTreeResponse dto = CategoryTreeResponse.from(c);
+            long count = countMap.getOrDefault(c.getId(), 0L);
+            CategoryTreeResponse dto = CategoryTreeResponse.from(c, count);
             map.put(c.getId(), dto);
 
             if (c.getParent() == null) {

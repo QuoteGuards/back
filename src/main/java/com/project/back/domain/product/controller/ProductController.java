@@ -1,6 +1,7 @@
 package com.project.back.domain.product.controller;
 
 import com.project.back.domain.product.dto.response.ProductSearchResponse;
+import com.project.back.domain.product.service.ProductFavoriteService;
 import com.project.back.domain.product.service.ProductService;
 import com.project.back.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 public class ProductController {
 
     private final ProductService productService;
+    private final ProductFavoriteService productFavoriteService;
 
     // 제품 조회
     @GetMapping
@@ -29,6 +31,18 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success(
                 "제품 목록 조회 성공",
                 productService.searchProducts(categoryId, keyword, userId, pageable)
+        ));
+    }
+
+    // 즐겨찾기 목록 조회
+    @GetMapping("/favorites")
+    public ResponseEntity<ApiResponse<Page<ProductSearchResponse>>> getFavorites(
+            @AuthenticationPrincipal Long userId,
+            @PageableDefault(size = 20, sort = "name") Pageable pageable
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "즐겨찾기 목록 조회 성공",
+                productFavoriteService.getFavorites(userId, pageable)
         ));
     }
 

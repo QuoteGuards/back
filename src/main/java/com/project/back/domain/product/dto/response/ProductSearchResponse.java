@@ -23,6 +23,7 @@ public class ProductSearchResponse {
     private String unit;
     private boolean vatApplicable;
     private boolean isFavorite;
+    private boolean isActive;
 
     public static ProductSearchResponse of(Product product, boolean isFavorite) {
         return ProductSearchResponse.builder()
@@ -38,6 +39,7 @@ public class ProductSearchResponse {
                 .unit(product.getUnit())
                 .vatApplicable(product.isVatApplicable())
                 .isFavorite(isFavorite)
+                .isActive(product.isActive())
                 .build();
     }
 }
