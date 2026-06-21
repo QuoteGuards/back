@@ -7,8 +7,12 @@ import com.project.back.domain.approval.entity.QuoteApprovalReason;
 import com.project.back.domain.approval.repository.ApprovalRequestRepository;
 import com.project.back.domain.approval.repository.QuoteApprovalHistoryRepository;
 import com.project.back.domain.approval.repository.QuoteApprovalReasonRepository;
+import com.project.back.domain.quote.entity.Quote;
+import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
+import com.project.back.global.exception.CustomException;
+import com.project.back.global.exception.ErrorCode;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +29,7 @@ public class ApprovalService {
     private final QuoteApprovalReasonRepository quoteApprovalReasonRepository;
     private final QuoteApprovalHistoryRepository quoteApprovalHistoryRepository;
     private final UserRepository userRepository;
+    private final QuoteRepository quoteRepository;
 
     // ── 1. 승인 요청 ──
     @Transactional
@@ -51,9 +56,15 @@ public class ApprovalService {
                 .quoteId(quoteId)
                 .requester(requester)
                 .requestMemo(requestMemo)
+                .status(ApprovalRequest.ApprovalStatus.PENDING) // 승인 대기시 명시적으로 PENDING 설정
                 .build();
 
         approvalRequestRepository.save(approvalRequest);
+
+        // 💡 [견적 파트 오케스트레이션 연동 추가]: 승인 요청이 들어갔으므로 견적서 상태를 승인대기(APPROVAL_PENDING)로 전이
+        Quote quote = quoteRepository.findById(quoteId)
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+        quote.complete(true);
 
         // 승인 이력 저장 (REQUESTED)
         saveHistory(
@@ -84,6 +95,13 @@ public class ApprovalService {
         // 승인 처리
         approvalRequest.approve(approver, memo);
         approvalRequestRepository.save(approvalRequest);
+
+        // [견적 파트 오케스트레이션 연동]: 연관된 견적서를 찾아 확정 상태로 동기화
+        Quote quote = quoteRepository.findById(approvalRequest.getQuoteId())
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+
+        // 최종 승인이 났으므로 즉시 발송 가능한 상태 혹은 고객 발송 준비 상태로 전이합니다.
+        quote.markAsSent();
 
         // 승인 이력 저장
         saveHistory(
@@ -119,6 +137,12 @@ public class ApprovalService {
         // 반려 처리
         approvalRequest.reject(approver, rejectReason);
         approvalRequestRepository.save(approvalRequest);
+
+        //[견적 파트 오케스트레이션 연동]: 반려된 견적서를 REVISING(수정 중) 상태로 변경하여 영업사원 수정 허용
+        Quote quote = quoteRepository.findById(approvalRequest.getQuoteId())
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+
+        quote.startRevising(); //변경 감지 메서드 호출
 
         // 반려 이력 저장
         saveHistory(

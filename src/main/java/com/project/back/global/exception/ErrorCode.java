@@ -43,6 +43,16 @@ public enum ErrorCode {
 
     // Quote
     QUOTE_NOT_FOUND(HttpStatus.NOT_FOUND, "QUOTE_001", "견적서를 찾을 수 없습니다."),
+    QUOTE_NOT_EDITABLE(HttpStatus.BAD_REQUEST, "QUOTE_002", "수정 가능한 상태가 아닙니다."),
+    QUOTE_NOT_EXPIRED(HttpStatus.BAD_REQUEST, "QUOTE_003", "만료된 견적만 재작성할 수 있습니다."),
+    QUOTE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "QUOTE_004", "본인이 작성한 견적만 접근할 수 있습니다."),
+
+    // Customer
+    CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "CUSTOMER_001", "존재하지 않는 고객입니다."),
+
+    // Training
+    TRAINING_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "TRAINING_001", "교육 콘텐츠를 찾을 수 없습니다."),
+    TRAINING_NOT_COMPLETED(HttpStatus.FORBIDDEN, "TRAINING_002", "필수 교육을 이수해야 견적을 작성할 수 있습니다."),
 
     // User Stats
     USER_STATS_NOT_FOUND(HttpStatus.NOT_FOUND, "STATS_001", "해당 사용자의 통계 데이터가 없습니다."),

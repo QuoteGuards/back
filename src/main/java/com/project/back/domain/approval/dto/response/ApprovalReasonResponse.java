@@ -20,7 +20,7 @@ public class ApprovalReasonResponse {
     public static ApprovalReasonResponse from(QuoteApprovalReason entity) {
         return ApprovalReasonResponse.builder()
                 .id(entity.getId())
-                .quoteId(entity.getQuoteId())
+                .quoteId(entity.getQuote().getId())
                 .reasonType(entity.getReasonType().name())
                 .reasonMessage(entity.getReasonMessage())
                 .createdAt(entity.getCreatedAt())

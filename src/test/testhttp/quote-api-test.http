@@ -1,0 +1,315 @@
+### QuoteGuard API 전체 통합 테스트 스크립트
+### 실행 순서대로 하나씩 실행하세요 (▶ 버튼)
+
+@baseUrl = http://localhost:8080
+@token = 영업사원 로그인 후 받은 토큰 붙여넣기
+@adminToken = 관리자 로그인 후 받은 토큰 붙여넣기
+@customerId = 1
+@quoteId = 6 _견적 작성 후 받은 견적 Id 붙여넣기
+@quoteNumber = Q20260621373835 _견적 작성 후 받은 견적 번호 붙여넣기
+
+###############################################
+# 0. 인증 및 가입 승인 프로세스
+###############################################
+
+### 0-1. 테스트용 영업사원 계정 생성 (기본 가입 상태: PENDING)
+POST {{baseUrl}}/api/auth/signup
+Content-Type: application/json
+
+{
+  "email": "sales@test.com",
+  "password": "Password123!",
+  "name": "테스트영업사원",
+  "department": "영업1팀",
+  "phone": "010-1234-5678"
+}
+
+### 0-1. 테스트 관리자 계정 생성
+POST http://localhost:8080/api/auth/signup
+Content-Type: application/json
+
+{
+"email": "admin@test.com",
+"password": "Password123!",
+"name": "최고관리자",
+"department": "영업관리부",
+"phone": "010-0000-0000"
+}
+
+
+### 0-2. 미리 심어둔 SUPER_ADMIN 관리자 로그인
+### ➡️ 실행 후 발급된 토큰을 맨 위 @adminToken 변수에 붙여넣으세요!
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@test.com",
+  "password": "Password123!"
+}
+
+
+### 0-3. 관리자 권한으로 영업사원 가입 승인 처리
+POST {{baseUrl}}/api/admin/users/approve
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "email": "sales@test.com",
+  "status": "APPROVED"
+}
+
+
+### 0-4. 승인 완료된 영업사원 로그인 -> 정상 토큰 발급 완료!
+### ➡️ 실행 후 발급된 토큰을 맨 위 @token 변수에 붙여넣으세요!
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "sales@test.com",
+  "password": "Password123!"
+}
+
+
+###############################################
+# 1. 필수 교육 이수
+###############################################
+
+### 1-1. 필수 교육 콘텐츠 정보 및 미디어 URL 조회
+GET {{baseUrl}}/api/trainings/quote-writing
+Authorization: Bearer {{token}}
+
+
+### 1-2. 영상 시청 진도율 100% 반영 저장 (80% 이상 조건 충족으로 COMPLETED 자동 전이)
+PATCH {{baseUrl}}/api/trainings/quote-writing/progress
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "progressRate": 100.00,
+  "watchedSeconds": 1200,
+  "lastWatchedSeconds": 1200
+}
+
+
+### 1-3. 내 교육 상태 확인 -> 비디오 시청 'COMPLETED' 여부 체크
+GET {{baseUrl}}/api/trainings/me/status
+Authorization: Bearer {{token}}
+
+
+###############################################
+# 2. 견적 작성 가이드 지침 확인
+###############################################
+
+### 2-1. 필수 가이드 문서 내용 조회
+GET {{baseUrl}}/api/guides/quote-writing
+Authorization: Bearer {{token}}
+
+
+### 2-2. 가이드 읽음 확인 완료 처리 (비디오 COMPLETED + 가이드 CONFIRM 충족으로 견적락 해제)
+POST {{baseUrl}}/api/guides/quote-writing/confirm
+Authorization: Bearer {{token}}
+
+
+###############################################
+# 3. 고객 정보 관리 CRUD
+###############################################
+
+### 3-1. 신규 고객사 등록 → 생성된 id를 맨 위 @customerId 자리에 기입하세요.
+POST {{baseUrl}}/api/customers
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "companyName": "소프트테크 주식회사",
+  "contactName": "홍길동 팀장",
+  "email": "hong-tech@test.com",
+  "phone": "010-9876-5432",
+  "businessNumber": "220-81-12345",
+  "address": "서울시 소프트구 개발로 42",
+  "memo": "2026년 상반기 대형 프로젝트 리드 고객"
+}
+
+
+### 3-2. 등록된 고객 단건 조회
+GET {{baseUrl}}/api/customers/{{customerId}}
+Authorization: Bearer {{token}}
+
+
+### 3-3. 고객 마스터 데이터 수정 테스트
+PUT {{baseUrl}}/api/customers/{{customerId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "companyName": "소프트테크 주식회사 (수정본)",
+  "contactName": "홍길동 부장",
+  "email": "hong-director@test.com",
+  "phone": "010-9876-5432",
+  "businessNumber": "220-81-12345",
+  "address": "서울시 소프트구 개발로 777 빌딩 5층",
+  "memo": "고객사 담당자 승진 및 주소지 이전 반영"
+}
+
+
+### 3-4. 영업사원 검색창 입력 대응 (자동완성 쿼리)
+GET {{baseUrl}}/api/customers/search?name=소프트
+Authorization: Bearer {{token}}
+
+
+###############################################
+# 4. 견적서 핵심 파이프라인
+###############################################
+
+### 4-1. 견적서 신규 임시저장 (PDF 연동용 발행일, 납기, 품목 규격 필수 탑재)
+### 실행 후 발급된 id를 @quoteId에, quoteNumber를 @quoteNumber에 채우세요.
+POST {{baseUrl}}/api/quotes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "customerId": {{customerId}},
+  "discountPolicyId": null,
+  "issuedDate": "2026-06-21",
+  "validUntil": "2026-07-21",
+  "deliveryTerm": "검수 후 2주일 이내 납품",
+  "internalMemo": "AI 보조 모듈 추가 요구사항 검토 필요.",
+  "items": [
+    {
+      "productId": null,
+      "productName": "엔터프라이즈 보안 패키지 V2",
+      "productCode": "SG-SEC-001",
+      "spec": "200 유저 라이센스 / 1년 갱신형",
+      "unitPrice": 1500000.00,
+      "costPrice": 900000.00,
+      "quantity": 2,
+      "discountRate": 12.50,
+      "vatApplicable": true
+    },
+    {
+      "productId": null,
+      "productName": "클라우드 스토리지 백업 모듈",
+      "productCode": "SG-STG-042",
+      "spec": "초고속 SSD 5TB 스토리지 노드",
+      "unitPrice": 800000.00,
+      "costPrice": 500000.00,
+      "quantity": 5,
+      "discountRate": 5.00,
+      "vatApplicable": true
+    }
+  ]
+}
+
+
+### 4-2. 임시저장 상태(`DRAFT`) 견적서 수정 및 금액 재계산
+PATCH {{baseUrl}}/api/quotes/{{quoteId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "customerId": {{customerId}},
+  "issuedDate": "2026-06-21",
+  "validUntil": "2026-07-31",
+  "deliveryTerm": "즉시 납품 가능 (계약 체결 후 3일 이내)",
+  "internalMemo": "고객 요청으로 납기 일정 단축 수정 조율함.",
+  "items": [
+    {
+      "productId": null,
+      "productName": "엔터프라이즈 보안 패키지 V2 (수정본)",
+      "productCode": "SG-SEC-001",
+      "spec": "200 유저 라이센스 / 1년 갱신형",
+      "unitPrice": 1500000.00,
+      "costPrice": 900000.00,
+      "quantity": 3,
+      "discountRate": 10.00,
+      "vatApplicable": true
+    }
+  ]
+}
+
+
+### 4-3. 견적서 상세 조회 (💡 박제된 snapshot 데이터 정상 로드 검증)
+GET {{baseUrl}}/api/quotes/{{quoteId}}
+Authorization: Bearer {{token}}
+
+
+### 4-4. 사내 분석용 지표 격리 조회 (원가 합계, 예상 이익금, 수익률 검토)
+GET {{baseUrl}}/api/quotes/{{quoteId}}/internal-analysis
+Authorization: Bearer {{token}}
+
+
+### 4-5. 견적서 제출 처리 및 상태 자동 변환 테스트
+POST {{baseUrl}}/api/quotes/{{quoteId}}/complete
+Authorization: Bearer {{token}}
+
+
+### 4-6. 내 최신본 견적 목록 전체 조회
+GET {{baseUrl}}/api/quotes/me
+Authorization: Bearer {{token}}
+
+
+### 4-7. 목록 필터링 테스트 - 상태 조건
+GET {{baseUrl}}/api/quotes/me?status=APPROVAL_PENDING
+Authorization: Bearer {{token}}
+
+
+### 4-8. 목록 필터링 테스트 - 고객사명 조건
+GET {{baseUrl}}/api/quotes/me?customerName=소프트
+Authorization: Bearer {{token}}
+
+
+### 4-9. 목록 필터링 테스트 - 고유 견적번호 조건
+GET {{baseUrl}}/api/quotes/me?quoteNumber={{quoteNumber}}
+Authorization: Bearer {{token}}
+
+
+### 4-10. 타 도메인 연동 전용 라우트 테스트 (견적 번호 다이렉트 조회)
+GET {{baseUrl}}/api/quotes/number/{{quoteNumber}}
+Authorization: Bearer {{token}}
+
+
+### 4-11. 최근 견적 내용 복사 및 발행일 오늘 날짜 초기화 재사용 테스트
+POST {{baseUrl}}/api/quotes/{{quoteId}}/reuse
+Authorization: Bearer {{token}}
+
+
+### 4-12. 만료 견적 기반 버전 점프 재작성 테스트
+### (※ 💡 원활한 테스트를 위해 DB에서 해당 견적 status를 먼저 EXPIRED로 강제 변경한 후 호출하세요)
+POST {{baseUrl}}/api/quotes/{{quoteId}}/rewrite
+Authorization: Bearer {{token}}
+
+
+###############################################
+# 5. 결재 및 오케스트레이션 연동 검증
+###############################################
+
+### 5-1. [영업사원] 결재 대기 요청 상신
+### 💡 호출하는 즉시 오케스트레이션에 의해 quotes 테이블의 status가 'APPROVAL_PENDING'으로 자동 락 전이
+POST {{baseUrl}}/api/quotes/{{quoteId}}/approval-requests
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "quoteId": {{quoteId}},
+  "requestMemo": "고객사 요청 특수 할인율 10% 적용 건으로 최종 승인 요청합니다."
+}
+
+
+### 5-2. [관리자] 결재 최종 승인 처리
+### 💡 호출 즉시 상태 감지 로직이 연동 작동하여 견적서 status가 즉시 'SENT' 상태로 자동 업그레이드 완료
+POST {{baseUrl}}/api/admin/quotes/{{quoteId}}/approve
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "approvalRequestId": 1,
+  "memo": "수익성 지표가 허용 범위 내에 있으므로 발송을 최종 승인합니다."
+}
+
+
+###############################################
+# 6. 전사 교육 이수 통계 모니터링 (SUPER_ADMIN 전용)
+###############################################
+
+### 6-1. 전사 영업사원들의 필수 제한 교육 이수율 리포트 집계 조회
+GET {{baseUrl}}/api/admin/trainings/status
+Authorization: Bearer {{adminToken}}
