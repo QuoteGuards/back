@@ -33,10 +33,10 @@ public class ApprovalController {
     public ResponseEntity<ApprovalRequestResponse> requestApproval(
             @PathVariable Long quoteId,
             @RequestBody @Valid ApprovalRequestDto request,
-            @AuthenticationPrincipal String userId
+            @AuthenticationPrincipal Long userId
     ) {
         ApprovalRequest result = approvalService.requestApproval(
-                quoteId, Long.parseLong(userId), request.getRequestMemo()
+                quoteId, userId, request.getRequestMemo()
         );
         return ResponseEntity.ok(ApprovalRequestResponse.from(result));
     }
@@ -72,11 +72,11 @@ public class ApprovalController {
     public ResponseEntity<ApprovalRequestResponse> approve(
             @PathVariable Long quoteId,
             @RequestBody @Valid ApprovalDecisionDto request,
-            @AuthenticationPrincipal String userId
+            @AuthenticationPrincipal Long userId
     ) {
         ApprovalRequest result = approvalService.approve(
                 request.getApprovalRequestId(),
-                Long.parseLong(userId),
+                userId,
                 request.getMemo());
         return ResponseEntity.ok(ApprovalRequestResponse.from(result));
     }
@@ -88,11 +88,11 @@ public class ApprovalController {
     public ResponseEntity<ApprovalRequestResponse> reject(
             @PathVariable Long quoteId,
             @RequestBody @Valid ApprovalDecisionDto request,
-            @AuthenticationPrincipal String userId
+            @AuthenticationPrincipal Long userId
     ) {
         ApprovalRequest result = approvalService.reject(
                 request.getApprovalRequestId(),
-                Long.parseLong(userId),
+                userId,
                 request.getRejectReason());
         return ResponseEntity.ok(ApprovalRequestResponse.from(result));
     }
@@ -104,11 +104,11 @@ public class ApprovalController {
     public ResponseEntity<ApprovalRequestResponse> reRequest(
             @PathVariable Long quoteId,
             @RequestBody @Valid ReRequestDto request,
-            @AuthenticationPrincipal String userId
+            @AuthenticationPrincipal Long userId
     ) {
         ApprovalRequest result = approvalService.reRequest(
                 request.getApprovalRequestId(),
-                Long.parseLong(userId),
+                userId,
                 request.getRequestMemo());
         return ResponseEntity.ok(ApprovalRequestResponse.from(result));
     }

@@ -30,7 +30,7 @@ public record QuoteInternalAnalysisResponse(
 ) {
     public static QuoteInternalAnalysisResponse from(Quote quote) {
         List<ApprovalReasonType> reasons = quote.getApprovalReasons().stream()
-                .map(r -> r.getReasonType())
+                .map(r -> ApprovalReasonType.valueOf(r.getReasonType().name()))
                 .toList();
 
         List<QuoteItemInternalResponse> itemDetails = quote.getItems().stream()

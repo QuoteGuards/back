@@ -1,5 +1,6 @@
 package com.project.back.domain.approval.entity;
 
+import com.project.back.domain.quote.entity.Quote;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -17,9 +18,10 @@ public class QuoteApprovalReason {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Quote Entity 생성 전 임시 처리 → 나중에 @ManyToOne으로 교체
-    @Column(name = "quote_id", nullable = false)
-    private Long quoteId;
+    // Quote Entity 생성 전 임시 처리 → 나중에 @ManyToOne으로 교체 -> 교체완료
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "quote_id", nullable = false)
+    private Quote quote;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -42,9 +44,9 @@ public class QuoteApprovalReason {
         HIGH_AMOUNT
     }
 
-    public static QuoteApprovalReason of(Long quoteId, ReasonType reasonType, String message) {
+    public static QuoteApprovalReason of(Quote quote, ReasonType reasonType, String message) {
         return QuoteApprovalReason.builder()
-                .quoteId(quoteId)
+                .quote(quote)
                 .reasonType(reasonType)
                 .reasonMessage(message)
                 .build();
