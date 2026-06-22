@@ -45,10 +45,9 @@ public class DiscountPolicyService {
     public DiscountPolicyResponse create(DiscountPolicyCreateRequest request, Long userId) {
         Category category = resolveCategory(request.getTargetType(), request.getCategoryId());
         Product product = resolveProduct(request.getTargetType(), request.getProductId());
-        validatePeriod(request.getEffectiveFrom(), request.getEffectiveTo());
-
         LocalDateTime from = request.getEffectiveFrom() != null
                 ? request.getEffectiveFrom() : LocalDateTime.now();
+        validatePeriod(from, request.getEffectiveTo());
 
         DiscountPolicy policy = DiscountPolicy.builder()
                 .policyName(request.getName())
@@ -72,10 +71,9 @@ public class DiscountPolicyService {
         DiscountPolicy policy = findById(policyId);
         Category category = resolveCategory(request.getTargetType(), request.getCategoryId());
         Product product = resolveProduct(request.getTargetType(), request.getProductId());
-        validatePeriod(request.getEffectiveFrom(), request.getEffectiveTo());
-
         LocalDateTime from = request.getEffectiveFrom() != null
                 ? request.getEffectiveFrom() : policy.getEffectiveFrom();
+        validatePeriod(from, request.getEffectiveTo());
 
         policy.update(
                 request.getName(),
