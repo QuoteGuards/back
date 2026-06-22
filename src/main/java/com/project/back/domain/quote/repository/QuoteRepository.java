@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
+
 public interface QuoteRepository extends JpaRepository<Quote, Long>, QuoteRepositoryCustom {
 
     List<Quote> findByCreatedByIdAndStatusAndIsLatestTrueOrderByCreatedAtDesc(
@@ -45,18 +46,4 @@ public interface QuoteRepository extends JpaRepository<Quote, Long>, QuoteReposi
 
     @Query("SELECT MAX(q.quoteNumber) FROM Quote q WHERE q.quoteNumber LIKE :prefix%")
     Optional<String> findMaxQuoteNumberByPrefix(@Param("prefix") String prefix);
-
-    /**
-     * 통계 집계용: 사용자의 제출된 견적(DRAFT·CANCELLED 제외, 최신 버전만) 전체 조회.
-     * 서비스 계층에서 Java 스트림으로 집계한다.
-     */
-    @Query("SELECT q FROM Quote q WHERE q.createdBy.id = :userId AND q.isLatest = true AND q.status NOT IN :excludedStatuses")
-    List<Quote> findSubmittedByUserId(@Param("userId") Long userId,
-                                      @Param("excludedStatuses") List<QuoteStatus> excludedStatuses);
-
-    /**
-     * 배치 재집계용: 제출된 견적이 존재하는 사용자 ID 목록 조회.
-     */
-    @Query("SELECT DISTINCT q.createdBy.id FROM Quote q WHERE q.isLatest = true AND q.status NOT IN :excludedStatuses")
-    List<Long> findUserIdsWithSubmittedQuotes(@Param("excludedStatuses") List<QuoteStatus> excludedStatuses);
 }

@@ -244,6 +244,14 @@ public class QuoteService {
         return newQuote;
     }
 
+    /**
+     * 매일 자정: 유효기간이 지난 견적을 EXPIRED 상태로 전이한다.
+     *
+     * <p>통계 갱신은 이 메서드에서 직접 수행하지 않는다.
+     * REQUIRES_NEW 트랜잭션으로 recalculate를 호출하면 외부 트랜잭션(expire)이
+     * 롤백될 경우 통계만 갱신된 채로 남는 정합성 문제가 발생한다.
+     * 만료 견적의 통계는 {@link UserStatsBatchService}가 매일 02:00에 일괄 처리한다.</p>
+     */
     @Scheduled(cron = "0 0 0 * * *")
     @Transactional
     public void expireOverdueQuotes() {
