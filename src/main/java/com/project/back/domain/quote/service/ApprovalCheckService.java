@@ -51,6 +51,6 @@ public class ApprovalCheckService {
 
     private boolean isHighAmount(BigDecimal threshold, BigDecimal totalAmount) {
         if (threshold == null || totalAmount == null) return false;
-        return totalAmount.compareTo(threshold) > 0;
+        return totalAmount.compareTo(threshold) >= 0;
     }
 }
