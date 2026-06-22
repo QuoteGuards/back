@@ -42,7 +42,7 @@ public class UserStatsBatchService {
      * 매일 02:00: 통계 갱신 대상 전 사용자를 재집계한다.
      * 한 사용자 처리 실패 시 로그를 남기고 다음 사용자를 계속 처리한다.
      */
-    @Scheduled(cron = "0 0 2 * * *")
+    @Scheduled(cron = "0 0 2 * * *", zone = "Asia/Seoul")
     @Transactional(readOnly = true)
     public void recalculateAllUsers() {
         // UserStats 보유 사용자 + 견적 생성 사용자 합집합

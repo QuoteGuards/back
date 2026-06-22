@@ -123,8 +123,8 @@ public class QuoteService {
 
         quote.complete(approvalRequired);
 
-        // 견적 제출 시 통계 갱신
-        userStatsUpdateService.recalculate(requester.getId());
+        // 견적 제출 시 통계 갱신 - 커밋 이후 재집계
+        userStatsUpdateService.recalculateAfterCommit(requester.getId());
 
         return quote;
     }

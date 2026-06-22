@@ -51,23 +51,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         try {
-            if (jwtTokenProvider.validateToken(token)) {
-                String subject = jwtTokenProvider.getSubject(token);
-                Long userId = Long.parseLong(subject);
-                String role = jwtTokenProvider.getRole(token);
-
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(
-                                userId,
-                                null,
-                                List.of(new SimpleGrantedAuthority("ROLE_" + role))
-                        );
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+            if (!jwtTokenProvider.validateToken(token)) {
+                // 토큰 존재하지만 유효하지 않음 → 즉시 401 반환
+                SecurityContextHolder.clearContext();
+                jwtAuthenticationEntryPoint.commence(
+                        request,
+                        response,
+                        new BadCredentialsException("유효하지 않은 토큰입니다.")
+                );
+                return;
             }
 
-            filterChain.doFilter(request, response);
+            String subject = jwtTokenProvider.getSubject(token);
+            Long userId = Long.parseLong(subject);
+            String role = jwtTokenProvider.getRole(token);
+
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            userId,
+                            null,
+                            List.of(new SimpleGrantedAuthority("ROLE_" + role))
+                    );
+            SecurityContextHolder.getContext().setAuthentication(authentication);
 
         } catch (Exception e) {
+            // 토큰 파싱/검증 중 예외 → 401 반환
             log.warn("JWT authentication failed: {}", e.getMessage());
             SecurityContextHolder.clearContext();
             jwtAuthenticationEntryPoint.commence(
@@ -75,7 +83,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     response,
                     new BadCredentialsException("유효하지 않은 토큰입니다.", e)
             );
+            return;
         }
+
+        // 인증 성공 후 필터 체인 통과 (try 외부 → 이후 필터 예외가 JWT 오류로 오인되지 않음)
+        filterChain.doFilter(request, response);
     }
 
     private String resolveToken(HttpServletRequest request) {

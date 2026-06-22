@@ -13,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * 사용자 통계 데이터 수집 및 갱신 서비스.
@@ -66,10 +68,10 @@ public class UserStatsUpdateService {
                 .orElseGet(() -> UserStats.builder().user(user).build());
 
         stats.update(
-                (int) proj.totalQuotes(),
-                (int) proj.approvedQuotes(),
-                (int) proj.rejectedQuotes(),
-                (int) proj.sentQuotes(),
+                Math.toIntExact(proj.totalQuotes()),
+                Math.toIntExact(proj.approvedQuotes()),
+                Math.toIntExact(proj.rejectedQuotes()),
+                Math.toIntExact(proj.sentQuotes()),
                 proj.safeAmount(proj.totalAmount()),
                 proj.safeAmount(proj.totalSupplyAmount()),
                 proj.safeAmount(proj.totalProfitAmount()),
@@ -79,5 +81,27 @@ public class UserStatsUpdateService {
 
         userStatsRepository.save(stats);
         log.debug("사용자 통계 갱신 완료 [userId={}, totalQuotes={}]", userId, proj.totalQuotes());
+    }
+
+    /**
+     * 현재 트랜잭션 커밋 이후에 통계를 재집계한다.
+     *
+     * <p>상태 변경(승인/반려/제출)이 커밋되기 전에 REQUIRES_NEW 집계 쿼리가 실행되면
+     * 이전 상태를 읽는 정합성 문제를 방지한다.
+     * 활성 트랜잭션이 없는 경우(배치 등) {@link #recalculate}를 즉시 호출한다.</p>
+     *
+     * @param userId 통계를 갱신할 사용자 ID
+     */
+    public void recalculateAfterCommit(Long userId) {
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    recalculate(userId);
+                }
+            });
+        } else {
+            recalculate(userId);
+        }
     }
 }

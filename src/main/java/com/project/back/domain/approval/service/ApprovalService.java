@@ -115,8 +115,8 @@ public class ApprovalService {
                 memo
         );
 
-        // 견적 작성자 통계 갱신 (승인 + 발송 카운트 반영)
-        userStatsUpdateService.recalculate(quote.getCreatedBy().getId());
+        // 견적 작성자 통계 갱신 (승인 + 발송 카운트 반영) - 커밋 이후 재집계
+        userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
 
         return approvalRequest;
     }
@@ -159,8 +159,8 @@ public class ApprovalService {
                 rejectReason
         );
 
-        // 견적 작성자 통계 갱신 (반려 카운트 반영)
-        userStatsUpdateService.recalculate(quote.getCreatedBy().getId());
+        // 견적 작성자 통계 갱신 (반려 카운트 반영) - 커밋 이후 재집계
+        userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
 
         return approvalRequest;
     }
