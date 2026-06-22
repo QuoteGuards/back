@@ -29,8 +29,8 @@ public class CustomerService {
     }
 
     // 고객 단건 조회
-    public Customer getCustomer(Long customerId) {
-        return customerRepository.findById(customerId)
+    public Customer getCustomer(Long customerId, Long userId) {
+        return customerRepository.findByIdAndUserId(customerId, userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CUSTOMER_NOT_FOUND));
     }
 
@@ -54,10 +54,11 @@ public class CustomerService {
 
     // 고객 정보 수정
     @Transactional
-    public Customer updateCustomer(Long customerId, String companyName, String contactName,
+    public Customer updateCustomer(Long customerId, Long userId, String companyName, String contactName,
                                    String email, String phone, String businessNumber,
                                    String address, String memo) {
-        Customer customer = getCustomer(customerId);
+        Customer customer = getCustomer(customerId, userId);
+
         customer.update(companyName, contactName, email, phone, businessNumber, address, memo);
         return customer;
     }
