@@ -71,9 +71,9 @@ class CustomerServiceTest {
         @DisplayName("존재하는 고객 조회 성공")
         void getCustomer_success() {
             Customer customer = mock(Customer.class);
-            when(customerRepository.findById(1L)).thenReturn(Optional.of(customer));
+            when(customerRepository.findByIdAndUserId(1L, 1L)).thenReturn(Optional.of(customer));
 
-            Customer result = customerService.getCustomer(1L);
+            Customer result = customerService.getCustomer(1L, 1L);
 
             assertThat(result).isEqualTo(customer);
         }
@@ -81,9 +81,9 @@ class CustomerServiceTest {
         @Test
         @DisplayName("존재하지 않는 고객 조회 시 예외 발생")
         void getCustomer_notFound_throwsException() {
-            when(customerRepository.findById(999L)).thenReturn(Optional.empty());
+            when(customerRepository.findByIdAndUserId(999L, 1L)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> customerService.getCustomer(999L))
+            assertThatThrownBy(() -> customerService.getCustomer(999L, 1L))
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(ErrorCode.CUSTOMER_NOT_FOUND));

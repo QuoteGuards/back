@@ -6,6 +6,9 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+// @Version: 동일 사용자 통계 동시 갱신 시 마지막 커밋 승리(last-write-wins) 대신
+// OptimisticLockException을 발생시켜 데이터 유실을 방지한다.
+
 @Entity
 @Table(name = "user_stats")
 @Getter
@@ -17,6 +20,11 @@ public class UserStats {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    @Builder.Default
+    private Long version = 0L;
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
@@ -69,5 +77,19 @@ public class UserStats {
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public void update(int totalQuotes, int approvedQuotes, int rejectedQuotes, int sentQuotes,
+                       BigDecimal totalAmount, BigDecimal totalSupplyAmount, BigDecimal totalProfitAmount,
+                       BigDecimal averageDiscountRate, BigDecimal averageProfitRate) {
+        this.totalQuotes = totalQuotes;
+        this.approvedQuotes = approvedQuotes;
+        this.rejectedQuotes = rejectedQuotes;
+        this.sentQuotes = sentQuotes;
+        this.totalAmount = totalAmount;
+        this.totalSupplyAmount = totalSupplyAmount;
+        this.totalProfitAmount = totalProfitAmount;
+        this.averageDiscountRate = averageDiscountRate;
+        this.averageProfitRate = averageProfitRate;
     }
 }

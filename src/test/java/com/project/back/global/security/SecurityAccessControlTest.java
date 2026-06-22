@@ -1,6 +1,10 @@
 package com.project.back.global.security;
 
+import com.project.back.domain.approval.controller.ApprovalController;
+import com.project.back.domain.approval.service.ApprovalService;
+import com.project.back.domain.auth.controller.AuthController;
 import com.project.back.domain.auth.service.AuthService;
+import com.project.back.domain.user.controller.AdminUserController;
 import com.project.back.domain.user.service.UserManagementService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -8,11 +12,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -21,13 +31,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * URL별 접근 제어(인증/인가) 통합 테스트
  *
- * @WebMvcTest 는 기본적으로 Spring Security 기본 자동 설정(CSRF 활성, Basic Auth)을 사용한다.
- * @Import 로 실제 SecurityConfig 및 의존 빈을 명시적으로 로드해야 우리의 필터 체인이 적용된다.
- * - SecurityConfig : @EnableWebSecurity 로 기본 자동 설정 비활성화 + 우리 규칙 적용
- * - JwtAuthenticationEntryPoint, JwtAccessDeniedHandler, SecurityErrorResponseWriter : 실제 401/403 JSON 응답 작성
- * - JwtTokenProvider 는 Mock → JWT 없는 요청은 인증 안 됨(미인증 테스트 시나리오 동작)
+ * 인증 방식: {@code SecurityMockMvcRequestPostProcessors.jwt()}
+ *
+ * {@code @WithMockUser}는 HttpSession에 SecurityContext를 저장하지만,
+ *      STATELESS 정책에서는 {@code RequestAttributeSecurityContextRepository}가 세션을 읽지 않아 인증이 전달되지 않는다.
+ * {@code jwt()} 포스트 프로세서는 RequestAttribute에 직접 SecurityContext를 설정하므로 STATELESS에서 정상 동작한다.
+ *
+ * controllers를 명시하여 필요한 Controller만 로드한다.
+ * /api/admin/dashboard/**, /api/dashboard/me는 컨트롤러 없이 SecurityConfig 규칙만으로 검증 가능하다.
  */
-@WebMvcTest
+@WebMvcTest(controllers = {AuthController.class, AdminUserController.class, ApprovalController.class})
 @Import({SecurityConfig.class, JwtAuthenticationEntryPoint.class, JwtAccessDeniedHandler.class, SecurityErrorResponseWriter.class})
 class SecurityAccessControlTest {
 
@@ -41,7 +54,20 @@ class SecurityAccessControlTest {
     private UserManagementService userManagementService;
 
     @MockitoBean
+    private ApprovalService approvalService;
+
+    @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
+
+    /**
+     * 테스트용 인증 객체 생성 — principal을 Long userId로 설정하여 @AuthenticationPrincipal Long userId 호환
+     */
+    private RequestPostProcessor asUser(Long userId, String role) {
+        Authentication auth = new UsernamePasswordAuthenticationToken(
+                userId, null, List.of(new SimpleGrantedAuthority("ROLE_" + role))
+        );
+        return authentication(auth);
+    }
 
     // ============================================================
     // 1. 공개 엔드포인트 - 미인증 접근 허용
@@ -130,9 +156,9 @@ class SecurityAccessControlTest {
 
         @Test
         @DisplayName("SALES_STAFF가 /api/admin/users/** 접근 → 403")
-        @WithMockUser(roles = "SALES_STAFF")
         void adminUsers_salesStaff_returns403() throws Exception {
-            mockMvc.perform(get("/api/admin/users/1"))
+            mockMvc.perform(get("/api/admin/users/1")
+                            .with(asUser(1L, "SALES_STAFF")))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.status").value("fail"))
                     .andExpect(jsonPath("$.code").value("AUTH_007"));
@@ -140,9 +166,9 @@ class SecurityAccessControlTest {
 
         @Test
         @DisplayName("SALES_MANAGER가 /api/admin/users/** 접근 → 403")
-        @WithMockUser(roles = "SALES_MANAGER")
         void adminUsers_salesManager_returns403() throws Exception {
-            mockMvc.perform(get("/api/admin/users/1"))
+            mockMvc.perform(get("/api/admin/users/1")
+                            .with(asUser(1L, "SALES_MANAGER")))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.status").value("fail"))
                     .andExpect(jsonPath("$.code").value("AUTH_007"));
@@ -150,9 +176,9 @@ class SecurityAccessControlTest {
 
         @Test
         @DisplayName("SUPER_ADMIN이 /api/admin/users/** 접근 → 보안 통과")
-        @WithMockUser(roles = "SUPER_ADMIN")
         void adminUsers_superAdmin_securityPassed() throws Exception {
-            mockMvc.perform(get("/api/admin/users/1"))
+            mockMvc.perform(get("/api/admin/users/1")
+                            .with(asUser(1L, "SUPER_ADMIN")))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         assertThat(status).as("SUPER_ADMIN should not get 401").isNotEqualTo(401);
@@ -171,9 +197,9 @@ class SecurityAccessControlTest {
 
         @Test
         @DisplayName("SALES_STAFF가 /api/admin/approval-requests/** 접근 → 403")
-        @WithMockUser(roles = "SALES_STAFF")
         void approvalRequests_salesStaff_returns403() throws Exception {
-            mockMvc.perform(get("/api/admin/approval-requests"))
+            mockMvc.perform(get("/api/admin/approval-requests")
+                            .with(asUser(1L, "SALES_STAFF")))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.status").value("fail"))
                     .andExpect(jsonPath("$.code").value("AUTH_007"));
@@ -181,9 +207,9 @@ class SecurityAccessControlTest {
 
         @Test
         @DisplayName("SALES_MANAGER가 /api/admin/approval-requests/** 접근 → 보안 통과")
-        @WithMockUser(roles = "SALES_MANAGER")
         void approvalRequests_salesManager_securityPassed() throws Exception {
-            mockMvc.perform(get("/api/admin/approval-requests"))
+            mockMvc.perform(get("/api/admin/approval-requests")
+                            .with(asUser(1L, "SALES_MANAGER")))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         assertThat(status).as("SALES_MANAGER should not get 401").isNotEqualTo(401);
@@ -193,9 +219,9 @@ class SecurityAccessControlTest {
 
         @Test
         @DisplayName("SUPER_ADMIN이 /api/admin/approval-requests/** 접근 → 보안 통과")
-        @WithMockUser(roles = "SUPER_ADMIN")
         void approvalRequests_superAdmin_securityPassed() throws Exception {
-            mockMvc.perform(get("/api/admin/approval-requests"))
+            mockMvc.perform(get("/api/admin/approval-requests")
+                            .with(asUser(1L, "SUPER_ADMIN")))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         assertThat(status).isNotEqualTo(401);
@@ -210,9 +236,9 @@ class SecurityAccessControlTest {
 
         @Test
         @DisplayName("SALES_STAFF가 /api/admin/dashboard/** 접근 → 403")
-        @WithMockUser(roles = "SALES_STAFF")
         void adminDashboard_salesStaff_returns403() throws Exception {
-            mockMvc.perform(get("/api/admin/dashboard/stats"))
+            mockMvc.perform(get("/api/admin/dashboard/stats")
+                            .with(asUser(1L, "SALES_STAFF")))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.status").value("fail"))
                     .andExpect(jsonPath("$.code").value("AUTH_007"));
@@ -220,9 +246,9 @@ class SecurityAccessControlTest {
 
         @Test
         @DisplayName("SALES_MANAGER가 /api/admin/dashboard/** 접근 → 보안 통과")
-        @WithMockUser(roles = "SALES_MANAGER")
         void adminDashboard_salesManager_securityPassed() throws Exception {
-            mockMvc.perform(get("/api/admin/dashboard/stats"))
+            mockMvc.perform(get("/api/admin/dashboard/stats")
+                            .with(asUser(1L, "SALES_MANAGER")))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         assertThat(status).isNotEqualTo(401);
@@ -241,9 +267,9 @@ class SecurityAccessControlTest {
 
         @Test
         @DisplayName("SALES_STAFF가 /api/dashboard/me 접근 → 보안 통과")
-        @WithMockUser(roles = "SALES_STAFF")
         void dashboardMe_salesStaff_securityPassed() throws Exception {
-            mockMvc.perform(get("/api/dashboard/me"))
+            mockMvc.perform(get("/api/dashboard/me")
+                            .with(asUser(1L, "SALES_STAFF")))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         assertThat(status).as("authenticated user should not get 401").isNotEqualTo(401);
@@ -253,9 +279,9 @@ class SecurityAccessControlTest {
 
         @Test
         @DisplayName("SALES_MANAGER가 /api/dashboard/me 접근 → 보안 통과")
-        @WithMockUser(roles = "SALES_MANAGER")
         void dashboardMe_salesManager_securityPassed() throws Exception {
-            mockMvc.perform(get("/api/dashboard/me"))
+            mockMvc.perform(get("/api/dashboard/me")
+                            .with(asUser(1L, "SALES_MANAGER")))
                     .andExpect(result -> {
                         int status = result.getResponse().getStatus();
                         assertThat(status).isNotEqualTo(401);

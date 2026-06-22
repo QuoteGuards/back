@@ -51,6 +51,7 @@ public enum ErrorCode {
     DISCOUNT_POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, "DISCOUNT_001", "할인 정책을 찾을 수 없습니다."),
     DISCOUNT_TARGET_REQUIRED(HttpStatus.BAD_REQUEST, "DISCOUNT_002", "적용 대상(카테고리/제품)을 지정해야 합니다."),
     DISCOUNT_INVALID_PERIOD(HttpStatus.BAD_REQUEST, "DISCOUNT_003", "정책 종료일은 시작일보다 이후여야 합니다."),
+
     // Email
     EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_001", "이메일 발송에 실패했습니다."),
 
