@@ -20,21 +20,21 @@ public class DiscountPolicyUpdateRequest {
     private Long categoryId;
     private Long productId;
 
-    `@NotNull`
-    `@DecimalMin`("0.00")
-    `@DecimalMax`("100.00")
-    `@Digits`(integer = 3, fraction = 2)
+    @NotNull
+    @DecimalMin("0.00")
+    @DecimalMax("100.00")
+    @Digits(integer = 3, fraction = 2)
     private BigDecimal maxDiscountRate;
 
-    `@NotNull`
-    `@DecimalMin`("0.00")
-    `@DecimalMax`("100.00")
-    `@Digits`(integer = 3, fraction = 2)
+    @NotNull
+    @DecimalMin("0.00")
+    @DecimalMax("100.00")
+    @Digits(integer = 3, fraction = 2)
     private BigDecimal minProfitRate;
 
-    `@NotNull`
-    `@DecimalMin`("0.00")
-    `@Digits`(integer = 16, fraction = 2)
+    @NotNull
+    @DecimalMin("0.00")
+    @Digits(integer = 16, fraction = 2)
     private BigDecimal highAmountThreshold;
 
     private LocalDateTime effectiveFrom;
