@@ -17,6 +17,7 @@ import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.training.service.TrainingService;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
+import com.project.back.domain.user.service.UserStatsUpdateService;
 import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.global.enums.QuoteStatus;
 import com.project.back.global.exception.CustomException;
@@ -46,6 +47,7 @@ public class QuoteService {
     private final QuoteCalculationService calculationService;
     private final ApprovalCheckService approvalCheckService;
     private final TrainingService trainingService;
+    private final UserStatsUpdateService userStatsUpdateService;
 
     // 💡 TODO: [제품 팀원 리포지토리 완료 시 변경할 곳] 2번 팀원이 DiscountPolicyRepository를 주입할 수 있게 선언해주면 주석을 해제
     // private final DiscountPolicyRepository discountPolicyRepository;
@@ -120,6 +122,10 @@ public class QuoteService {
         if (approvalRequired) saveApprovalReasons(quote, reasons);
 
         quote.complete(approvalRequired);
+
+        // 견적 제출 시 통계 갱신
+        userStatsUpdateService.recalculate(requester.getId());
+
         return quote;
     }
 

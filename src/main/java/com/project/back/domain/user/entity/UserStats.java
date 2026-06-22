@@ -70,4 +70,18 @@ public class UserStats {
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
+    public void update(int totalQuotes, int approvedQuotes, int rejectedQuotes, int sentQuotes,
+                       BigDecimal totalAmount, BigDecimal totalSupplyAmount, BigDecimal totalProfitAmount,
+                       BigDecimal averageDiscountRate, BigDecimal averageProfitRate) {
+        this.totalQuotes = totalQuotes;
+        this.approvedQuotes = approvedQuotes;
+        this.rejectedQuotes = rejectedQuotes;
+        this.sentQuotes = sentQuotes;
+        this.totalAmount = totalAmount;
+        this.totalSupplyAmount = totalSupplyAmount;
+        this.totalProfitAmount = totalProfitAmount;
+        this.averageDiscountRate = averageDiscountRate;
+        this.averageProfitRate = averageProfitRate;
+    }
 }
