@@ -18,6 +18,7 @@ import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.training.service.TrainingService;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
+import com.project.back.domain.user.service.UserStatsUpdateService;
 import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.global.enums.QuoteStatus;
 import com.project.back.global.exception.CustomException;
@@ -49,6 +50,7 @@ public class QuoteService {
     private final ApprovalService approvalService;
     private final ApprovalCheckService approvalCheckService;
     private final TrainingService trainingService;
+    private final UserStatsUpdateService userStatsUpdateService;
 
     // 💡 TODO: [제품 팀원 리포지토리 완료 시 변경할 곳] 2번 팀원이 DiscountPolicyRepository를 주입할 수 있게 선언해주면 주석을 해제
     // private final DiscountPolicyRepository discountPolicyRepository;
@@ -128,6 +130,10 @@ public class QuoteService {
         }
 
         quote.complete(approvalRequired);
+
+        // 견적 제출 시 통계 갱신 - 커밋 이후 재집계
+        userStatsUpdateService.recalculateAfterCommit(requester.getId());
+
         return quote;
     }
 
@@ -256,6 +262,14 @@ public class QuoteService {
         return newQuote;
     }
 
+    /**
+     * 매일 자정: 유효기간이 지난 견적을 EXPIRED 상태로 전이한다.
+     *
+     * <p>통계 갱신은 이 메서드에서 직접 수행하지 않는다.
+     * REQUIRES_NEW 트랜잭션으로 recalculate를 호출하면 외부 트랜잭션(expire)이
+     * 롤백될 경우 통계만 갱신된 채로 남는 정합성 문제가 발생한다.
+     * 만료 견적의 통계는 {@link UserStatsBatchService}가 매일 02:00에 일괄 처리한다.</p>
+     */
     @Scheduled(cron = "0 0 0 * * *")
     @Transactional
     public void expireOverdueQuotes() {
