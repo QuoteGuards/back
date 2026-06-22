@@ -25,6 +25,9 @@ public record QuoteDetailResponse(
         String phone,
         String address,
 
+        //자사(발행처) 정보 스냅샷 - PDF/문서 발행용
+        CompanyInfo company,
+
         List<QuoteItemResponse> items,
         LocalDate issuedDate,
         LocalDate validUntil,
@@ -38,6 +41,25 @@ public record QuoteDetailResponse(
         BigDecimal taxAmount,
         BigDecimal totalAmount
 ) {
+    public record CompanyInfo(
+            String name,
+            String address,
+            String phone,
+            String email,
+            String businessNumber
+    ) {
+        public static CompanyInfo from(com.project.back.domain.quote.entity.QuoteCompany company) {
+            if (company == null) return null;
+            return new CompanyInfo(
+                    company.getName(),
+                    company.getAddress(),
+                    company.getPhone(),
+                    company.getEmail(),
+                    company.getBusinessNumber()
+            );
+        }
+    }
+
     public static QuoteDetailResponse from(Quote quote) {
         List<ApprovalReasonType> reasons = quote.getApprovalReasons().stream()
                 .map(r -> ApprovalReasonType.valueOf(r.getReasonType().name()))
@@ -60,6 +82,7 @@ public record QuoteDetailResponse(
                 quote.getQuoteCustomer().getEmail(),       // 추가
                 quote.getQuoteCustomer().getPhone(),       // 추가
                 quote.getQuoteCustomer().getAddress(),     // 추가
+                CompanyInfo.from(quote.getCompany()),      // 자사 스냅샷 추가
                 itemResponses,
                 quote.getIssuedDate(),
                 quote.getValidUntil(),
