@@ -44,7 +44,7 @@ public class CustomerController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long customerId) {
 
-        Customer customer = customerService.getCustomer(customerId);
+        Customer customer = customerService.getCustomer(customerId, userId);
         return ResponseEntity.ok(ApiResponse.success(CustomerDetailResponse.from(customer)));
     }
 
@@ -77,6 +77,7 @@ public class CustomerController {
 
         Customer customer = customerService.updateCustomer(
                 customerId,
+                userId,
                 request.companyName(),
                 request.contactName(),
                 request.email(),
