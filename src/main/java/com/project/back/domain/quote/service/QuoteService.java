@@ -1,5 +1,6 @@
 package com.project.back.domain.quote.service;
 
+import com.project.back.domain.approval.service.ApprovalService;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.customer.repository.CustomerRepository;
 import com.project.back.domain.discount.entity.DiscountPolicy;
@@ -17,10 +18,12 @@ import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.training.service.TrainingService;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
+import com.project.back.domain.user.service.UserStatsUpdateService;
 import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.global.enums.QuoteStatus;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
+import jakarta.validation.constraints.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -44,8 +47,10 @@ public class QuoteService {
     private final QuoteApprovalReasonRepository approvalReasonRepository;
     private final CustomerRepository customerRepository;
     private final QuoteCalculationService calculationService;
+    private final ApprovalService approvalService;
     private final ApprovalCheckService approvalCheckService;
     private final TrainingService trainingService;
+    private final UserStatsUpdateService userStatsUpdateService;
 
     // 💡 TODO: [제품 팀원 리포지토리 완료 시 변경할 곳] 2번 팀원이 DiscountPolicyRepository를 주입할 수 있게 선언해주면 주석을 해제
     // private final DiscountPolicyRepository discountPolicyRepository;
@@ -61,7 +66,7 @@ public class QuoteService {
                            List<QuoteItemCommand> itemCommands) {
 
         validateTrainingCompleted(createdBy.getId());
-        Customer customer = getCustomerOrThrow(customerId);
+        Customer customer = getCustomerOrThrow(customerId, createdBy.getId());
         DiscountPolicy policy = resolveDiscountPolicy(discountPolicyId);
 
         //원본 고객 엔티티 데이터 복사 후 발행 시점 박제용 스냅샷 생성
@@ -111,15 +116,24 @@ public class QuoteService {
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
 
+        //편집 가능한 상태(DRAFT, REVISING)인지 검증
+        validateEditable(quote);
+
         List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quoteId);
         List<ApprovalReasonType> reasons = approvalCheckService.check(
                 quote.getDiscountPolicy(), items, quote.getTotalAmount(), quote.getProfitRate());
 
         boolean approvalRequired = !reasons.isEmpty();
         approvalReasonRepository.deleteByQuote_Id(quoteId);
-        if (approvalRequired) saveApprovalReasons(quote, reasons);
+        if (approvalRequired) {
+            approvalService.saveApprovalReasons(quote, reasons);
+        }
 
         quote.complete(approvalRequired);
+
+        // 견적 제출 시 통계 갱신 - 커밋 이후 재집계
+        userStatsUpdateService.recalculateAfterCommit(requester.getId());
+
         return quote;
     }
 
@@ -136,8 +150,18 @@ public class QuoteService {
         validateOwner(quote, requester);
         validateEditable(quote);
 
-        Customer customer = getCustomerOrThrow(customerId);
-        quote.updateInfo(customer, internalMemo, issuedDate, validUntil, deliveryTerm);
+        Customer customer = getCustomerOrThrow(customerId, requester.getId());
+
+        //고객 정보가 바뀌었을 때를 대비해 스냅샷을 새로 생성
+        QuoteCustomer snapshot = QuoteCustomer.builder()
+                .companyName(customer.getCompanyName())
+                .contactName(customer.getContactName())
+                .email(customer.getEmail())
+                .phone(customer.getPhone())
+                .address(customer.getAddress())
+                .build();
+
+        quote.updateInfo(customer, snapshot, internalMemo, issuedDate, validUntil, deliveryTerm);
 
         quoteItemRepository.deleteByQuoteId(quoteId);
         List<QuoteItem> items = buildItems(quote, itemCommands);
@@ -238,6 +262,14 @@ public class QuoteService {
         return newQuote;
     }
 
+    /**
+     * 매일 자정: 유효기간이 지난 견적을 EXPIRED 상태로 전이한다.
+     *
+     * <p>통계 갱신은 이 메서드에서 직접 수행하지 않는다.
+     * REQUIRES_NEW 트랜잭션으로 recalculate를 호출하면 외부 트랜잭션(expire)이
+     * 롤백될 경우 통계만 갱신된 채로 남는 정합성 문제가 발생한다.
+     * 만료 견적의 통계는 {@link UserStatsBatchService}가 매일 02:00에 일괄 처리한다.</p>
+     */
     @Scheduled(cron = "0 0 0 * * *")
     @Transactional
     public void expireOverdueQuotes() {
@@ -253,8 +285,8 @@ public class QuoteService {
         return QuoteDetailResponse.from(quote);
     }
 
-    private Customer getCustomerOrThrow(Long customerId) {
-        return customerRepository.findById(customerId)
+    private Customer getCustomerOrThrow(Long customerId, Long requesterId) {
+        return customerRepository.findByIdAndUserId(customerId, requesterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.CUSTOMER_NOT_FOUND));
     }
 
@@ -344,30 +376,16 @@ public class QuoteService {
                 .toList();
     }
 
-    private void saveApprovalReasons(Quote quote, List<ApprovalReasonType> reasons) {
-        approvalReasonRepository.saveAll(reasons.stream()
-                .map(reason -> QuoteApprovalReason.builder()
-                        .quote(quote)
-                        .reasonType(QuoteApprovalReason.ReasonType.valueOf(reason.name()))
-                        .reasonMessage(defaultMessage(reason, quote))
-                        .build())
-                .toList());
-    }
-
-    private String defaultMessage(ApprovalReasonType reason, Quote quote) {
-        return switch (reason) {
-            case DISCOUNT_EXCEEDED -> "적용 할인율이 정책 허용치를 초과합니다.";
-            case LOW_PROFIT -> String.format("이익률 %.2f%%가 최소 기준 미만입니다.", quote.getProfitRate());
-            case HIGH_AMOUNT -> String.format("견적 총금액 %,.0f원이 승인 기준금액을 초과합니다.",
-                    quote.getTotalAmount().doubleValue());
-        };
-    }
-
     public record QuoteItemCommand(
-            Long productId, String productName, String productCode,
-            String spec,
-            BigDecimal unitPrice, BigDecimal costPrice,
-            BigDecimal quantity, BigDecimal discountRate, Boolean vatApplicable
+            Long productId,
+            @NotBlank(message = "제품명은 필수입니다.") String productName,
+            String productCode,
+            @Size(max = 200) String spec,
+            @NotNull(message = "단가는 필수입니다.") @DecimalMin("0") BigDecimal unitPrice,
+            @NotNull(message = "원가는 필수입니다.") @DecimalMin("0") BigDecimal costPrice,
+            @NotNull(message = "수량은 필수입니다.") @DecimalMin("0.01") BigDecimal quantity,
+            @DecimalMin("0") @DecimalMax("100") BigDecimal discountRate, // 💡 할인율 상한선(100%) 추가
+            @NotNull(message = "VAT 적용 여부는 필수입니다.") Boolean vatApplicable
     ) {}
 
     private User findUser(Long userId) {

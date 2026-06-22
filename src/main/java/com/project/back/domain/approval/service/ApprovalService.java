@@ -11,6 +11,7 @@ import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
+import com.project.back.domain.user.service.UserStatsUpdateService;
 import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
@@ -31,6 +32,7 @@ public class ApprovalService {
     private final QuoteApprovalHistoryRepository quoteApprovalHistoryRepository;
     private final UserRepository userRepository;
     private final QuoteRepository quoteRepository;
+    private final UserStatsUpdateService userStatsUpdateService;
 
     // ── 1. 승인 요청 ──
     @Transactional
@@ -113,6 +115,9 @@ public class ApprovalService {
                 memo
         );
 
+        // 견적 작성자 통계 갱신 (승인 + 발송 카운트 반영) - 커밋 이후 재집계
+        userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
+
         return approvalRequest;
     }
 
@@ -153,6 +158,9 @@ public class ApprovalService {
                 ApprovalRequest.ApprovalStatus.REJECTED,
                 rejectReason
         );
+
+        // 견적 작성자 통계 갱신 (반려 카운트 반영) - 커밋 이후 재집계
+        userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
 
         return approvalRequest;
     }

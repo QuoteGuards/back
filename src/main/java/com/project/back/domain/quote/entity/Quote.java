@@ -167,9 +167,10 @@ public class Quote {
         this.profitRate = profitRate;
     }
 
-    public void updateInfo(Customer customer, String internalMemo,
+    public void updateInfo(Customer customer, QuoteCustomer snapshot, String internalMemo,
                            LocalDate issuedDate, LocalDate validUntil, String deliveryTerm) {
         this.customer = customer;
+        this.quoteCustomer = snapshot; //스냅샷 동기화
         this.internalMemo = internalMemo;
         this.issuedDate = issuedDate;
         this.validUntil = validUntil;
