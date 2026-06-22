@@ -31,8 +31,16 @@ public record EmailHistoryResponse(
                 buyer,
                 e.getToEmail(),
                 e.getSubject(),
-                e.getStatus() == EmailSendStatus.SENT ? "성공" : "실패",
+                toStatusLabel(e.getStatus()),
                 e.getFailureReason()
         );
+    }
+
+    private static String toStatusLabel(EmailSendStatus status) {
+        return switch (status) {
+            case SENT -> "성공";
+            case PENDING -> "대기중";
+            case FAILED -> "실패";
+        };
     }
 }
