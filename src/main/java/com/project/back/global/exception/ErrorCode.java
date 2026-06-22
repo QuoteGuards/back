@@ -47,6 +47,9 @@ public enum ErrorCode {
     QUOTE_NOT_EXPIRED(HttpStatus.BAD_REQUEST, "QUOTE_003", "만료된 견적만 재작성할 수 있습니다."),
     QUOTE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "QUOTE_004", "본인이 작성한 견적만 접근할 수 있습니다."),
 
+    // Email
+    EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_001", "이메일 발송에 실패했습니다."),
+
     // Customer
     CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "CUSTOMER_001", "존재하지 않는 고객입니다."),
 
