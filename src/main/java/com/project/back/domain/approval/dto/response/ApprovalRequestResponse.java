@@ -34,7 +34,7 @@ public class ApprovalRequestResponse {
     public static ApprovalRequestResponse from(ApprovalRequest entity) {
         return ApprovalRequestResponse.builder()
                 .id(entity.getId())
-                .quoteId(entity.getQuoteId())
+                .quoteId(entity.getQuote().getId())
                 .requesterId(entity.getRequester().getId())
                 .requesterName(entity.getRequester().getName())
                 .approverId(entity.getApprover() != null ? entity.getApprover().getId() : null)

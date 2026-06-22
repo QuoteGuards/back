@@ -116,7 +116,7 @@ public class QuoteService {
                 quote.getDiscountPolicy(), items, quote.getTotalAmount(), quote.getProfitRate());
 
         boolean approvalRequired = !reasons.isEmpty();
-        approvalReasonRepository.deleteByQuoteId(quoteId);
+        approvalReasonRepository.deleteByQuote_Id(quoteId);
         if (approvalRequired) saveApprovalReasons(quote, reasons);
 
         quote.complete(approvalRequired);
