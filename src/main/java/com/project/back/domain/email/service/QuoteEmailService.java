@@ -76,12 +76,26 @@ public class QuoteEmailService {
             }
 
             mailSender.send(message);
-            emailHistoryService.record(user, quote, request, EmailSendStatus.SENT, null);
 
         } catch (MessagingException | IOException | RuntimeException e) {
-            log.error("견적서 이메일 발송 실패 - quoteNumber={}, to={}", quoteNumber, request.to(), e);
+            log.error("견적서 이메일 발송 실패 - quoteNumber={}, to={}", quoteNumber, maskEmail(request.to()), e);
             emailHistoryService.record(user, quote, request, EmailSendStatus.FAILED, e.getMessage());
             throw new CustomException(ErrorCode.EMAIL_SEND_FAILED);
         }
+
+        // 발송 성공 후 이력 저장 - 이력 저장 실패가 발송 결과를 FAILED로 뒤집지 않도록 try 밖에서 처리
+        emailHistoryService.record(user, quote, request, EmailSendStatus.SENT, null);
+    }
+
+    // 로그에 수신자 이메일을 평문 노출하지 않도록 로컬 파트 앞 2자만 남기고 마스킹
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return "***";
+        }
+        int at = email.indexOf('@');
+        String local = email.substring(0, at);
+        String domain = email.substring(at);
+        String visible = local.length() <= 2 ? local : local.substring(0, 2);
+        return visible + "***" + domain;
     }
 }
