@@ -3,6 +3,7 @@ package com.project.back.domain.email.service;
 import com.project.back.domain.document.dto.QuotePdfData;
 import com.project.back.domain.document.service.QuoteDocumentService;
 import com.project.back.domain.email.dto.QuoteEmailRequest;
+import com.project.back.domain.email.entity.EmailSendStatus;
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.user.entity.User;
@@ -34,6 +35,7 @@ public class QuoteEmailService {
     private final QuoteRepository quoteRepository;
     private final UserRepository userRepository;
     private final QuoteDocumentService documentService;
+    private final EmailHistoryService emailHistoryService;
 
     @Value("${mail.from-address}")
     private String fromAddress;
@@ -41,7 +43,12 @@ public class QuoteEmailService {
     @Value("${mail.from-name:QuoteGuard}")
     private String fromName;
 
-    public void sendQuoteEmail(String quoteNumber, Long userId, QuoteEmailRequest request) {
+    public void sendQuoteEmail(
+            String quoteNumber,
+            Long userId,
+            QuoteEmailRequest request
+    ) {
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
@@ -55,9 +62,11 @@ public class QuoteEmailService {
 
             helper.setFrom(fromAddress, fromName);
             helper.setTo(request.to());
+
             if (StringUtils.hasText(request.cc())) {
                 helper.setCc(request.cc());
             }
+
             helper.setSubject(request.subject());
             helper.setText(request.body() != null ? request.body() : "", false);
 
@@ -67,8 +76,11 @@ public class QuoteEmailService {
             }
 
             mailSender.send(message);
-        } catch (MessagingException | IOException e) {
+            emailHistoryService.record(user, quote, request, EmailSendStatus.SENT, null);
+
+        } catch (MessagingException | IOException | RuntimeException e) {
             log.error("견적서 이메일 발송 실패 - quoteNumber={}, to={}", quoteNumber, request.to(), e);
+            emailHistoryService.record(user, quote, request, EmailSendStatus.FAILED, e.getMessage());
             throw new CustomException(ErrorCode.EMAIL_SEND_FAILED);
         }
     }
