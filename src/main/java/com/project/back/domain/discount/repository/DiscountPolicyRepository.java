@@ -11,8 +11,15 @@ import org.springframework.data.repository.query.Param;
 public interface DiscountPolicyRepository extends JpaRepository<DiscountPolicy,Long> {
 
     // 필터 적용해서 정책 찾기
-    @Query("""
+    @Query(value = """
             SELECT p FROM DiscountPolicy p
+            LEFT JOIN FETCH p.category
+            LEFT JOIN FETCH p.product
+            WHERE (:targetType IS NULL OR p.targetType = :targetType)
+              AND (:isActive IS NULL OR p.isActive = :isActive)
+            """,
+            countQuery = """
+            SELECT COUNT(p) FROM DiscountPolicy p
             WHERE (:targetType IS NULL OR p.targetType = :targetType)
               AND (:isActive IS NULL OR p.isActive = :isActive)
             """)
