@@ -2,9 +2,11 @@ package com.project.back.domain.dashboard.service;
 
 import com.project.back.domain.dashboard.dto.MonthlyTrendRow;
 import com.project.back.domain.dashboard.dto.PeriodRange;
+import com.project.back.domain.dashboard.dto.StatusCountRow;
 import com.project.back.domain.dashboard.dto.SummaryRow;
 import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
 import com.project.back.domain.dashboard.dto.response.MonthlyTrendResponse;
+import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
 import com.project.back.domain.dashboard.repository.DashboardRepository;
 import com.project.back.global.enums.QuoteStatus;
 import lombok.RequiredArgsConstructor;
@@ -14,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -58,6 +62,23 @@ public class DashboardService {
                 .quoteCount(nzL(row.quoteCount()))
                 .totalAmount(nz(row.totalAmount()))
                 .build();
+    }
+
+    // 견적 상태별 건수 (전체 상태를 0 포함하여 반환 → 차트 일관성)
+    public List<QuoteStatusCountResponse> getQuoteStatusCount(String period, LocalDate from, LocalDate to) {
+        PeriodRange range = PeriodRange.of(period, from, to);
+
+        Map<QuoteStatus, Long> counts = new EnumMap<>(QuoteStatus.class);
+        for (StatusCountRow row : dashboardRepository.aggregateStatusCount(range.from(), range.to())) {
+            counts.put(row.status(), nzL(row.count()));
+        }
+
+        return java.util.Arrays.stream(QuoteStatus.values())
+                .map(status -> QuoteStatusCountResponse.builder()
+                        .status(status.name())
+                        .count(counts.getOrDefault(status, 0L))
+                        .build())
+                .toList();
     }
 
     private long nzL(Long v) {

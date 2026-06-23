@@ -1,6 +1,7 @@
 package com.project.back.domain.dashboard.repository;
 
 import com.project.back.domain.dashboard.dto.MonthlyTrendRow;
+import com.project.back.domain.dashboard.dto.StatusCountRow;
 import com.project.back.domain.dashboard.dto.SummaryRow;
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.global.enums.QuoteStatus;
@@ -51,6 +52,22 @@ public interface DashboardRepository extends JpaRepository<Quote, Long> {
             ORDER BY YEAR(q.createdAt), MONTH(q.createdAt)
             """)
     List<MonthlyTrendRow> aggregateMonthlyTrend(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
+
+    // 견적 상태별 건수 (데이터 있는 상태만 반환 → Service에서 전체 상태 0 보정)
+    @Query("""
+            SELECT new com.project.back.domain.dashboard.dto.StatusCountRow(
+                q.status,
+                COUNT(q))
+            FROM Quote q
+            WHERE q.isLatest = true
+              AND (:from IS NULL OR q.createdAt >= :from)
+              AND (:to   IS NULL OR q.createdAt <= :to)
+            GROUP BY q.status
+            """)
+    List<StatusCountRow> aggregateStatusCount(
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
     );

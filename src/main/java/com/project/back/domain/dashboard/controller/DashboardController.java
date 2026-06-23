@@ -2,6 +2,7 @@ package com.project.back.domain.dashboard.controller;
 
 import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
 import com.project.back.domain.dashboard.dto.response.MonthlyTrendResponse;
+import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
 import com.project.back.domain.dashboard.service.DashboardService;
 import com.project.back.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -45,6 +46,19 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponse.success(
                 "월별 추이 조회 성공",
                 dashboardService.getMonthlyTrend(period, from, to)
+        ));
+    }
+
+    // 견적 상태별 건수
+    @GetMapping("/quote-status")
+    public ResponseEntity<ApiResponse<List<QuoteStatusCountResponse>>> getQuoteStatusCount(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "견적 상태별 건수 조회 성공",
+                dashboardService.getQuoteStatusCount(period, from, to)
         ));
     }
 }
