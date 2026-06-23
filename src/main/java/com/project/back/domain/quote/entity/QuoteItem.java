@@ -75,6 +75,9 @@ public class QuoteItem {
     @Column(length = 200)
     private String spec;
 
+    @Column(name = "discount_reason", length = 255)
+    private String discountReason;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -84,11 +87,12 @@ public class QuoteItem {
     private LocalDateTime updatedAt;
 
     public void updateCalculation(BigDecimal discountAmount, BigDecimal lineSupplyAmount,
-                                  BigDecimal vatAmount, BigDecimal lineTotal) {
+                                  BigDecimal vatAmount, BigDecimal lineTotal, String discountReason) {
         this.discountAmount = discountAmount;
         this.lineSupplyAmount = lineSupplyAmount;
         this.vatAmount = vatAmount;
         this.lineTotal = lineTotal;
+        this.discountReason = discountReason;
     }
 
     public void updateQuantityAndDiscount(BigDecimal quantity, BigDecimal discountRate) {
