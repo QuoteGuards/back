@@ -15,6 +15,7 @@ import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -88,7 +89,19 @@ public class TrainingService {
     }
 
     private boolean isDuplicateConstraint(DataIntegrityViolationException e, String constraintName) {
-        return e.getMessage() != null && e.getMessage().contains(constraintName);
+        Throwable cause = e;
+        while (cause != null) {
+            if (cause instanceof org.hibernate.exception.ConstraintViolationException violation) {
+                return constraintName.equalsIgnoreCase(violation.getConstraintName());
+            }
+            cause = cause.getCause();
+        }
+        return false;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveGuideConfirmation(GuideConfirmation confirmation) {
+        guideConfirmationRepository.saveAndFlush(confirmation);
     }
 
     //견적 작성 가이드 확인 완료 처리
@@ -99,16 +112,10 @@ public class TrainingService {
 
         if (!alreadyConfirmed) {
             try {
-                GuideConfirmation confirmation = GuideConfirmation.builder()
-                        .user(user)
-                        .guideType(GuideType.QUOTE_WRITE_GUIDE)
-                        .build();
-                guideConfirmationRepository.saveAndFlush(confirmation);
+                GuideConfirmation confirmation = GuideConfirmation.builder().user(user).guideType(GuideType.QUOTE_WRITE_GUIDE).build();
+                saveGuideConfirmation(confirmation); // 격리된 트랜잭션 호출
             } catch (DataIntegrityViolationException e) {
-                if (!isDuplicateConstraint(e, "uk_guide_confirmation_user_type")) {
-                    throw e;
-                }
-
+                if (!isDuplicateConstraint(e, "uk_guide_confirmation_user_type")) throw e;
             }
         }
     }
@@ -122,19 +129,23 @@ public class TrainingService {
                 .findAllByTrainingContentIdWithUser(content.getId());
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public UserTrainingProgress saveInitialProgress(User user, TrainingContent content) {
+        UserTrainingProgress progress = UserTrainingProgress.builder()
+                .user(user)
+                .trainingContent(content)
+                .build();
+        return userTrainingProgressRepository.saveAndFlush(progress);
+    }
+
     private UserTrainingProgress createInitialProgress(User user, TrainingContent content) {
         try {
-            UserTrainingProgress progress = UserTrainingProgress.builder()
-                    .user(user)
-                    .trainingContent(content)
-                    .build();
-            return userTrainingProgressRepository.saveAndFlush(progress);
+            return saveInitialProgress(user, content);
         } catch (DataIntegrityViolationException e) {
             if (!isDuplicateConstraint(e, "uk_user_training_progress_user_content")) {
                 throw e;
             }
-            return userTrainingProgressRepository
-                    .findByUserIdAndTrainingContentId(user.getId(), content.getId())
+            return userTrainingProgressRepository.findByUserIdAndTrainingContentId(user.getId(), content.getId())
                     .orElseThrow(() -> e);
         }
     }
