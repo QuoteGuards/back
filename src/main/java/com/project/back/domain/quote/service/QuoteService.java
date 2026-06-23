@@ -394,6 +394,7 @@ public class QuoteService {
             @NotNull(message = "수량은 필수입니다.") @DecimalMin("0.01") BigDecimal quantity,
             @DecimalMin("0") @DecimalMax("100") BigDecimal discountRate,
             @NotNull(message = "VAT 적용 여부는 필수입니다.") Boolean vatApplicable,
+            @Size(max = 255, message = "할인 사유는 255자 이내로 입력해주세요.")
             String discountReason // 할인 사유 필드
     ) {
         public void validateDiscountReason() {
