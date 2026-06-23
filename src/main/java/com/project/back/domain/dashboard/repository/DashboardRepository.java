@@ -75,20 +75,21 @@ public interface DashboardRepository extends JpaRepository<Quote, Long> {
             @Param("to") LocalDateTime to
     );
 
-    // 인기 제품 순위: quote_items를 productId로 집계 (수동입력/삭제제품 제외)
+    // 인기 제품 순위: Product를 조인해 productId 기준 집계 (현재 제품명 사용, 스냅샷 이름 분리/중복 방지)
+    // INNER JOIN이라 productId NULL(수동입력) 및 삭제된 제품은 자동 제외
     @Query("""
             SELECT new com.project.back.domain.dashboard.dto.PopularProductRow(
-                qi.productId,
-                qi.productName,
+                p.id,
+                p.name,
                 COUNT(qi),
                 SUM(qi.quantity),
                 SUM(qi.lineTotal))
             FROM QuoteItem qi
-            WHERE qi.productId IS NOT NULL
-              AND qi.quote.isLatest = true
+            JOIN Product p ON p.id = qi.productId
+            WHERE qi.quote.isLatest = true
               AND (:from IS NULL OR qi.quote.createdAt >= :from)
               AND (:to   IS NULL OR qi.quote.createdAt <= :to)
-            GROUP BY qi.productId, qi.productName
+            GROUP BY p.id, p.name
             ORDER BY COUNT(qi) DESC, SUM(qi.quantity) DESC
             """)
     List<PopularProductRow> aggregatePopularProducts(
