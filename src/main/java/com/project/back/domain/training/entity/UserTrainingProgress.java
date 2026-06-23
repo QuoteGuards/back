@@ -65,18 +65,31 @@ public class UserTrainingProgress {
 
     // 진도율 업데이트 (80% 이상이면 COMPLETED로 전이)
     public void updateProgress(BigDecimal progressRate, int watchedSeconds, int lastWatchedSeconds) {
+        // 1. 진도율 검증 (0 ~ 100)
+        if (progressRate == null
+                || progressRate.compareTo(BigDecimal.ZERO) < 0
+                || progressRate.compareTo(new BigDecimal("100.00")) > 0) {
+            throw new IllegalArgumentException("진도율은 0에서 100 사이여야 합니다.");
+        }
+
+        // 2. 시간 검증 (음수 금지 및 논리적 순서)
+        if (watchedSeconds < 0 || lastWatchedSeconds < 0 || lastWatchedSeconds > watchedSeconds) {
+            throw new IllegalArgumentException("유효하지 않은 시청 시간입니다.");
+        }
+
         this.progressRate = progressRate;
         this.watchedSeconds = watchedSeconds;
         this.lastWatchedSeconds = lastWatchedSeconds;
 
-        if (this.status == TrainingStatus.NOT_STARTED) {
-            this.status = TrainingStatus.IN_PROGRESS;
+        // 80% 이상이면 자동으로 완료 처리
+        if (this.status != TrainingStatus.COMPLETED) {
+            if (this.progressRate.compareTo(new BigDecimal("80.00")) >= 0) {
+                this.status = TrainingStatus.COMPLETED;
+                this.completedAt = LocalDateTime.now();
+            } else if (this.progressRate.compareTo(BigDecimal.ZERO) > 0) {
+                this.status = TrainingStatus.IN_PROGRESS;
+            }
         }
 
-        if (progressRate.compareTo(new BigDecimal("80.00")) >= 0
-                && this.status != TrainingStatus.COMPLETED) {
-            this.status = TrainingStatus.COMPLETED;
-            this.completedAt = LocalDateTime.now();
-        }
     }
 }
