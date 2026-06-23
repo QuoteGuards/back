@@ -1,5 +1,6 @@
 package com.project.back.domain.dashboard.repository;
 
+import com.project.back.domain.dashboard.dto.MonthlyTrendRow;
 import com.project.back.domain.dashboard.dto.SummaryRow;
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.global.enums.QuoteStatus;
@@ -8,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public interface DashboardRepository extends JpaRepository<Quote, Long> {
 
@@ -32,5 +34,24 @@ public interface DashboardRepository extends JpaRepository<Quote, Long> {
             @Param("to") LocalDateTime to,
             @Param("approved") QuoteStatus approved,
             @Param("rejected") QuoteStatus rejected
+    );
+
+    // 월별 추이: 연·월 단위로 견적 수 / 총액 집계 (데이터 있는 월만 반환)
+    @Query("""
+            SELECT new com.project.back.domain.dashboard.dto.MonthlyTrendRow(
+                YEAR(q.createdAt),
+                MONTH(q.createdAt),
+                COUNT(q),
+                SUM(q.totalAmount))
+            FROM Quote q
+            WHERE q.isLatest = true
+              AND (:from IS NULL OR q.createdAt >= :from)
+              AND (:to   IS NULL OR q.createdAt <= :to)
+            GROUP BY YEAR(q.createdAt), MONTH(q.createdAt)
+            ORDER BY YEAR(q.createdAt), MONTH(q.createdAt)
+            """)
+    List<MonthlyTrendRow> aggregateMonthlyTrend(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
     );
 }

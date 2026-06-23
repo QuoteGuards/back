@@ -1,6 +1,7 @@
 package com.project.back.domain.dashboard.controller;
 
 import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
+import com.project.back.domain.dashboard.dto.response.MonthlyTrendResponse;
 import com.project.back.domain.dashboard.service.DashboardService;
 import com.project.back.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -10,10 +11,12 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/dashboard")
 @PreAuthorize("hasAnyRole('SALES_MANAGER', 'SUPER_ADMIN')")
+// 최고관리자, 영업관리자만 접근
 @RequiredArgsConstructor
 public class DashboardController {
 
@@ -29,6 +32,19 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponse.success(
                 "대시보드 요약 조회 성공",
                 dashboardService.getSummary(period, from, to)
+        ));
+    }
+
+    // 월별 추이: 월별 견적 수 / 총액 (추이 그래프용)
+    @GetMapping("/monthly-trend")
+    public ResponseEntity<ApiResponse<List<MonthlyTrendResponse>>> getMonthlyTrend(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "월별 추이 조회 성공",
+                dashboardService.getMonthlyTrend(period, from, to)
         ));
     }
 }
