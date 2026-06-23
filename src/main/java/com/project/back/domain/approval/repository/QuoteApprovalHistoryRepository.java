@@ -17,11 +17,13 @@ public interface QuoteApprovalHistoryRepository extends JpaRepository<QuoteAppro
 
     // 특정 견적의 전체 승인 이력 조회
     @Query("""
+
             SELECT h FROM QuoteApprovalHistory h
-            JOIN h.approvalRequest ar
-            WHERE ar.quoteId = :quoteId
-            ORDER BY h.actedAt ASC
-            """)
+                JOIN h.approvalRequest ar
+                JOIN FETCH h.actor
+                WHERE ar.quote.id = :quoteId
+                ORDER BY h.actedAt ASC
+        """)
     List<QuoteApprovalHistory> findAllByQuoteId(@Param("quoteId") Long quoteId);
 
     // 특정 승인 요청의 가장 최근 이력 조회

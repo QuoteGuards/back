@@ -45,7 +45,7 @@ public class ApprovalRequestDetailResponse {
     ) {
         return ApprovalRequestDetailResponse.builder()
                 .id(entity.getId())
-                .quoteId(entity.getQuoteId())
+                .quoteId(entity.getQuote().getId())
                 .requesterId(entity.getRequester().getId())
                 .requesterName(entity.getRequester().getName())
                 .approverId(entity.getApprover() != null
