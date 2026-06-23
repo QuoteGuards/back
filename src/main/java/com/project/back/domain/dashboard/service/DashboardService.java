@@ -3,12 +3,14 @@ package com.project.back.domain.dashboard.service;
 import com.project.back.domain.dashboard.dto.MonthlyTrendRow;
 import com.project.back.domain.dashboard.dto.PeriodRange;
 import com.project.back.domain.dashboard.dto.PopularProductRow;
+import com.project.back.domain.dashboard.dto.SalesStaffRow;
 import com.project.back.domain.dashboard.dto.StatusCountRow;
 import com.project.back.domain.dashboard.dto.SummaryRow;
 import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
 import com.project.back.domain.dashboard.dto.response.MonthlyTrendResponse;
 import com.project.back.domain.dashboard.dto.response.PopularProductResponse;
 import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
+import com.project.back.domain.dashboard.dto.response.SalesStaffResponse;
 import com.project.back.domain.dashboard.repository.DashboardRepository;
 import com.project.back.global.enums.QuoteStatus;
 import lombok.RequiredArgsConstructor;
@@ -103,6 +105,41 @@ public class DashboardService {
                 .totalQuantity(nz(row.totalQuantity()))
                 .totalSalesAmount(nz(row.totalSalesAmount()))
                 .build();
+    }
+
+    // 영업사원별 통계 (작성건수/승인율/반려율)
+    public List<SalesStaffResponse> getSalesStaff(String period, LocalDate from, LocalDate to) {
+        PeriodRange range = PeriodRange.of(period, from, to);
+
+        return dashboardRepository.aggregateSalesStaff(
+                        range.from(), range.to(), QuoteStatus.APPROVED, QuoteStatus.REJECTED)
+                .stream()
+                .map(this::toSalesStaffResponse)
+                .toList();
+    }
+
+    private SalesStaffResponse toSalesStaffResponse(SalesStaffRow row) {
+        long approved = nzL(row.approvedQuotes());
+        long rejected = nzL(row.rejectedQuotes());
+        long processed = approved + rejected;
+
+        return SalesStaffResponse.builder()
+                .userId(row.userId())
+                .userName(row.userName())
+                .totalQuotes(nzL(row.totalQuotes()))
+                .approvedQuotes(approved)
+                .rejectedQuotes(rejected)
+                .approvalRate(ratio(approved, processed))
+                .rejectionRate(ratio(rejected, processed))
+                .build();
+    }
+
+    // 비율(%) 계산, 0 나눗셈 방어
+    private BigDecimal ratio(long part, long total) {
+        if (total == 0) return BigDecimal.ZERO;
+        return BigDecimal.valueOf(part)
+                .multiply(BigDecimal.valueOf(100))
+                .divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
     }
 
     private long nzL(Long v) {

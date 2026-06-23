@@ -2,6 +2,7 @@ package com.project.back.domain.dashboard.repository;
 
 import com.project.back.domain.dashboard.dto.MonthlyTrendRow;
 import com.project.back.domain.dashboard.dto.PopularProductRow;
+import com.project.back.domain.dashboard.dto.SalesStaffRow;
 import com.project.back.domain.dashboard.dto.StatusCountRow;
 import com.project.back.domain.dashboard.dto.SummaryRow;
 import com.project.back.domain.quote.entity.Quote;
@@ -94,5 +95,28 @@ public interface DashboardRepository extends JpaRepository<Quote, Long> {
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
             Pageable pageable
+    );
+
+    // 영업사원별: 작성자(createdBy)로 GROUP BY, 견적수/승인/반려 집계
+    @Query("""
+            SELECT new com.project.back.domain.dashboard.dto.SalesStaffRow(
+                u.id,
+                u.name,
+                COUNT(q),
+                SUM(CASE WHEN q.status = :approved THEN 1L ELSE 0L END),
+                SUM(CASE WHEN q.status = :rejected THEN 1L ELSE 0L END))
+            FROM Quote q
+            JOIN q.createdBy u
+            WHERE q.isLatest = true
+              AND (:from IS NULL OR q.createdAt >= :from)
+              AND (:to   IS NULL OR q.createdAt <= :to)
+            GROUP BY u.id, u.name
+            ORDER BY COUNT(q) DESC
+            """)
+    List<SalesStaffRow> aggregateSalesStaff(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            @Param("approved") QuoteStatus approved,
+            @Param("rejected") QuoteStatus rejected
     );
 }

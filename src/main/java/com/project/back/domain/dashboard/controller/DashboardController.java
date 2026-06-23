@@ -4,6 +4,7 @@ import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
 import com.project.back.domain.dashboard.dto.response.MonthlyTrendResponse;
 import com.project.back.domain.dashboard.dto.response.PopularProductResponse;
 import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
+import com.project.back.domain.dashboard.dto.response.SalesStaffResponse;
 import com.project.back.domain.dashboard.service.DashboardService;
 import com.project.back.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -74,6 +75,19 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponse.success(
                 "인기 제품 순위 조회 성공",
                 dashboardService.getPopularProducts(period, from, to, limit)
+        ));
+    }
+
+    // 영업사원별 통계: 작성건수 / 승인율 / 반려율
+    @GetMapping("/sales-staff")
+    public ResponseEntity<ApiResponse<List<SalesStaffResponse>>> getSalesStaff(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "영업사원별 통계 조회 성공",
+                dashboardService.getSalesStaff(period, from, to)
         ));
     }
 }
