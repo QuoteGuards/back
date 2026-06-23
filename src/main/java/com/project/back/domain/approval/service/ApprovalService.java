@@ -12,6 +12,7 @@ import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.domain.user.service.UserStatsUpdateService;
+import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import jakarta.persistence.EntityNotFoundException;
@@ -45,7 +46,7 @@ public class ApprovalService {
         // }
 
         // 이미 PENDING 상태 승인 요청이 있으면 중복 요청 방지
-        if (approvalRequestRepository.existsByQuoteIdAndStatus(
+        if (approvalRequestRepository.existsByQuote_IdAndStatus(
                 quoteId, ApprovalRequest.ApprovalStatus.PENDING)) {
             throw new IllegalStateException("이미 승인 대기 중인 요청이 있습니다.");
         }
@@ -54,8 +55,11 @@ public class ApprovalService {
                 .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
 
         // 승인 요청 생성
+        Quote quote = quoteRepository.findById(quoteId)
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+
         ApprovalRequest approvalRequest = ApprovalRequest.builder()
-                .quoteId(quoteId)
+                .quote(quote)
                 .requester(requester)
                 .requestMemo(requestMemo)
                 .status(ApprovalRequest.ApprovalStatus.PENDING) // 승인 대기시 명시적으로 PENDING 설정
@@ -63,10 +67,6 @@ public class ApprovalService {
 
         approvalRequestRepository.save(approvalRequest);
 
-        // 💡 [견적 파트 오케스트레이션 연동 추가]: 승인 요청이 들어갔으므로 견적서 상태를 승인대기(APPROVAL_PENDING)로 전이
-        Quote quote = quoteRepository.findById(quoteId)
-                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
-        quote.complete(true);
 
         // 승인 이력 저장 (REQUESTED)
         saveHistory(
@@ -99,7 +99,7 @@ public class ApprovalService {
         approvalRequestRepository.save(approvalRequest);
 
         // [견적 파트 오케스트레이션 연동]: 연관된 견적서를 찾아 확정 상태로 동기화
-        Quote quote = quoteRepository.findById(approvalRequest.getQuoteId())
+        Quote quote = quoteRepository.findById(approvalRequest.getQuote().getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
 
         // 최종 승인이 났으므로 즉시 발송 가능한 상태 혹은 고객 발송 준비 상태로 전이합니다.
@@ -144,7 +144,7 @@ public class ApprovalService {
         approvalRequestRepository.save(approvalRequest);
 
         //[견적 파트 오케스트레이션 연동]: 반려된 견적서를 REVISING(수정 중) 상태로 변경하여 영업사원 수정 허용
-        Quote quote = quoteRepository.findById(approvalRequest.getQuoteId())
+        Quote quote = quoteRepository.findById(approvalRequest.getQuote().getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
 
         quote.startRevising(); //변경 감지 메서드 호출
@@ -216,13 +216,13 @@ public class ApprovalService {
 
     // ── 7. 승인 필요 사유 조회 ──
     public List<QuoteApprovalReason> getApprovalReasons(Long quoteId) {
-        return quoteApprovalReasonRepository.findByQuoteId(quoteId);
+        return quoteApprovalReasonRepository.findByQuote_Id(quoteId);
     }
 
     // ── Private 메서드 ──
 
     private ApprovalRequest findApprovalRequestById(Long approvalRequestId) {
-        return approvalRequestRepository.findById(approvalRequestId)
+        return approvalRequestRepository.findByIdWithUsers(approvalRequestId)
                 .orElseThrow(() -> new EntityNotFoundException("승인 요청을 찾을 수 없습니다."));
     }
 
@@ -236,7 +236,7 @@ public class ApprovalService {
         ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
 
         List<QuoteApprovalReason> reasons =
-                quoteApprovalReasonRepository.findByQuoteId(approvalRequest.getQuoteId());
+                quoteApprovalReasonRepository.findByQuote_Id(approvalRequest.getQuote().getId());
 
         List<QuoteApprovalHistory> histories =
                 quoteApprovalHistoryRepository
@@ -262,5 +262,43 @@ public class ApprovalService {
                 memo
         );
         quoteApprovalHistoryRepository.save(history);
+
+
     }
+
+    @Transactional
+    public void saveApprovalReasons(Quote quote, List<ApprovalReasonType> reasonTypes) {
+
+        if (reasonTypes == null || reasonTypes.isEmpty()) {
+            return;
+        }
+
+        List<QuoteApprovalReason> reasons = reasonTypes.stream()
+                .map(type -> QuoteApprovalReason.of(
+                        quote,
+                        convertReasonType(type),
+                        buildReasonMessage(type)
+                ))
+                .toList();
+
+        quoteApprovalReasonRepository.saveAll(reasons);
+    }
+
+    // global enum → approval enum 변환
+    private QuoteApprovalReason.ReasonType convertReasonType(ApprovalReasonType type) {
+        return switch (type) {
+            case DISCOUNT_EXCEEDED -> QuoteApprovalReason.ReasonType.DISCOUNT_EXCEEDED;
+            case LOW_PROFIT -> QuoteApprovalReason.ReasonType.LOW_PROFIT;
+            case HIGH_AMOUNT -> QuoteApprovalReason.ReasonType.HIGH_AMOUNT;
+        };
+    }
+
+    private String buildReasonMessage(ApprovalReasonType type) {
+        return switch (type) {
+            case DISCOUNT_EXCEEDED -> "할인율이 정책 기준을 초과했습니다.";
+            case LOW_PROFIT -> "이익률이 최소 기준에 미달합니다.";
+            case HIGH_AMOUNT -> "견적 총액이 고액 기준 이상입니다.";
+        };
+    }
+
 }

@@ -1,6 +1,5 @@
 package com.project.back.domain.quote.service;
 
-import com.project.back.domain.approval.service.ApprovalService;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.customer.repository.CustomerRepository;
 import com.project.back.domain.discount.entity.DiscountPolicy;
@@ -47,7 +46,6 @@ public class QuoteService {
     private final QuoteApprovalReasonRepository approvalReasonRepository;
     private final CustomerRepository customerRepository;
     private final QuoteCalculationService calculationService;
-    private final ApprovalService approvalService;
     private final ApprovalCheckService approvalCheckService;
     private final TrainingService trainingService;
     private final UserStatsUpdateService userStatsUpdateService;
@@ -124,9 +122,15 @@ public class QuoteService {
                 quote.getDiscountPolicy(), items, quote.getTotalAmount(), quote.getProfitRate());
 
         boolean approvalRequired = !reasons.isEmpty();
-        approvalReasonRepository.deleteByQuoteId(quoteId);
+        approvalReasonRepository.deleteByQuote_Id(quoteId);
         if (approvalRequired) {
-            approvalService.saveApprovalReasons(quote, reasons);
+            List<QuoteApprovalReason> reasonEntities = reasons.stream()
+                    .map(r -> QuoteApprovalReason.of(
+                            quote,
+                            QuoteApprovalReason.ReasonType.valueOf(r.name()),
+                            r.name()))
+                    .toList();
+            approvalReasonRepository.saveAll(reasonEntities);
         }
 
         quote.complete(approvalRequired);
