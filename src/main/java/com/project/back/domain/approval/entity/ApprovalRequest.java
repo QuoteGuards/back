@@ -1,5 +1,6 @@
 package com.project.back.domain.approval.entity;
 
+import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -21,8 +22,9 @@ public class ApprovalRequest {
     private Long id;
 
     // Quote Entity 생성 전 임시 처리 → 나중에 @ManyToOne으로 교체
-    @Column(name = "quote_id", nullable = false)
-    private Long quoteId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "quote_id", nullable = false)
+    private Quote quote;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "requester_id", nullable = false)

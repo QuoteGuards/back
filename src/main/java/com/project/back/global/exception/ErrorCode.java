@@ -22,6 +22,9 @@ public enum ErrorCode {
     CANNOT_MODIFY_SELF(HttpStatus.BAD_REQUEST, "USER_002", "자기 자신의 권한 변경 또는 비활성화는 불가합니다."),
     USER_NOT_APPROVED(HttpStatus.BAD_REQUEST, "USER_003", "APPROVED 상태가 아닌 사용자는 비활성화할 수 없습니다."),
     USER_NOT_SUSPENDED(HttpStatus.BAD_REQUEST, "USER_004", "SUSPENDED 상태가 아닌 사용자는 재활성화할 수 없습니다."),
+    DUPLICATE_PHONE(HttpStatus.CONFLICT, "USER_005", "이미 사용 중인 전화번호입니다."),
+    SAME_AS_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "USER_006", "새 비밀번호는 현재 비밀번호와 달라야 합니다."),
+    PASSWORD_CONFIRM_MISMATCH(HttpStatus.BAD_REQUEST, "USER_007", "새 비밀번호와 비밀번호 확인이 일치하지 않습니다."),
 
     // JWT
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "JWT_001", "유효하지 않은 토큰입니다."),
