@@ -373,6 +373,7 @@ public class QuoteService {
                             .costPrice(src.getCostPrice())
                             .quantity(src.getQuantity())
                             .discountRate(src.getDiscountRate())
+                            .discountReason(src.getDiscountReason())
                             .vatApplicable(src.getVatApplicable())
                             .sortOrder(order[0]++)
                             .build();
@@ -384,7 +385,7 @@ public class QuoteService {
     }
 
     public record QuoteItemCommand(
-            Long productId,
+            @NotNull(message = "제품 ID는 필수입니다.") Long productId,
             @NotBlank(message = "제품명은 필수입니다.") String productName,
             String productCode,
             @Size(max = 200) String spec,
