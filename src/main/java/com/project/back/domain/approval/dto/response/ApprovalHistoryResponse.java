@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class ApprovalHistoryResponse {
 
     private Long id;
+    private Long approvalRequestId;
 
     // 처리한 사람
     private Long actorId;
@@ -27,6 +28,7 @@ public class ApprovalHistoryResponse {
     public static ApprovalHistoryResponse from(QuoteApprovalHistory entity) {
         return ApprovalHistoryResponse.builder()
                 .id(entity.getId())
+                .approvalRequestId(entity.getApprovalRequest().getId())
                 .actorId(entity.getActor().getId())
                 .actorName(entity.getActor().getName())
                 .action(entity.getAction().name())
