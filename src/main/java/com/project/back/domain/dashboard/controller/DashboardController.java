@@ -7,6 +7,7 @@ import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
 import com.project.back.domain.dashboard.dto.response.SalesStaffResponse;
 import com.project.back.domain.dashboard.service.DashboardService;
 import com.project.back.global.common.ApiResponse;
+import com.project.back.domain.dashboard.dto.response.SalesAnalysisResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -35,6 +36,19 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponse.success(
                 "대시보드 요약 조회 성공",
                 dashboardService.getSummary(period, from, to)
+        ));
+    }
+
+    // 영업 현황 분석 문구
+    @GetMapping("/sales-analysis")
+    public ResponseEntity<ApiResponse<SalesAnalysisResponse>> getSalesAnalysis(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "영업 현황 분석 조회 성공",
+                dashboardService.getSalesAnalysis(period, from, to)
         ));
     }
 
