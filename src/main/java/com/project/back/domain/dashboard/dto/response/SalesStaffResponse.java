@@ -14,6 +14,6 @@ public class SalesStaffResponse {
     private long totalQuotes;       // 작성 건수
     private long approvedQuotes;    // 승인 건수
     private long rejectedQuotes;    // 반려 건수
-    private BigDecimal approvalRate;  // 승인율(%) = 승인/(승인+반려)
-    private BigDecimal rejectionRate; // 반려율(%)
+    private BigDecimal approvalRate;  // 승인율(%) = 승인/전체작성(totalQuotes)
+    private BigDecimal rejectionRate; // 반려율(%) = 반려/전체작성(totalQuotes)
 }

@@ -120,18 +120,19 @@ public class DashboardService {
     }
 
     private SalesStaffResponse toSalesStaffResponse(SalesStaffRow row) {
+        long total = nzL(row.totalQuotes());
         long approved = nzL(row.approvedQuotes());
         long rejected = nzL(row.rejectedQuotes());
-        long processed = approved + rejected;
 
         return SalesStaffResponse.builder()
                 .userId(row.userId())
                 .userName(row.userName())
-                .totalQuotes(nzL(row.totalQuotes()))
+                .totalQuotes(total)
                 .approvedQuotes(approved)
                 .rejectedQuotes(rejected)
-                .approvalRate(ratio(approved, processed))
-                .rejectionRate(ratio(rejected, processed))
+                // 분모 = 전체 작성 견적(totalQuotes) → 응답 필드와 검산 일관
+                .approvalRate(ratio(approved, total))
+                .rejectionRate(ratio(rejected, total))
                 .build();
     }
 
