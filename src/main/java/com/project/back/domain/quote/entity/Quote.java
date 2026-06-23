@@ -196,6 +196,11 @@ public class Quote {
         this.expiredAt = LocalDateTime.now();
     }
 
+    public void markAsApproved() {
+        this.status = QuoteStatus.APPROVED;
+        this.approvedAt = LocalDateTime.now();
+    }
+
     public void markAsSent() {
         this.status = QuoteStatus.SENT;
         this.sentAt = LocalDateTime.now();
