@@ -14,9 +14,11 @@ public record TrainingProgressRequest(
         @DecimalMax(value = "100.00", message = "진도율은 100 이하여야 합니다.")
         BigDecimal progressRate,
 
+        @NotNull(message = "시청 시간은 필수입니다.")
         @Min(value = 0, message = "시청 시간은 0 이상이어야 합니다.")
-        int watchedSeconds,
+        Integer watchedSeconds,
 
+        @NotNull(message = "마지막 시청 위치는 필수입니다.")
         @Min(value = 0, message = "마지막 시청 위치는 0 이상이어야 합니다.")
-        int lastWatchedSeconds
+        Integer lastWatchedSeconds
 ) {}

@@ -2,11 +2,12 @@
 ### 실행 순서대로 하나씩 실행하세요 (▶ 버튼)
 
 @baseUrl = http://localhost:8080
-@token = 영업사원 로그인 후 받은 토큰 붙여넣기
-@adminToken = 관리자 로그인 후 받은 토큰 붙여넣기
-@customerId = 1
+@token = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiI3IiwiZW1haWwiOiJzYWxlczVAdGVzdC5jb20iLCJyb2xlIjoiU0FMRVNfU1RBRkYiLCJpYXQiOjE3ODIxODEwNTEsImV4cCI6MTc4MjE5OTA1MX0.BYWXlraoW5KExylkV5WkcxxKpUIEmRC9awSGF-L_FoDtsiG5mW79dxw3UqPJG5Go
+@adminToken = eyJhbGciOiJIUzM4NCJ9.eyJzdWIiOiIyIiwiZW1haWwiOiJhZG1pbkB0ZXN0LmNvbSIsInJvbGUiOiJTVVBFUl9BRE1JTiIsImlhdCI6MTc4MjE4MTM3NSwiZXhwIjoxNzgyMTk5Mzc1fQ.y3vWfPwQPmwsjSImQrmZmCrerYP-rTlMPCNso5gx3xMMkCEgI3yX1aIROO2W7Hho
+@customerId = 3
 @quoteId = 6 _견적 작성 후 받은 견적 Id 붙여넣기
 @quoteNumber = Q20260621373835 _견적 작성 후 받은 견적 번호 붙여넣기
+@userId = 8
 
 ###############################################
 # 0. 인증 및 가입 승인 프로세스
@@ -17,11 +18,11 @@ POST {{baseUrl}}/api/auth/signup
 Content-Type: application/json
 
 {
-  "email": "sales@test.com",
+  "email": "sales9@test.com",
   "password": "Password123!",
-  "name": "테스트영업사원",
+  "name": "테스트영업사원9",
   "department": "영업1팀",
-  "phone": "010-1234-5678"
+  "phone": "010-1239-5678"
 }
 
 ### 0-1. 테스트 관리자 계정 생성
@@ -49,14 +50,9 @@ Content-Type: application/json
 
 
 ### 0-3. 관리자 권한으로 영업사원 가입 승인 처리
-POST {{baseUrl}}/api/admin/users/approve
+PATCH {{baseUrl}}/api/admin/users/{{userId}}/approve
 Authorization: Bearer {{adminToken}}
 Content-Type: application/json
-
-{
-  "email": "sales@test.com",
-  "status": "APPROVED"
-}
 
 
 ### 0-4. 승인 완료된 영업사원 로그인 -> 정상 토큰 발급 완료!
@@ -65,7 +61,7 @@ POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
 {
-  "email": "sales@test.com",
+  "email": "sales9@test.com",
   "password": "Password123!"
 }
 
@@ -85,7 +81,7 @@ Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
-  "progressRate": 100.00,
+  "progressRate": 90.00,
   "watchedSeconds": 1200,
   "lastWatchedSeconds": 1200
 }
