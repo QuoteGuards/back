@@ -1,0 +1,34 @@
+package com.project.back.domain.dashboard.controller;
+
+import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
+import com.project.back.domain.dashboard.service.DashboardService;
+import com.project.back.global.common.ApiResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+
+@RestController
+@RequestMapping("/api/admin/dashboard")
+@PreAuthorize("hasAnyRole('SALES_MANAGER', 'SUPER_ADMIN')")
+@RequiredArgsConstructor
+public class DashboardController {
+
+    private final DashboardService dashboardService;
+
+    // 요약 카드: 견적수·금액·승인/반려/발송 건수·평균 할인율·평균 이익률
+    @GetMapping("/summary")
+    public ResponseEntity<ApiResponse<DashboardSummaryResponse>> getSummary(
+            @RequestParam(required = false) String period,  // ONE_MONTH/THREE_MONTHS/SIX_MONTHS/CUSTOM
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "대시보드 요약 조회 성공",
+                dashboardService.getSummary(period, from, to)
+        ));
+    }
+}
