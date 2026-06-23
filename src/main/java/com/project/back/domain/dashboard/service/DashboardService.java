@@ -89,9 +89,10 @@ public class DashboardService {
     // 인기 제품 순위 (TOP N, 기간 필터)
     public List<PopularProductResponse> getPopularProducts(String period, LocalDate from, LocalDate to, int limit) {
         PeriodRange range = PeriodRange.of(period, from, to);
+        int safeLimit = Math.min(Math.max(limit, 1), 100);  // 1~100 보정 (PageRequest 예외 방지)
 
         return dashboardRepository.aggregatePopularProducts(
-                        range.from(), range.to(), PageRequest.of(0, limit))
+                        range.from(), range.to(), PageRequest.of(0, safeLimit))
                 .stream()
                 .map(this::toPopularResponse)
                 .toList();
