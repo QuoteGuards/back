@@ -13,6 +13,7 @@ import com.project.back.global.enums.TrainingType;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,7 +32,7 @@ public class TrainingService {
     //견적 작성 필수 교육 콘텐츠 조회(활성화된 QUOTE_WRITE 타입 콘텐츠 반환)
     public TrainingContent getQuoteWritingContent() {
         return trainingContentRepository
-                .findByTrainingTypeAndActiveTrue(TrainingType.QUOTE_WRITE)
+                .findFirstByTrainingTypeAndActiveTrueOrderByUpdatedAtDesc(TrainingType.QUOTE_WRITE)
                 .orElseThrow(() -> new CustomException(ErrorCode.TRAINING_CONTENT_NOT_FOUND));
     }
 
@@ -67,10 +68,17 @@ public class TrainingService {
 
     //교육 이수 완료 여부 확인 (견적 작성 차단 판단용)
     public boolean isTrainingCompleted(Long userId) {
-        boolean videoCompleted = userTrainingProgressRepository
-                .existsByUserIdAndStatus(userId, TrainingStatus.COMPLETED);
+        TrainingContent content = getQuoteWritingContent();
+
+        UserTrainingProgress progress = userTrainingProgressRepository
+                .findByUserIdAndTrainingContentId(userId, content.getId())
+                .orElse(null);
+
+        boolean videoCompleted = (progress != null && progress.getStatus() == TrainingStatus.COMPLETED);
+
         boolean guideConfirmed = guideConfirmationRepository
                 .existsByUserIdAndGuideType(userId, GuideType.QUOTE_WRITE_GUIDE);
+
         return videoCompleted && guideConfirmed;
     }
 
@@ -86,11 +94,15 @@ public class TrainingService {
                 .existsByUserIdAndGuideType(user.getId(), GuideType.QUOTE_WRITE_GUIDE);
 
         if (!alreadyConfirmed) {
-            GuideConfirmation confirmation = GuideConfirmation.builder()
-                    .user(user)
-                    .guideType(GuideType.QUOTE_WRITE_GUIDE)
-                    .build();
-            guideConfirmationRepository.save(confirmation);
+            try {
+                GuideConfirmation confirmation = GuideConfirmation.builder()
+                        .user(user)
+                        .guideType(GuideType.QUOTE_WRITE_GUIDE)
+                        .build();
+                guideConfirmationRepository.save(confirmation);
+            } catch (DataIntegrityViolationException e) {
+                // 이미 다른 요청에서 성공적으로 저장했으므로 아무것도 하지 않음 (멱등성 보장)
+            }
         }
     }
 
@@ -104,11 +116,17 @@ public class TrainingService {
     }
 
     private UserTrainingProgress createInitialProgress(User user, TrainingContent content) {
-        UserTrainingProgress progress = UserTrainingProgress.builder()
-                .user(user)
-                .trainingContent(content)
-                .build();
-        return userTrainingProgressRepository.save(progress);
+        try {
+            UserTrainingProgress progress = UserTrainingProgress.builder()
+                    .user(user)
+                    .trainingContent(content)
+                    .build();
+            return userTrainingProgressRepository.save(progress);
+        } catch (DataIntegrityViolationException e) {
+            return userTrainingProgressRepository
+                    .findByUserIdAndTrainingContentId(user.getId(), content.getId())
+                    .orElseThrow(() -> e);
+        }
     }
 
     //교육 이수 상태 조회 결과
