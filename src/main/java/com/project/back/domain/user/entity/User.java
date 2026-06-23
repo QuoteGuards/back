@@ -114,6 +114,15 @@ public class User {
         if (position != null) this.position = position;
     }
 
+    public void updateMyProfile(String name, String phone) {
+        if (name != null && !name.isBlank()) this.name = name;
+        if (phone != null) this.phone = phone.isBlank() ? null : phone;
+    }
+
+    public void changePassword(String encodedPassword) {
+        this.password = encodedPassword;
+    }
+
     public void changeRole(UserRole newRole) {
         this.role = newRole;
     }
