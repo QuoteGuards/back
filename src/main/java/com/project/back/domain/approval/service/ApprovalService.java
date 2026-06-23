@@ -102,8 +102,8 @@ public class ApprovalService {
         Quote quote = quoteRepository.findById(approvalRequest.getQuote().getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
 
-        // 최종 승인이 났으므로 즉시 발송 가능한 상태 혹은 고객 발송 준비 상태로 전이합니다.
-        quote.markAsSent();
+        // 승인 완료 상태로 전이. 이후 이메일 발송 시 SENT로 변경된다.
+        quote.markAsApproved();
 
         // 승인 이력 저장
         saveHistory(
