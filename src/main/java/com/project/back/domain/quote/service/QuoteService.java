@@ -333,17 +333,11 @@ public class QuoteService {
         int[] order = {0};
         return commands.stream()
                 .map(cmd -> {
-                    // 할인 사유 검증
                     cmd.validateDiscountReason();
-                    // 제품 검증
                     var product = productRepository.findById(cmd.productId())
                             .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+                    if (!product.isActive()) throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
 
-                    if (!product.isActive()) {
-                        throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
-                    }
-
-                    // 1. 여기서 item 변수를 먼저 선언하고 빌드합니다.
                     QuoteItem item = QuoteItem.builder()
                             .quote(quote)
                             .productId(product.getId())
@@ -359,10 +353,7 @@ public class QuoteService {
                             .sortOrder(order[0]++)
                             .build();
 
-                    // 2. 연관관계 편의 메서드 호출
                     quote.addItem(item);
-
-                    // 3. 이제 item을 리턴합니다.
                     return item;
                 })
                 .toList();
@@ -371,19 +362,24 @@ public class QuoteService {
     private List<QuoteItem> copyItems(Quote newQuote, List<QuoteItem> sourceItems) {
         int[] order = {0};
         return sourceItems.stream()
-                .map(src -> QuoteItem.builder()
-                        .quote(newQuote)
-                        .productId(src.getProductId())
-                        .productName(src.getProductName())
-                        .productCode(src.getProductCode())
-                        .spec(src.getSpec())
-                        .unitPrice(src.getUnitPrice())
-                        .costPrice(src.getCostPrice())
-                        .quantity(src.getQuantity())
-                        .discountRate(src.getDiscountRate())
-                        .vatApplicable(src.getVatApplicable())
-                        .sortOrder(order[0]++)
-                        .build())
+                .map(src -> {
+                    QuoteItem item = QuoteItem.builder()
+                            .quote(newQuote)
+                            .productId(src.getProductId())
+                            .productName(src.getProductName())
+                            .productCode(src.getProductCode())
+                            .spec(src.getSpec())
+                            .unitPrice(src.getUnitPrice())
+                            .costPrice(src.getCostPrice())
+                            .quantity(src.getQuantity())
+                            .discountRate(src.getDiscountRate())
+                            .vatApplicable(src.getVatApplicable())
+                            .sortOrder(order[0]++)
+                            .build();
+
+                    newQuote.addItem(item);
+                    return item;
+                })
                 .toList();
     }
 
