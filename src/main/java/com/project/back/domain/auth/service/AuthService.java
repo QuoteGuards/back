@@ -31,7 +31,14 @@ public class AuthService {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
 
-        // 2. 비밀번호 암호화 및 유저 객체 생성
+        // 2. 중복 전화번호 검사 (전화번호가 입력된 경우에만)
+        if (request.getPhone() != null && !request.getPhone().isBlank()) {
+            if (userRepository.existsByPhone(request.getPhone())) {
+                throw new CustomException(ErrorCode.DUPLICATE_PHONE);
+            }
+        }
+
+        // 3. 비밀번호 암호화 및 유저 객체 생성
         User user = User.builder()
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
