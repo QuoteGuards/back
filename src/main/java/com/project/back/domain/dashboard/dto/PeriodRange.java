@@ -17,9 +17,15 @@ public record PeriodRange(LocalDateTime from, LocalDateTime to) {
             case "ONE_MONTH"    -> new PeriodRange(today.minusMonths(1).atStartOfDay(), null);
             case "THREE_MONTHS" -> new PeriodRange(today.minusMonths(3).atStartOfDay(), null);
             case "SIX_MONTHS"   -> new PeriodRange(today.minusMonths(6).atStartOfDay(), null);
-            case "CUSTOM"       -> new PeriodRange(
-                    from != null ? from.atStartOfDay() : null,
-                    to   != null ? to.atTime(LocalTime.MAX) : null);
+            case "CUSTOM"       -> {
+                LocalDateTime fromDt = from != null ? from.atStartOfDay() : null;
+                LocalDateTime toDt   = to   != null ? to.atTime(LocalTime.MAX) : null;
+                // 역순 범위(from > to) 거부 → 400 (빈 결과 폴백 방지)
+                if (fromDt != null && toDt != null && fromDt.isAfter(toDt)) {
+                    throw new CustomException(ErrorCode.INVALID_INPUT);
+                }
+                yield new PeriodRange(fromDt, toDt);
+            }
             // 유효하지 않은 period 값 → 400 (조용한 전체 기간 폴백 방지)
             default             -> throw new CustomException(ErrorCode.INVALID_INPUT);
         };
