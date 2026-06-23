@@ -27,7 +27,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException e) {
         log.warn("DataIntegrityViolationException: {}", e.getMessage());
-        ErrorCode errorCode = ErrorCode.DUPLICATE_EMAIL;
+        // 예외 메시지에서 위반된 컬럼을 판별하여 적절한 에러코드 반환
+        String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+        Throwable cause = e.getRootCause();
+        String causeMsg = (cause != null && cause.getMessage() != null)
+                ? cause.getMessage().toLowerCase() : "";
+        ErrorCode errorCode = (msg.contains("phone") || causeMsg.contains("phone"))
+                ? ErrorCode.DUPLICATE_PHONE
+                : ErrorCode.DUPLICATE_EMAIL;
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
                 .body(ApiResponse.fail(errorCode.getCode(), errorCode.getMessage()));
