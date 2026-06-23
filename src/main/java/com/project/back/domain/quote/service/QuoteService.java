@@ -5,6 +5,8 @@ import com.project.back.domain.customer.repository.CustomerRepository;
 import com.project.back.domain.discount.entity.DiscountPolicy;
 // 💡 TODO: [2번 팀원 리포지토리 완료 시 변경할 곳] 아래 임시 레포지토리 패키지 경로를 팀원의 실제 경로로 맞추거나 주석을 해제하세요.
 // import com.project.back.domain.discount.repository.DiscountPolicyRepository;
+import com.project.back.domain.discount.repository.DiscountPolicyRepository;
+import com.project.back.domain.product.repository.ProductRepository;
 import com.project.back.domain.quote.dto.response.QuoteDetailResponse;
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.approval.entity.QuoteApprovalReason;
@@ -49,9 +51,8 @@ public class QuoteService {
     private final ApprovalCheckService approvalCheckService;
     private final TrainingService trainingService;
     private final UserStatsUpdateService userStatsUpdateService;
-
-    // 💡 TODO: [제품 팀원 리포지토리 완료 시 변경할 곳] 2번 팀원이 DiscountPolicyRepository를 주입할 수 있게 선언해주면 주석을 해제
-    // private final DiscountPolicyRepository discountPolicyRepository;
+    private final DiscountPolicyRepository discountPolicyRepository;
+    private final ProductRepository productRepository;
 
     @Transactional
     public Quote saveDraft(User createdBy,
@@ -208,8 +209,8 @@ public class QuoteService {
                 .validUntil(source.getValidUntil())
                 .deliveryTerm(source.getDeliveryTerm())
                 .status(QuoteStatus.DRAFT)
-                .quoteCustomer(source.getQuoteCustomer()) // 삼룡님 변수명 싱크 완료
-                .company(source.getCompany())             // 삼룡님 변수명 싱크 완료
+                .quoteCustomer(source.getQuoteCustomer())
+                .company(source.getCompany())
                 .build();
 
         quoteRepository.save(newQuote);
@@ -253,8 +254,8 @@ public class QuoteService {
                 .versionNo(nextVersion)
                 .isLatest(true)
                 .originalQuote(originalQuote)
-                .quoteCustomer(expired.getQuoteCustomer()) // 삼룡님 변수명 싱크 완료
-                .company(expired.getCompany())             // 삼룡님 변수명 싱크 완료
+                .quoteCustomer(expired.getQuoteCustomer())
+                .company(expired.getCompany())
                 .build();
 
         quoteRepository.save(newQuote);
@@ -266,14 +267,6 @@ public class QuoteService {
         return newQuote;
     }
 
-    /**
-     * 매일 자정: 유효기간이 지난 견적을 EXPIRED 상태로 전이한다.
-     *
-     * <p>통계 갱신은 이 메서드에서 직접 수행하지 않는다.
-     * REQUIRES_NEW 트랜잭션으로 recalculate를 호출하면 외부 트랜잭션(expire)이
-     * 롤백될 경우 통계만 갱신된 채로 남는 정합성 문제가 발생한다.
-     * 만료 견적의 통계는 {@link UserStatsBatchService}가 매일 02:00에 일괄 처리한다.</p>
-     */
     @Scheduled(cron = "0 0 0 * * *")
     @Transactional
     public void expireOverdueQuotes() {
@@ -328,36 +321,50 @@ public class QuoteService {
         return candidate;
     }
 
-    /**
-     * 💡 문제 ③ 해결 파트
-     */
     private DiscountPolicy resolveDiscountPolicy(Long policyId) {
-        // 💡 TODO: [2번 팀원 리포지토리 완료 시 변경할 곳]
-        // 2번 팀원이 DiscountPolicyRepository를 만들고 프로젝트를 합치면, 아래 'return null;' 주석을 해제하고 실제 DB 조회 코드를 활성화하세요.
-        /*
-        Long targetPolicyId = (policyId != null) ? policyId : 1L;
-        return discountPolicyRepository.findById(targetPolicyId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 할인 정책입니다."));
-        */
-        return null;
+        if (policyId == null) {
+            return null;
+        }
+        return discountPolicyRepository.findById(policyId)
+                .orElseThrow(() -> new CustomException(ErrorCode.DISCOUNT_POLICY_NOT_FOUND));
     }
 
     private List<QuoteItem> buildItems(Quote quote, List<QuoteItemCommand> commands) {
         int[] order = {0};
         return commands.stream()
-                .map(cmd -> QuoteItem.builder()
-                        .quote(quote)
-                        .productId(cmd.productId())
-                        .productName(cmd.productName())
-                        .productCode(cmd.productCode())
-                        .spec(cmd.spec())
-                        .unitPrice(cmd.unitPrice())
-                        .costPrice(cmd.costPrice() != null ? cmd.costPrice() : BigDecimal.ZERO)
-                        .quantity(cmd.quantity())
-                        .discountRate(cmd.discountRate() != null ? cmd.discountRate() : BigDecimal.ZERO)
-                        .vatApplicable(cmd.vatApplicable() != null ? cmd.vatApplicable() : true)
-                        .sortOrder(order[0]++)
-                        .build())
+                .map(cmd -> {
+                    // 할인 사유 검증
+                    cmd.validateDiscountReason();
+                    // 제품 검증
+                    var product = productRepository.findById(cmd.productId())
+                            .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+
+                    if (!product.isActive()) {
+                        throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
+                    }
+
+                    // 1. 여기서 item 변수를 먼저 선언하고 빌드합니다.
+                    QuoteItem item = QuoteItem.builder()
+                            .quote(quote)
+                            .productId(product.getId())
+                            .productName(product.getName())
+                            .productCode(product.getCode())
+                            .spec(product.getSpec())
+                            .unitPrice(product.getUnitPrice())
+                            .costPrice(product.getCostPrice())
+                            .quantity(cmd.quantity())
+                            .discountRate(cmd.discountRate() != null ? cmd.discountRate() : BigDecimal.ZERO)
+                            .discountReason(cmd.discountReason())
+                            .vatApplicable(cmd.vatApplicable() != null ? cmd.vatApplicable() : true)
+                            .sortOrder(order[0]++)
+                            .build();
+
+                    // 2. 연관관계 편의 메서드 호출
+                    quote.addItem(item);
+
+                    // 3. 이제 item을 리턴합니다.
+                    return item;
+                })
                 .toList();
     }
 
@@ -388,9 +395,19 @@ public class QuoteService {
             @NotNull(message = "단가는 필수입니다.") @DecimalMin("0") BigDecimal unitPrice,
             @NotNull(message = "원가는 필수입니다.") @DecimalMin("0") BigDecimal costPrice,
             @NotNull(message = "수량은 필수입니다.") @DecimalMin("0.01") BigDecimal quantity,
-            @DecimalMin("0") @DecimalMax("100") BigDecimal discountRate, // 💡 할인율 상한선(100%) 추가
-            @NotNull(message = "VAT 적용 여부는 필수입니다.") Boolean vatApplicable
-    ) {}
+            @DecimalMin("0") @DecimalMax("100") BigDecimal discountRate,
+            @NotNull(message = "VAT 적용 여부는 필수입니다.") Boolean vatApplicable,
+            String discountReason // 할인 사유 필드
+    ) {
+        public void validateDiscountReason() {
+            // 할인율이 0보다 큰데 사유가 없으면 에러
+            if (discountRate != null && discountRate.compareTo(BigDecimal.ZERO) > 0) {
+                if (discountReason == null || discountReason.isBlank()) {
+                    throw new CustomException(ErrorCode.DISCOUNT_REASON_REQUIRED);
+                }
+            }
+        }
+    }
 
     private User findUser(Long userId) {
         return userRepository.findById(userId)

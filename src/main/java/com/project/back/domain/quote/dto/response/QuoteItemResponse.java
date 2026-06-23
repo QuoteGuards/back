@@ -18,7 +18,8 @@ public record QuoteItemResponse(
         BigDecimal vatAmount,
         BigDecimal lineSupplyAmount,
         BigDecimal lineTotal,
-        int sortOrder
+        int sortOrder,
+        String discountReason
 ) {
     public static QuoteItemResponse from(QuoteItem item) {
         return new QuoteItemResponse(
@@ -35,7 +36,8 @@ public record QuoteItemResponse(
                 item.getVatAmount(),
                 item.getLineSupplyAmount(),
                 item.getLineTotal(),
-                item.getSortOrder()
+                item.getSortOrder(),
+                item.getDiscountReason()
         );
     }
 }

@@ -36,5 +36,7 @@ public record QuoteItemRequest(
         BigDecimal discountRate,
 
         @NotNull(message = "VAT 적용 여부는 필수입니다.")
-        Boolean vatApplicable
+        Boolean vatApplicable,
+
+        String discountReason
 ) {}

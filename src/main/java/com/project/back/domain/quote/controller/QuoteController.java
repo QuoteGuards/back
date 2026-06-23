@@ -151,7 +151,8 @@ public class QuoteController {
                         i.costPrice(),
                         i.quantity(),
                         i.discountRate(),
-                        i.vatApplicable()))
+                        i.vatApplicable(),
+                        i.discountReason()))
                 .toList();
     }
 

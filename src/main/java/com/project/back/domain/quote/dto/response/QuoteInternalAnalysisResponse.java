@@ -61,7 +61,8 @@ public record QuoteInternalAnalysisResponse(
             BigDecimal quantity,
             BigDecimal discountRate,
             BigDecimal lineSupplyAmount,
-            BigDecimal lineTotal
+            BigDecimal lineTotal,
+            String discountReason
     ) {
         public static QuoteItemInternalResponse from(com.project.back.domain.quote.entity.QuoteItem item) {
             return new QuoteItemInternalResponse(
@@ -72,7 +73,8 @@ public record QuoteInternalAnalysisResponse(
                     item.getQuantity(),
                     item.getDiscountRate(),
                     item.getLineSupplyAmount(),
-                    item.getLineTotal()
+                    item.getLineTotal(),
+                    item.getDiscountReason()
             );
         }
     }
