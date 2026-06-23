@@ -87,6 +87,10 @@ public class TrainingService {
         return getQuoteWritingContent();
     }
 
+    private boolean isDuplicateConstraint(DataIntegrityViolationException e, String constraintName) {
+        return e.getMessage() != null && e.getMessage().contains(constraintName);
+    }
+
     //견적 작성 가이드 확인 완료 처리
     @Transactional
     public void confirmGuide(User user) {
@@ -99,9 +103,12 @@ public class TrainingService {
                         .user(user)
                         .guideType(GuideType.QUOTE_WRITE_GUIDE)
                         .build();
-                guideConfirmationRepository.save(confirmation);
+                guideConfirmationRepository.saveAndFlush(confirmation);
             } catch (DataIntegrityViolationException e) {
-                // 이미 다른 요청에서 성공적으로 저장했으므로 아무것도 하지 않음 (멱등성 보장)
+                if (!isDuplicateConstraint(e, "uk_guide_confirmation_user_type")) {
+                    throw e;
+                }
+
             }
         }
     }
@@ -121,8 +128,11 @@ public class TrainingService {
                     .user(user)
                     .trainingContent(content)
                     .build();
-            return userTrainingProgressRepository.save(progress);
+            return userTrainingProgressRepository.saveAndFlush(progress);
         } catch (DataIntegrityViolationException e) {
+            if (!isDuplicateConstraint(e, "uk_user_training_progress_user_content")) {
+                throw e;
+            }
             return userTrainingProgressRepository
                     .findByUserIdAndTrainingContentId(user.getId(), content.getId())
                     .orElseThrow(() -> e);

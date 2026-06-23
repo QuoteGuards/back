@@ -82,11 +82,14 @@ public class UserTrainingProgress {
         this.lastWatchedSeconds = lastWatchedSeconds;
 
         // 80% 이상이면 자동으로 완료 처리
-        if (this.progressRate.compareTo(new BigDecimal("80.00")) >= 0) {
-            if (this.status != TrainingStatus.COMPLETED) { // 이미 완료된 상태가 아닐 때만 처리
+        if (this.status != TrainingStatus.COMPLETED) {
+            if (this.progressRate.compareTo(new BigDecimal("80.00")) >= 0) {
                 this.status = TrainingStatus.COMPLETED;
-                this.completedAt = LocalDateTime.now(); // 완료 시간 기록
+                this.completedAt = LocalDateTime.now();
+            } else if (this.progressRate.compareTo(BigDecimal.ZERO) > 0) {
+                this.status = TrainingStatus.IN_PROGRESS;
             }
         }
+
     }
 }
