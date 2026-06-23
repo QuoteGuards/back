@@ -2,14 +2,17 @@ package com.project.back.domain.dashboard.service;
 
 import com.project.back.domain.dashboard.dto.MonthlyTrendRow;
 import com.project.back.domain.dashboard.dto.PeriodRange;
+import com.project.back.domain.dashboard.dto.PopularProductRow;
 import com.project.back.domain.dashboard.dto.StatusCountRow;
 import com.project.back.domain.dashboard.dto.SummaryRow;
 import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
 import com.project.back.domain.dashboard.dto.response.MonthlyTrendResponse;
+import com.project.back.domain.dashboard.dto.response.PopularProductResponse;
 import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
 import com.project.back.domain.dashboard.repository.DashboardRepository;
 import com.project.back.global.enums.QuoteStatus;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -79,6 +82,27 @@ public class DashboardService {
                         .count(counts.getOrDefault(status, 0L))
                         .build())
                 .toList();
+    }
+
+    // 인기 제품 순위 (TOP N, 기간 필터)
+    public List<PopularProductResponse> getPopularProducts(String period, LocalDate from, LocalDate to, int limit) {
+        PeriodRange range = PeriodRange.of(period, from, to);
+
+        return dashboardRepository.aggregatePopularProducts(
+                        range.from(), range.to(), PageRequest.of(0, limit))
+                .stream()
+                .map(this::toPopularResponse)
+                .toList();
+    }
+
+    private PopularProductResponse toPopularResponse(PopularProductRow row) {
+        return PopularProductResponse.builder()
+                .productId(row.productId())
+                .productName(row.productName())
+                .orderCount(nzL(row.orderCount()))
+                .totalQuantity(nz(row.totalQuantity()))
+                .totalSalesAmount(nz(row.totalSalesAmount()))
+                .build();
     }
 
     private long nzL(Long v) {

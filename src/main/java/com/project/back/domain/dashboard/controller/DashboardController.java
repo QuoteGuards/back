@@ -2,6 +2,7 @@ package com.project.back.domain.dashboard.controller;
 
 import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
 import com.project.back.domain.dashboard.dto.response.MonthlyTrendResponse;
+import com.project.back.domain.dashboard.dto.response.PopularProductResponse;
 import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
 import com.project.back.domain.dashboard.service.DashboardService;
 import com.project.back.global.common.ApiResponse;
@@ -59,6 +60,20 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponse.success(
                 "견적 상태별 건수 조회 성공",
                 dashboardService.getQuoteStatusCount(period, from, to)
+        ));
+    }
+
+    // 인기 제품 순위 (TOP N)
+    @GetMapping("/popular-products")
+    public ResponseEntity<ApiResponse<List<PopularProductResponse>>> getPopularProducts(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "인기 제품 순위 조회 성공",
+                dashboardService.getPopularProducts(period, from, to, limit)
         ));
     }
 }

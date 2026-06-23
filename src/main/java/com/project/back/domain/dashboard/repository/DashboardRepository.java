@@ -1,10 +1,12 @@
 package com.project.back.domain.dashboard.repository;
 
 import com.project.back.domain.dashboard.dto.MonthlyTrendRow;
+import com.project.back.domain.dashboard.dto.PopularProductRow;
 import com.project.back.domain.dashboard.dto.StatusCountRow;
 import com.project.back.domain.dashboard.dto.SummaryRow;
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.global.enums.QuoteStatus;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -70,5 +72,27 @@ public interface DashboardRepository extends JpaRepository<Quote, Long> {
     List<StatusCountRow> aggregateStatusCount(
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
+    );
+
+    // 인기 제품 순위: quote_items를 productId로 집계 (수동입력/삭제제품 제외)
+    @Query("""
+            SELECT new com.project.back.domain.dashboard.dto.PopularProductRow(
+                qi.productId,
+                qi.productName,
+                COUNT(qi),
+                SUM(qi.quantity),
+                SUM(qi.lineTotal))
+            FROM QuoteItem qi
+            WHERE qi.productId IS NOT NULL
+              AND qi.quote.isLatest = true
+              AND (:from IS NULL OR qi.quote.createdAt >= :from)
+              AND (:to   IS NULL OR qi.quote.createdAt <= :to)
+            GROUP BY qi.productId, qi.productName
+            ORDER BY COUNT(qi) DESC, SUM(qi.quantity) DESC
+            """)
+    List<PopularProductRow> aggregatePopularProducts(
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to,
+            Pageable pageable
     );
 }
