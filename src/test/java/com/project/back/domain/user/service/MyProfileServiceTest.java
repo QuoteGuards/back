@@ -45,13 +45,14 @@ class MyProfileServiceTest {
         try {
             User user = User.builder()
                     .id(id)
+                    .memberNumber("202600" + id)
                     .email("user@test.com")
                     .password("encodedOldPassword")
                     .name("홍길동")
                     .department("영업1팀")
                     .position("대리")
                     .phone("010-1234-5678")
-                    .status(UserStatus.APPROVED)
+                    .status(UserStatus.ACTIVE)
                     .role(UserRole.SALES_STAFF)
                     .build();
             setField(user, "createdAt", LocalDateTime.now());

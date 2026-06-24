@@ -72,7 +72,7 @@ class MyProfileControllerTest {
                 .position("대리")
                 .phone("010-1234-5678")
                 .role(UserRole.SALES_STAFF.name())
-                .status(UserStatus.APPROVED.name())
+                .status(UserStatus.ACTIVE.name())
                 .lastLoginAt(null)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())

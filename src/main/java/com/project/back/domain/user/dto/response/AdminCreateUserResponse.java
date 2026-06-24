@@ -6,9 +6,13 @@ import lombok.Getter;
 
 import java.time.LocalDateTime;
 
+/**
+ * 관리자가 신규 계정을 생성했을 때 반환하는 응답 DTO.
+ * temporaryPassword는 최초 1회 전달용이며, DB에는 암호화 후 저장되고 로그에 출력하지 않는다.
+ */
 @Getter
 @Builder
-public class UserDetailResponse {
+public class AdminCreateUserResponse {
 
     private final Long id;
     private final String memberNumber;
@@ -19,18 +23,14 @@ public class UserDetailResponse {
     private final String phone;
     private final String role;
     private final String status;
-    private final boolean mustChangePassword;
 
-    // 정지 이력
-    private final Long suspendedBy;
-    private final LocalDateTime suspendedAt;
+    /** 관리자에게 최초 1회만 전달. 화면에서 안내 후 폐기. */
+    private final String temporaryPassword;
 
-    private final LocalDateTime lastLoginAt;
     private final LocalDateTime createdAt;
-    private final LocalDateTime updatedAt;
 
-    public static UserDetailResponse from(User user) {
-        return UserDetailResponse.builder()
+    public static AdminCreateUserResponse from(User user, String temporaryPassword) {
+        return AdminCreateUserResponse.builder()
                 .id(user.getId())
                 .memberNumber(user.getMemberNumber())
                 .email(user.getEmail())
@@ -40,12 +40,8 @@ public class UserDetailResponse {
                 .phone(user.getPhone())
                 .role(user.getRole().name())
                 .status(user.getStatus().name())
-                .mustChangePassword(user.isMustChangePassword())
-                .suspendedBy(user.getSuspendedBy())
-                .suspendedAt(user.getSuspendedAt())
-                .lastLoginAt(user.getLastLoginAt())
+                .temporaryPassword(temporaryPassword)
                 .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
                 .build();
     }
 }
