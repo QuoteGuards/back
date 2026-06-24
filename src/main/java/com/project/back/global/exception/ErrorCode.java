@@ -49,6 +49,7 @@ public enum ErrorCode {
     QUOTE_NOT_EDITABLE(HttpStatus.BAD_REQUEST, "QUOTE_002", "수정 가능한 상태가 아닙니다."),
     QUOTE_NOT_EXPIRED(HttpStatus.BAD_REQUEST, "QUOTE_003", "만료된 견적만 재작성할 수 있습니다."),
     QUOTE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "QUOTE_004", "본인이 작성한 견적만 접근할 수 있습니다."),
+    DISCOUNT_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "QUOTE_005", "할인율 변경 시 사유를 반드시 입력해야 합니다."),
 
     // Discount Policy
     DISCOUNT_POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, "DISCOUNT_001", "할인 정책을 찾을 수 없습니다."),

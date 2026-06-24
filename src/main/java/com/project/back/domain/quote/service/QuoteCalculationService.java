@@ -67,7 +67,8 @@ public class QuoteCalculationService {
                 discountAmount.setScale(SCALE, RoundingMode.HALF_UP),
                 lineSupply.setScale(SCALE, RoundingMode.HALF_UP),
                 vatAmount,
-                lineTotal.setScale(SCALE, RoundingMode.HALF_UP)
+                lineTotal.setScale(SCALE, RoundingMode.HALF_UP),
+                item.getDiscountReason()
         );
     }
 
