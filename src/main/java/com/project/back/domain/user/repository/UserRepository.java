@@ -13,21 +13,30 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
+    Optional<User> findByMemberNumber(String memberNumber);
+
     Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);
 
     boolean existsByPhone(String phone);
 
+    boolean existsByMemberNumber(String memberNumber);
+
     boolean existsByPhoneAndIdNot(String phone, Long id);
 
-    Page<User> findByStatus(UserStatus status, Pageable pageable);
+    /**
+     * 특정 연도 접두사로 시작하는 회원번호 중 가장 큰 값을 반환.
+     * 예: prefix = "2026" → "2026001", "2026002" 중 최댓값 반환
+     */
+    @Query("SELECT MAX(u.memberNumber) FROM User u WHERE u.memberNumber LIKE CONCAT(:prefix, '%')")
+    Optional<String> findMaxMemberNumberByYearPrefix(@Param("prefix") String prefix);
 
     @Query("""
             SELECT u FROM User u
             WHERE (:role IS NULL OR u.role = :role)
               AND (:status IS NULL OR u.status = :status)
-              AND (:keyword IS NULL OR u.name LIKE %:keyword% OR u.email LIKE %:keyword%)
+              AND (:keyword IS NULL OR u.name LIKE %:keyword% OR u.memberNumber LIKE %:keyword%)
             """)
     Page<User> findAllWithFilters(
             @Param("role") UserRole role,

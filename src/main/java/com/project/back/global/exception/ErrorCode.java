@@ -12,25 +12,24 @@ public enum ErrorCode {
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "AUTH_001", "이미 사용 중인 이메일입니다."),
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "AUTH_002", "존재하지 않는 사용자입니다."),
     INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "AUTH_003", "비밀번호가 일치하지 않습니다."),
-    USER_PENDING(HttpStatus.FORBIDDEN, "AUTH_004", "승인 대기 중인 계정입니다. 관리자 승인 후 이용 가능합니다."),
-    USER_REJECTED(HttpStatus.FORBIDDEN, "AUTH_005", "거절된 계정입니다. 관리자에게 문의하세요."),
-    USER_SUSPENDED(HttpStatus.FORBIDDEN, "AUTH_006", "정지된 계정입니다. 관리자에게 문의하세요."),
-    ACCESS_DENIED(HttpStatus.FORBIDDEN, "AUTH_007", "접근 권한이 없습니다."),
+    USER_SUSPENDED(HttpStatus.FORBIDDEN, "AUTH_004", "정지된 계정입니다. 관리자에게 문의하세요."),
+    USER_DELETED(HttpStatus.FORBIDDEN, "AUTH_005", "삭제된 계정입니다. 관리자에게 문의하세요."),
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "AUTH_006", "접근 권한이 없습니다."),
 
     // User Management
-    USER_NOT_PENDING(HttpStatus.BAD_REQUEST, "USER_001", "승인 대기 중인 사용자만 승인/반려할 수 있습니다."),
-    CANNOT_MODIFY_SELF(HttpStatus.BAD_REQUEST, "USER_002", "자기 자신의 권한 변경 또는 비활성화는 불가합니다."),
-    USER_NOT_APPROVED(HttpStatus.BAD_REQUEST, "USER_003", "APPROVED 상태가 아닌 사용자는 비활성화할 수 없습니다."),
-    USER_NOT_SUSPENDED(HttpStatus.BAD_REQUEST, "USER_004", "SUSPENDED 상태가 아닌 사용자는 재활성화할 수 없습니다."),
-    DUPLICATE_PHONE(HttpStatus.CONFLICT, "USER_005", "이미 사용 중인 전화번호입니다."),
-    SAME_AS_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "USER_006", "새 비밀번호는 현재 비밀번호와 달라야 합니다."),
-    PASSWORD_CONFIRM_MISMATCH(HttpStatus.BAD_REQUEST, "USER_007", "새 비밀번호와 비밀번호 확인이 일치하지 않습니다."),
+    CANNOT_MODIFY_SELF(HttpStatus.BAD_REQUEST, "USER_001", "자기 자신의 권한 변경 또는 비활성화는 불가합니다."),
+    USER_NOT_ACTIVE(HttpStatus.BAD_REQUEST, "USER_002", "ACTIVE 상태가 아닌 사용자는 비활성화할 수 없습니다."),
+    USER_NOT_SUSPENDED(HttpStatus.BAD_REQUEST, "USER_003", "SUSPENDED 상태가 아닌 사용자는 재활성화할 수 없습니다."),
+    DUPLICATE_PHONE(HttpStatus.CONFLICT, "USER_004", "이미 사용 중인 전화번호입니다."),
+    SAME_AS_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "USER_005", "새 비밀번호는 현재 비밀번호와 달라야 합니다."),
+    PASSWORD_CONFIRM_MISMATCH(HttpStatus.BAD_REQUEST, "USER_006", "새 비밀번호와 비밀번호 확인이 일치하지 않습니다."),
+    DUPLICATE_MEMBER_NUMBER(HttpStatus.CONFLICT, "USER_007", "이미 사용 중인 회원번호입니다."),
 
     // JWT
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "JWT_001", "유효하지 않은 토큰입니다."),
     EXPIRED_TOKEN(HttpStatus.UNAUTHORIZED, "JWT_002", "만료된 토큰입니다."),
 
-    // cateory
+    // Category
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "CAT_001", "카테고리를 찾을 수 없습니다."),
     CATEGORY_MAX_DEPTH_EXCEEDED(HttpStatus.BAD_REQUEST, "CAT_002", "카테고리는 최대 3단계까지만 등록 가능합니다."),
     CATEGORY_HAS_PRODUCTS(HttpStatus.CONFLICT, "CAT_003", "연결된 제품이 있어 삭제할 수 없습니다."),

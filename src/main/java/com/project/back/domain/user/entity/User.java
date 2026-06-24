@@ -17,11 +17,18 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 100)
+    @Column(name = "member_number", unique = true, nullable = false, length = 20)
+    private String memberNumber;
+
+    @Column(unique = true, length = 100)
     private String email;
 
     @Column(nullable = false)
     private String password;
+
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private boolean mustChangePassword = true;
 
     @Column(nullable = false, length = 50)
     private String name;
@@ -43,19 +50,7 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private UserStatus status = UserStatus.PENDING;
-
-    @Column(name = "approved_by")
-    private Long approvedBy;
-
-    @Column(name = "approved_at")
-    private LocalDateTime approvedAt;
-
-    @Column(name = "rejected_at")
-    private LocalDateTime rejectedAt;
-
-    @Column(name = "reject_reason", length = 500)
-    private String rejectReason;
+    private UserStatus status = UserStatus.ACTIVE;
 
     @Column(name = "suspended_by")
     private Long suspendedBy;
@@ -83,18 +78,6 @@ public class User {
         this.updatedAt = LocalDateTime.now();
     }
 
-    public void approve(Long approverId) {
-        this.status = UserStatus.APPROVED;
-        this.approvedBy = approverId;
-        this.approvedAt = LocalDateTime.now();
-    }
-
-    public void reject(String reason) {
-        this.status = UserStatus.REJECTED;
-        this.rejectReason = reason;
-        this.rejectedAt = LocalDateTime.now();
-    }
-
     public void suspend(Long suspenderId) {
         this.status = UserStatus.SUSPENDED;
         this.suspendedBy = suspenderId;
@@ -102,9 +85,13 @@ public class User {
     }
 
     public void reactivate() {
-        this.status = UserStatus.APPROVED;
+        this.status = UserStatus.ACTIVE;
         this.suspendedBy = null;
         this.suspendedAt = null;
+    }
+
+    public void delete() {
+        this.status = UserStatus.DELETED;
     }
 
     public void updateInfo(String name, String phone, String department, String position) {
@@ -121,6 +108,7 @@ public class User {
 
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
+        this.mustChangePassword = false;
     }
 
     public void changeRole(UserRole newRole) {
