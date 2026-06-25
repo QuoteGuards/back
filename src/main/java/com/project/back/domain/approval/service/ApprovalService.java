@@ -201,7 +201,24 @@ public class ApprovalService {
         return approvalRequest;
     }
 
-    // ── 5. 승인 대기 목록 조회 (관리자용) ──
+    // ── 5. 승인 요청 메모 수정 ──
+    @Transactional
+    public void updateMemo(Long approvalRequestId, Long requesterId, String newMemo) {
+
+        ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
+
+        // PENDING 상태만 수정 가능
+        validatePendingStatus(approvalRequest);
+
+        // 본인 요청건만 수정 가능
+        if (!approvalRequest.getRequester().getId().equals(requesterId)) {
+            throw new CustomException(ErrorCode.APPROVAL_ACCESS_DENIED);
+        }
+
+        approvalRequest.updateMemo(newMemo);
+    }
+
+    // ── 6. 승인 대기 목록 조회 (관리자용) ──
     public List<ApprovalRequest> getPendingList() {
         return approvalRequestRepository.findByStatusOrderByRequestedAtAsc(
                 ApprovalRequest.ApprovalStatus.PENDING

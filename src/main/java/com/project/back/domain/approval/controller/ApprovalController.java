@@ -3,6 +3,7 @@ package com.project.back.domain.approval.controller;
 import com.project.back.domain.approval.dto.request.ApprovalDecisionDto;
 import com.project.back.domain.approval.dto.request.ApprovalRequestDto;
 import com.project.back.domain.approval.dto.request.ReRequestDto;
+import com.project.back.domain.approval.dto.request.UpdateMemoDto;
 import com.project.back.domain.approval.dto.response.ApprovalHistoryResponse;
 import com.project.back.domain.approval.dto.response.ApprovalReasonResponse;
 import com.project.back.domain.approval.dto.response.ApprovalRequestDetailResponse;
@@ -113,7 +114,21 @@ public class ApprovalController {
         return ResponseEntity.ok(ApprovalRequestResponse.from(result));
     }
 
-    // ── 7. 승인 이력 조회 ──
+    // ── 7. 승인 요청 메모 수정 ──
+    // PATCH /api/quotes/{quoteId}/approval-requests/{approvalRequestId}/memo
+    @PreAuthorize("hasRole('SALES_STAFF')")
+    @PatchMapping("/quotes/{quoteId}/approval-requests/{approvalRequestId}/memo")
+    public ResponseEntity<Void> updateMemo(
+            @PathVariable Long quoteId,
+            @PathVariable Long approvalRequestId,
+            @RequestBody UpdateMemoDto request,
+            @AuthenticationPrincipal Long userId
+    ) {
+        approvalService.updateMemo(approvalRequestId, userId, request.getRequestMemo());
+        return ResponseEntity.ok().build();
+    }
+
+    // ── 8. 승인 이력 조회 ──
     // GET /api/quotes/{quoteId}/approval-histories
     @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
     @GetMapping("/quotes/{quoteId}/approval-histories")
