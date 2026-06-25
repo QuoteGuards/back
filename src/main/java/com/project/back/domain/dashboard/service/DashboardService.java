@@ -12,6 +12,7 @@ import com.project.back.domain.dashboard.dto.response.PopularProductResponse;
 import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
 import com.project.back.domain.dashboard.dto.response.SalesStaffResponse;
 import com.project.back.domain.dashboard.repository.DashboardRepository;
+import com.project.back.domain.dashboard.dto.response.SalesAnalysisResponse;
 import com.project.back.global.enums.QuoteStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -50,6 +51,86 @@ public class DashboardService {
                 .averageProfitRate(toBd(row.averageProfitRate()))
                 .build();
     }
+
+    // 영업 현황 분석 문구
+    public SalesAnalysisResponse getSalesAnalysis(String period, LocalDate from, LocalDate to) {
+        PeriodRange range = PeriodRange.of(period, from, to);
+
+        SummaryRow row = dashboardRepository.aggregateSummary(
+                range.from(), range.to(), QuoteStatus.APPROVED, QuoteStatus.REJECTED);
+
+        long totalQuotes = nzL(row.totalQuotes());
+        long approvedQuotes = nzL(row.approvedQuotes());
+        long rejectedQuotes = nzL(row.rejectedQuotes());
+        long sentQuotes = nzL(row.sentQuotes());
+
+        BigDecimal totalAmount = nz(row.totalAmount());
+        BigDecimal totalProfitAmount = nz(row.totalProfitAmount());
+        BigDecimal averageDiscountRate = toBd(row.averageDiscountRate());
+        BigDecimal averageProfitRate = toBd(row.averageProfitRate());
+
+        BigDecimal approvalRate = ratio(approvedQuotes, totalQuotes);
+        BigDecimal rejectionRate = ratio(rejectedQuotes, totalQuotes);
+
+        return SalesAnalysisResponse.builder()
+                .totalQuotes(totalQuotes)
+                .approvedQuotes(approvedQuotes)
+                .rejectedQuotes(rejectedQuotes)
+                .sentQuotes(sentQuotes)
+                .totalAmount(totalAmount)
+                .totalProfitAmount(totalProfitAmount)
+                .averageDiscountRate(averageDiscountRate)
+                .averageProfitRate(averageProfitRate)
+                .approvalRate(approvalRate)
+                .rejectionRate(rejectionRate)
+                .summary(createSalesSummary(totalQuotes, totalAmount, averageProfitRate, approvalRate, rejectionRate))
+                .recommendation(createSalesRecommendation(totalQuotes, averageDiscountRate, averageProfitRate, rejectionRate))
+                .build();
+    }
+
+    private String createSalesSummary(
+            long totalQuotes,
+            BigDecimal totalAmount,
+            BigDecimal averageProfitRate,
+            BigDecimal approvalRate,
+            BigDecimal rejectionRate
+    ) {
+        if (totalQuotes == 0) {
+            return "선택한 기간에 등록된 견적 데이터가 없습니다.";
+        }
+
+        return "선택한 기간 동안 총 " + totalQuotes + "건의 견적이 등록되었고, "
+                + "총 견적 금액은 " + totalAmount + "원입니다. "
+                + "평균 이익률은 " + averageProfitRate + "%, "
+                + "승인율은 " + approvalRate + "%, "
+                + "반려율은 " + rejectionRate + "%입니다.";
+    }
+
+    private String createSalesRecommendation(
+            long totalQuotes,
+            BigDecimal averageDiscountRate,
+            BigDecimal averageProfitRate,
+            BigDecimal rejectionRate
+    ) {
+        if (totalQuotes == 0) {
+            return "견적 데이터가 쌓이면 할인율, 이익률, 승인/반려 비율을 기준으로 영업 현황을 분석할 수 있습니다.";
+        }
+
+        if (averageProfitRate.compareTo(BigDecimal.valueOf(10)) < 0) {
+            return "평균 이익률이 낮습니다. 원가 구조와 할인 조건을 우선 검토하는 것이 좋습니다.";
+        }
+
+        if (rejectionRate.compareTo(BigDecimal.valueOf(30)) >= 0) {
+            return "반려율이 높은 편입니다. 승인 요청 전에 할인율과 승인 필요 사유를 다시 점검하는 것이 좋습니다.";
+        }
+
+        if (averageDiscountRate.compareTo(BigDecimal.valueOf(20)) >= 0) {
+            return "평균 할인율이 높은 편입니다. 고할인 견적에 대한 내부 검토 기준을 강화하는 것이 좋습니다.";
+        }
+
+        return "전체 영업 흐름은 안정적인 편입니다. 현재 수준의 이익률과 승인율을 유지하는 것이 좋습니다.";
+    }
+
 
     // 월별 추이: 연·월 → "yyyy-MM" 포맷 변환
     public List<MonthlyTrendResponse> getMonthlyTrend(String period, LocalDate from, LocalDate to) {
