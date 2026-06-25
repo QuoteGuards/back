@@ -53,6 +53,10 @@ public class Notification {
     private LocalDateTime readAt;
 
     public void markAsRead() {
+        if(Boolean.TRUE.equals(this.isRead)) {
+            return;
+        }
+
         this.isRead = true;
         this.readAt = LocalDateTime.now();
     }
