@@ -2,6 +2,7 @@ package com.project.back.domain.quote.dto.response;
 
 import com.project.back.global.enums.QuoteStatus;
 import com.project.back.domain.quote.entity.Quote;
+import com.project.back.domain.quote.entity.QuoteCustomer;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -20,11 +21,12 @@ public record QuoteListResponse(
         LocalDateTime createdAt
 ) {
     public static QuoteListResponse from(Quote quote) {
+        QuoteCustomer qc = quote.getQuoteCustomer();
         return new QuoteListResponse(
                 quote.getId(),
                 quote.getQuoteNumber(),
-                quote.getQuoteCustomer().getCompanyName(), // 추가
-                quote.getQuoteCustomer().getContactName(), // 추가
+                qc != null ? qc.getCompanyName() : null,
+                qc != null ? qc.getContactName() : null,
                 quote.getTotalAmount(),
                 quote.getStatus(),
                 quote.getApprovalRequired(),
