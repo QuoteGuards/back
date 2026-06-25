@@ -5,6 +5,7 @@ import com.project.back.domain.approval.dto.request.ApprovalRequestDto;
 import com.project.back.domain.approval.dto.request.ReRequestDto;
 import com.project.back.domain.approval.dto.request.UpdateMemoDto;
 import com.project.back.domain.approval.dto.response.ApprovalHistoryResponse;
+import com.project.back.domain.approval.dto.response.ApprovalMonthlyStatsResponse;
 import com.project.back.domain.approval.dto.response.ApprovalReasonResponse;
 import com.project.back.domain.approval.dto.response.ApprovalRequestDetailResponse;
 import com.project.back.domain.approval.dto.response.ApprovalRequestResponse;
@@ -54,7 +55,15 @@ public class ApprovalController {
     }
 
 
-    // ── 3. 승인 대기 목록 조회 (관리자용) ──
+    // ── 3. 이달 승인/반려 통계 (관리자용) ──
+    // GET /api/admin/approval-requests/stats
+    @PreAuthorize("hasAnyRole('SALES_MANAGER', 'SUPER_ADMIN')")
+    @GetMapping("/admin/approval-requests/stats")
+    public ResponseEntity<ApprovalMonthlyStatsResponse> getMonthlyStats() {
+        return ResponseEntity.ok(approvalService.getMonthlyStats());
+    }
+
+    // ── 4. 승인 대기 목록 조회 (관리자용) ──
     // GET /api/admin/approval-requests
     @PreAuthorize("hasAnyRole('SALES_MANAGER', 'SUPER_ADMIN')")
     @GetMapping("/admin/approval-requests")

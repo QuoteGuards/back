@@ -13,7 +13,7 @@ public class ApprovalReasonResponse {
     private Long id;
     private Long quoteId;
     private String reasonType;
-    private String reasonMessage;
+    private String message;
     private LocalDateTime createdAt;
 
     // Entity → DTO 변환 메서드
@@ -22,7 +22,7 @@ public class ApprovalReasonResponse {
                 .id(entity.getId())
                 .quoteId(entity.getQuote().getId())
                 .reasonType(entity.getReasonType().name())
-                .reasonMessage(entity.getReasonMessage())
+                .message(entity.getReasonMessage())
                 .createdAt(entity.getCreatedAt())
                 .build();
     }

@@ -19,6 +19,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.project.back.domain.approval.dto.response.ApprovalMonthlyStatsResponse;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -218,7 +222,20 @@ public class ApprovalService {
         approvalRequest.updateMemo(newMemo);
     }
 
-    // ── 6. 승인 대기 목록 조회 (관리자용) ──
+    // ── 6. 이달 승인/반려 통계 ──
+    public ApprovalMonthlyStatsResponse getMonthlyStats() {
+        LocalDateTime from = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime to = from.plusMonths(1);
+
+        long approved = approvalRequestRepository.countByStatusAndProcessedAtBetween(
+                ApprovalRequest.ApprovalStatus.APPROVED, from, to);
+        long rejected = approvalRequestRepository.countByStatusAndProcessedAtBetween(
+                ApprovalRequest.ApprovalStatus.REJECTED, from, to);
+
+        return new ApprovalMonthlyStatsResponse(approved, rejected);
+    }
+
+    // ── 7. 승인 대기 목록 조회 (관리자용) ──
     public List<ApprovalRequest> getPendingList() {
         return approvalRequestRepository.findByStatusOrderByRequestedAtAsc(
                 ApprovalRequest.ApprovalStatus.PENDING
