@@ -74,6 +74,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/approval-requests/**").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/admin/quotes/*/approve").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/admin/quotes/*/reject").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
+                        .requestMatchers("/api/admin/quotes/*/ai-summary").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/admin/users/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/admin/dashboard/**").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                             // 제품, 카테고리 관리는 관리자만
