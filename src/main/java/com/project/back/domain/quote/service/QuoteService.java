@@ -339,7 +339,7 @@ public class QuoteService {
                             .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
                     if (!product.isActive()) throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
 
-                    validateDiscountReasonAgainstPolicy(policy, cmd, product);
+                    validateDiscountReasonAgainstPolicy(policy, cmd.discountRate(), cmd.discountReason(), cmd.quantity(), product);
 
                     QuoteItem item = QuoteItem.builder()
                             .quote(quote)
@@ -364,34 +364,40 @@ public class QuoteService {
 
      //할인율이 정책의 최대 할인율을 초과하거나,할인 적용 후 예상 이익률이 정책의 최소 이익률보다 낮으면 할인 사유를 필수로 요구한다.
      // 정책이 없는 경우(discountPolicyId가 null)에는 검증을 생략한다.
-    private void validateDiscountReasonAgainstPolicy(DiscountPolicy policy, QuoteItemCommand cmd, Product product) {
-        if (policy == null) return;
+     // 기존 메서드를 수정하여 인자를 받도록 변경
+     private void validateDiscountReasonAgainstPolicy(DiscountPolicy policy,
+                                                      BigDecimal discountRate,
+                                                      String discountReason,
+                                                      BigDecimal quantity,
+                                                      Product product) {
+         if (policy == null) return;
 
-        BigDecimal discountRate = cmd.discountRate() != null ? cmd.discountRate() : BigDecimal.ZERO;
-        BigDecimal quantity = cmd.quantity();
+         BigDecimal rate = discountRate != null ? discountRate : BigDecimal.ZERO;
 
-        boolean exceedsMaxDiscount = policy.getMaxDiscountRate() != null
-                && discountRate.compareTo(policy.getMaxDiscountRate()) > 0;
+         // 정책 위반 여부 계산 로직
+         boolean exceedsMaxDiscount = policy.getMaxDiscountRate() != null
+                 && rate.compareTo(policy.getMaxDiscountRate()) > 0;
 
-        BigDecimal base = product.getUnitPrice().multiply(quantity);
-        BigDecimal discountAmount = discountRate.compareTo(BigDecimal.ZERO) > 0
-                ? base.multiply(discountRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
-                : BigDecimal.ZERO;
-        BigDecimal lineSupply = base.subtract(discountAmount);
-        BigDecimal lineCost = product.getCostPrice().multiply(quantity);
-        BigDecimal profit = lineSupply.subtract(lineCost);
-        BigDecimal profitRate = lineSupply.compareTo(BigDecimal.ZERO) == 0
-                ? BigDecimal.ZERO
-                : profit.multiply(BigDecimal.valueOf(100)).divide(lineSupply, 2, RoundingMode.HALF_UP);
+         BigDecimal base = product.getUnitPrice().multiply(quantity);
+         BigDecimal discountAmount = rate.compareTo(BigDecimal.ZERO) > 0
+                 ? base.multiply(rate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                 : BigDecimal.ZERO;
+         BigDecimal lineSupply = base.subtract(discountAmount);
+         BigDecimal lineCost = product.getCostPrice().multiply(quantity);
+         BigDecimal profit = lineSupply.subtract(lineCost);
+         BigDecimal profitRate = lineSupply.compareTo(BigDecimal.ZERO) == 0
+                 ? BigDecimal.ZERO
+                 : profit.multiply(BigDecimal.valueOf(100)).divide(lineSupply, 2, RoundingMode.HALF_UP);
 
-        boolean belowMinProfit = policy.getMinProfitRate() != null
-                && profitRate.compareTo(policy.getMinProfitRate()) < 0;
+         boolean belowMinProfit = policy.getMinProfitRate() != null
+                 && profitRate.compareTo(policy.getMinProfitRate()) < 0;
 
-        if ((exceedsMaxDiscount || belowMinProfit)
-                && (cmd.discountReason() == null || cmd.discountReason().isBlank())) {
-            throw new CustomException(ErrorCode.DISCOUNT_REASON_REQUIRED);
-        }
-    }
+         // 사유 검증
+         if ((exceedsMaxDiscount || belowMinProfit)
+                 && (discountReason == null || discountReason.isBlank())) {
+             throw new CustomException(ErrorCode.DISCOUNT_REASON_REQUIRED);
+         }
+     }
 
 
      //만료 견적 재작성(rewriteExpiredQuote) 시 사용.
@@ -410,6 +416,17 @@ public class QuoteService {
                      // 만약 필수 제품이 비활성화되었다면 예외 처리하거나 null로 넘김
                      if (src.getProductId() != null && currentProduct == null) {
                          throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
+                     }
+
+                     //재작성 시에도 정책 검증 실시
+                     if (currentProduct != null) {
+                         validateDiscountReasonAgainstPolicy(
+                                 newQuote.getDiscountPolicy(),
+                                 src.getDiscountRate(),
+                                 src.getDiscountReason(),
+                                 src.getQuantity(),
+                                 currentProduct
+                         );
                      }
 
                      QuoteItem item = QuoteItem.builder()
