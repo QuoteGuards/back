@@ -5,8 +5,12 @@ import com.project.back.domain.approval.service.ApprovalService;
 import com.project.back.domain.auth.controller.AuthController;
 import com.project.back.domain.auth.service.AuthService;
 import com.project.back.domain.user.controller.AdminUserController;
+import com.project.back.domain.user.entity.User;
+import com.project.back.domain.user.entity.UserRole;
+import com.project.back.domain.user.entity.UserStatus;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.domain.user.service.UserManagementService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -21,8 +25,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -62,6 +69,24 @@ class SecurityAccessControlTest {
 
     @MockitoBean
     private UserRepository userRepository;
+
+    /**
+     * MustChangePasswordFilter가 DB를 조회하므로 인증된 요청 테스트에서는
+     * mustChangePassword=false인 사용자를 기본 stub으로 등록한다.
+     */
+    @BeforeEach
+    void stubUserRepository() {
+        User activeUser = User.builder()
+                .memberNumber("2600001")
+                .email("2600001@quoteguard.com")
+                .password("encoded")
+                .name("테스트")
+                .role(UserRole.SALES_STAFF)
+                .status(UserStatus.ACTIVE)
+                .mustChangePassword(false)
+                .build();
+        given(userRepository.findById(anyLong())).willReturn(Optional.of(activeUser));
+    }
 
     /**
      * 테스트용 인증 객체 생성 — principal을 Long userId로 설정하여 @AuthenticationPrincipal Long userId 호환
