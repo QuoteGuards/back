@@ -52,6 +52,30 @@ public record QuoteInternalAnalysisResponse(
         );
     }
 
+    public static QuoteInternalAnalysisResponse from(
+            Quote quote,
+            boolean approvalRequired,
+            List<ApprovalReasonType> approvalReasons
+    ) {
+        List<QuoteItemInternalResponse> itemDetails = quote.getItems().stream()
+                .map(QuoteItemInternalResponse::from)
+                .toList();
+
+        return new QuoteInternalAnalysisResponse(
+                quote.getId(),
+                quote.getQuoteNumber(),
+                quote.getSupplyAmount(),
+                quote.getTaxAmount(),
+                quote.getTotalAmount(),
+                quote.getTotalCostAmount(),
+                quote.getExpectedProfitAmount(),
+                quote.getProfitRate(),
+                approvalRequired,
+                approvalReasons,
+                itemDetails
+        );
+    }
+
     //항목별 내부 검토 데이터 (원가 포함)
     public record QuoteItemInternalResponse(
             Long id,

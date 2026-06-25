@@ -189,10 +189,17 @@ public class QuoteService {
         return quote;
     }
 
-    public Quote getInternalAnalysis(Long quoteId, User requester) {
+    public record InternalAnalysisResult(Quote quote, boolean approvalRequired, List<ApprovalReasonType> reasons) {}
+
+    public InternalAnalysisResult getInternalAnalysis(Long quoteId, User requester) {
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
-        return quote;
+
+        List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quoteId);
+        List<ApprovalReasonType> reasons = approvalCheckService.check(
+                quote.getDiscountPolicy(), items, quote.getTotalAmount(), quote.getProfitRate());
+
+        return new InternalAnalysisResult(quote, !reasons.isEmpty(), reasons);
     }
 
     @Transactional
