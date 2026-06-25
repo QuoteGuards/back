@@ -2,6 +2,7 @@ package com.project.back.domain.user.controller;
 
 import tools.jackson.databind.json.JsonMapper;
 import com.project.back.domain.user.dto.response.AdminCreateUserResponse;
+import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
 import com.project.back.domain.user.service.UserManagementService;
@@ -13,6 +14,7 @@ import com.project.back.global.security.JwtAuthenticationEntryPoint;
 import com.project.back.global.security.JwtTokenProvider;
 import com.project.back.global.security.SecurityConfig;
 import com.project.back.global.security.SecurityErrorResponseWriter;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -30,8 +32,10 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -57,6 +61,20 @@ class AdminUserControllerTest {
 
     @MockitoBean
     private UserRepository userRepository;
+
+    @BeforeEach
+    void stubUserRepository() {
+        User activeUser = User.builder()
+                .memberNumber("2600001")
+                .email("2600001@quoteguard.com")
+                .password("encoded")
+                .name("테스트")
+                .role(UserRole.SALES_STAFF)
+                .status(UserStatus.ACTIVE)
+                .mustChangePassword(false)
+                .build();
+        given(userRepository.findById(anyLong())).willReturn(Optional.of(activeUser));
+    }
 
     private RequestPostProcessor asUser(Long userId, String role) {
         Authentication auth = new UsernamePasswordAuthenticationToken(
@@ -97,6 +115,7 @@ class AdminUserControllerTest {
                                     "name", "홍길동",
                                     "department", "영업1팀",
                                     "position", "대리",
+                                    "phone", "010-1234-5678",
                                     "role", "SALES_STAFF"
                             ))))
                     .andExpect(status().isCreated())
@@ -202,6 +221,7 @@ class AdminUserControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(Map.of(
                                     "name", "홍길동",
+                                    "phone", "010-1234-5678",
                                     "role", "SALES_STAFF"
                             ))))
                     .andExpect(status().isConflict())

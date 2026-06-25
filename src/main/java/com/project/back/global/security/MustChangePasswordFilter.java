@@ -68,11 +68,15 @@ public class MustChangePasswordFilter extends OncePerRequestFilter {
         }
 
         // DB 조회 후 mustChangePassword 확인
-        boolean mustChange = userRepository.findById(userId)
-                .map(user -> user.isMustChangePassword())
-                .orElse(false);
+        // 사용자를 찾을 수 없는 경우 인증 불가 상태로 간주하여 차단
+        var userOpt = userRepository.findById(userId);
+        if (userOpt.isEmpty()) {
+            log.warn("MustChangePasswordFilter: userId={} not found in DB — blocking request", userId);
+            securityErrorResponseWriter.write(response, ErrorCode.MUST_CHANGE_PASSWORD);
+            return;
+        }
 
-        if (mustChange) {
+        if (userOpt.get().isMustChangePassword()) {
             log.debug("MustChangePasswordFilter: userId={} blocked - mustChangePassword=true", userId);
             securityErrorResponseWriter.write(response, ErrorCode.MUST_CHANGE_PASSWORD);
             return;
