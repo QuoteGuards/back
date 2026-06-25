@@ -158,6 +158,7 @@ class UserManagementServiceTest {
         void updateUserInfo_success() {
             User user = buildUser(1L, UserStatus.ACTIVE, UserRole.SALES_STAFF);
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
+            given(userRepository.saveAndFlush(user)).willReturn(user);
 
             UpdateUserInfoRequest request = new UpdateUserInfoRequest();
             setRequestField(request, "name", "새이름");
@@ -197,6 +198,7 @@ class UserManagementServiceTest {
         void changeRole_success() {
             User user = buildUser(2L, UserStatus.ACTIVE, UserRole.SALES_STAFF);
             given(userRepository.findById(2L)).willReturn(Optional.of(user));
+            given(userRepository.saveAndFlush(user)).willReturn(user);
 
             ChangeUserRoleRequest request = new ChangeUserRoleRequest();
             setRequestField(request, "role", UserRole.SALES_MANAGER);
@@ -230,6 +232,7 @@ class UserManagementServiceTest {
         void suspendUser_success() {
             User user = buildUser(2L, UserStatus.ACTIVE, UserRole.SALES_STAFF);
             given(userRepository.findById(2L)).willReturn(Optional.of(user));
+            given(userRepository.saveAndFlush(user)).willReturn(user);
 
             UserDetailResponse result = userManagementService.suspendUser(1L, 2L);
 
@@ -271,6 +274,7 @@ class UserManagementServiceTest {
         void reactivateUser_success() {
             User user = buildUser(1L, UserStatus.SUSPENDED, UserRole.SALES_STAFF);
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
+            given(userRepository.saveAndFlush(user)).willReturn(user);
 
             UserDetailResponse result = userManagementService.reactivateUser(1L);
 
