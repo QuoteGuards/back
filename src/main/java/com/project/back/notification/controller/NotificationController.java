@@ -7,6 +7,7 @@ import com.project.back.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 
 import java.util.List;
 
@@ -20,7 +21,7 @@ public class NotificationController {
     // 알림 목록 조회
     @GetMapping
     public ResponseEntity<ApiResponse<List<NotificationResponse>>> getNotifications(
-            @RequestParam Long userId
+            @AuthenticationPrincipal Long userId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "알림 목록 조회 성공",
@@ -31,7 +32,7 @@ public class NotificationController {
     // 읽지 않은 알림 개수 조회
     @GetMapping("/unread-count")
     public ResponseEntity<ApiResponse<Long>> getUnreadCount(
-            @RequestParam Long userId
+            @AuthenticationPrincipal Long userId
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "읽지 않은 알림 개수 조회 성공",
@@ -42,9 +43,11 @@ public class NotificationController {
     // 알림 읽음 처리
     @PatchMapping("/{notificationId}/read")
     public ResponseEntity<ApiResponse<Void>> markAsRead(
+            @AuthenticationPrincipal Long userId,
             @PathVariable Long notificationId
+
     ) {
-        notificationService.markAsRead(notificationId);
+        notificationService.markAsRead(notificationId, userId);
 
         return ResponseEntity.ok(ApiResponse.success(
                 "알림 읽음 처리 성공",

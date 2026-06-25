@@ -12,6 +12,7 @@ import org.springframework.web.client.RestClient;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -49,7 +50,11 @@ public class AiService {
         String memo = request == null ? "" : safe(request.consultationMemo());
         List<String> productNames = request == null || request.productNames() == null
                 ? List.of()
-                : request.productNames();
+                : request.productNames().stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(name -> !name.isBlank())
+                .toList();
 
         String prompt = """
                 아래 정보를 바탕으로 고객에게 보낼 견적 제안 문구 초안을 작성해줘.
@@ -102,9 +107,16 @@ public class AiService {
         }
 
         Map candidate = (Map) candidates.get(0);
-        Map content = (Map) candidate.get("content");
-        List parts = (List) content.get("parts");
+        if (candidate == null) {
+            return "AI 응답을 생성하지 못했습니다.";
+        }
 
+        Map content = (Map) candidate.get("content");
+        if (content == null) {
+            return "AI 응답을 생성하지 못했습니다.";
+        }
+
+        List parts = (List) content.get("parts");
         if (parts == null || parts.isEmpty()) {
             return "AI 응답을 생성하지 못했습니다.";
         }

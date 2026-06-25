@@ -31,9 +31,13 @@ public class NotificationService {
 
     // 알림 읽음 처리
     @Transactional
-    public void markAsRead(Long notificationId) {
+    public void markAsRead(Long notificationId, Long userId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new IllegalArgumentException("알림을 찾을 수 없습니다."));
+
+        if (!notification.getUser().getId().equals(userId)) {
+            throw new IllegalArgumentException("해당 알림에 접근할 수 없습니다.");
+        }
 
         notification.markAsRead();
     }

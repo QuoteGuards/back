@@ -9,6 +9,7 @@ import com.project.back.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -20,7 +21,7 @@ public class AiController {
     // 상담 메모 요약
     @PostMapping("/consultation-summary")
     public ResponseEntity<ApiResponse<ConsultationSummaryResponse>> summarizeConsultation(
-            @RequestBody ConsultationSummaryRequest request
+           @Valid @RequestBody ConsultationSummaryRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "상담 메모 요약 성공",
@@ -31,7 +32,7 @@ public class AiController {
     // 고객 제안 문구 생성
     @PostMapping("/proposal-message")
     public ResponseEntity<ApiResponse<ProposalMessageResponse>> createProposalMessage(
-            @RequestBody ProposalMessageRequest request
+            @Valid @RequestBody ProposalMessageRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "고객 제안 문구 생성 성공",
