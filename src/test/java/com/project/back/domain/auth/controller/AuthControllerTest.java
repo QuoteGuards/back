@@ -18,9 +18,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
 
+import com.project.back.global.security.JwtTokenProvider;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
+import static org.mockito.Mockito.verify;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -39,6 +41,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private UserRepository userRepository;
+
+    @Autowired
+    private JwtTokenProvider jwtTokenProvider;
 
     @Test
     @DisplayName("POST /api/auth/login - 200 OK (success, mustChangePassword=false)")
@@ -164,15 +169,18 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/auth/logout - 200 OK")
-    @WithMockUser
+    @DisplayName("POST /api/auth/logout - 200 OK (userId=1L principal verified)")
     void logout_success() throws Exception {
-        willDoNothing().given(authService).logout(any());
+        String token = jwtTokenProvider.createAccessToken(1L, "2026001@quoteguard.com", "SALES_STAFF");
+        willDoNothing().given(authService).logout(1L);
 
         mockMvc.perform(post("/api/auth/logout")
                         .with(csrf())
+                        .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("success"));
+
+        verify(authService).logout(1L);
     }
 }

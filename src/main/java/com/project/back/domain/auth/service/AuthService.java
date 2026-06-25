@@ -17,7 +17,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.UUID;
 
 @Service
@@ -64,7 +68,8 @@ public class AuthService {
     // 액세스 토큰 재발급
     @Transactional
     public TokenRefreshResponse refresh(RefreshTokenRequest request) {
-        RefreshToken stored = refreshTokenRepository.findByToken(request.getRefreshToken())
+        String hashedToken = hashToken(request.getRefreshToken());
+        RefreshToken stored = refreshTokenRepository.findByToken(hashedToken)
                 .orElseThrow(() -> new CustomException(ErrorCode.REFRESH_TOKEN_NOT_FOUND));
 
         if (stored.isExpired()) {
@@ -93,15 +98,28 @@ public class AuthService {
     }
 
     // 리프레시 토큰 생성 및 DB 저장 (기존 토큰 교체)
+    // DB에는 SHA-256 해시값만 저장하고, 원문은 클라이언트에게만 반환한다.
     private String issueRefreshToken(Long userId) {
         refreshTokenRepository.deleteByUserId(userId);
 
         String rawToken = UUID.randomUUID().toString();
+        String hashedToken = hashToken(rawToken);
         long validityMs = jwtTokenProvider.getRefreshTokenValidityMs();
         LocalDateTime expiryDate = LocalDateTime.now().plusSeconds(validityMs / 1000);
 
-        refreshTokenRepository.save(RefreshToken.of(userId, rawToken, expiryDate));
+        refreshTokenRepository.save(RefreshToken.of(userId, hashedToken, expiryDate));
         return rawToken;
+    }
+
+    // 리프레시 토큰 SHA-256 해시
+    private String hashToken(String rawToken) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(rawToken.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 not available", e);
+        }
     }
 
     private void validateUserStatus(UserStatus status) {

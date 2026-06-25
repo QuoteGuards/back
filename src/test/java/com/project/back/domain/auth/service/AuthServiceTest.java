@@ -22,7 +22,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -150,13 +153,13 @@ class AuthServiceTest {
         @Test
         @DisplayName("valid refresh token - new access token issued")
         void refresh_success() throws Exception {
-            RefreshToken stored = RefreshToken.of(1L, "valid-refresh-token",
-                    LocalDateTime.now().plusDays(7));
+            String raw = "valid-refresh-token";
+            RefreshToken stored = RefreshToken.of(1L, sha256(raw), LocalDateTime.now().plusDays(7));
 
             RefreshTokenRequest request = new RefreshTokenRequest();
-            setField(request, "refreshToken", "valid-refresh-token");
+            setField(request, "refreshToken", raw);
 
-            given(refreshTokenRepository.findByToken("valid-refresh-token"))
+            given(refreshTokenRepository.findByToken(sha256(raw)))
                     .willReturn(Optional.of(stored));
             given(userRepository.findById(1L))
                     .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, false)));
@@ -172,9 +175,10 @@ class AuthServiceTest {
         @Test
         @DisplayName("REFRESH_TOKEN_NOT_FOUND exception")
         void refresh_tokenNotFound() throws Exception {
+            String raw = "unknown-token";
             RefreshTokenRequest request = new RefreshTokenRequest();
-            setField(request, "refreshToken", "unknown-token");
-            given(refreshTokenRepository.findByToken("unknown-token")).willReturn(Optional.empty());
+            setField(request, "refreshToken", raw);
+            given(refreshTokenRepository.findByToken(sha256(raw))).willReturn(Optional.empty());
 
             assertThatThrownBy(() -> authService.refresh(request))
                     .isInstanceOf(CustomException.class)
@@ -185,12 +189,12 @@ class AuthServiceTest {
         @Test
         @DisplayName("expired refresh token - REFRESH_TOKEN_EXPIRED exception")
         void refresh_tokenExpired() throws Exception {
-            RefreshToken expired = RefreshToken.of(1L, "expired-token",
-                    LocalDateTime.now().minusDays(1));
+            String raw = "expired-token";
+            RefreshToken expired = RefreshToken.of(1L, sha256(raw), LocalDateTime.now().minusDays(1));
 
             RefreshTokenRequest request = new RefreshTokenRequest();
-            setField(request, "refreshToken", "expired-token");
-            given(refreshTokenRepository.findByToken("expired-token"))
+            setField(request, "refreshToken", raw);
+            given(refreshTokenRepository.findByToken(sha256(raw)))
                     .willReturn(Optional.of(expired));
 
             assertThatThrownBy(() -> authService.refresh(request))
@@ -241,5 +245,15 @@ class AuthServiceTest {
         var field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private String sha256(String input) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }
