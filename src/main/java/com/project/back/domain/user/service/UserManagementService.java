@@ -139,6 +139,19 @@ public class UserManagementService {
         return UserDetailResponse.from(user);
     }
 
+    // 사용자 삭제 (소프트 삭제: → DELETED), 자기 자신 삭제 불가
+    @Transactional
+    public void deleteUser(Long requesterId, Long userId) {
+        if (requesterId.equals(userId)) {
+            throw new CustomException(ErrorCode.CANNOT_MODIFY_SELF);
+        }
+        User user = findUserById(userId);
+        if (user.getStatus() == UserStatus.DELETED) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
+        user.delete();
+    }
+
     /**
      * 회원번호 자동 생성: YY(년도 뒤 2자리) + 5자리 난수 (예: 2684921)
      * 중복 시 최대 5회 재시도한다.
