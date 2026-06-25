@@ -111,8 +111,9 @@ public class QuoteController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long quoteId) {
 
-        Quote quote = quoteService.getInternalAnalysis(quoteId, getUser(userId));
-        return ResponseEntity.ok(ApiResponse.success(QuoteInternalAnalysisResponse.from(quote)));
+        QuoteService.InternalAnalysisResult result = quoteService.getInternalAnalysis(quoteId, getUser(userId));
+        return ResponseEntity.ok(ApiResponse.success(
+                QuoteInternalAnalysisResponse.from(result.quote(), result.approvalRequired(), result.reasons())));
     }
 
     // 최근 견적 재사용
