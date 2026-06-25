@@ -1,7 +1,11 @@
 package com.project.back.domain.auth.service;
 
 import com.project.back.domain.auth.dto.request.LoginRequest;
+import com.project.back.domain.auth.dto.request.RefreshTokenRequest;
 import com.project.back.domain.auth.dto.response.LoginResponse;
+import com.project.back.domain.auth.dto.response.TokenRefreshResponse;
+import com.project.back.domain.auth.entity.RefreshToken;
+import com.project.back.domain.auth.repository.RefreshTokenRepository;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
@@ -18,12 +22,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.util.HexFormat;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -40,12 +49,15 @@ class AuthServiceTest {
     @Mock
     private JwtTokenProvider jwtTokenProvider;
 
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+
     @Nested
-    @DisplayName("로그인 (이메일 + 비밀번호)")
+    @DisplayName("login")
     class Login {
 
         @Test
-        @DisplayName("ACTIVE 사용자 - 로그인 성공, mustChangePassword=false 반환")
+        @DisplayName("ACTIVE - success, mustChangePassword=false")
         void login_active_success() {
             LoginRequest request = mockLoginRequest("2026001@quoteguard.com", "Pass@1234");
             given(userRepository.findByEmail("2026001@quoteguard.com"))
@@ -53,16 +65,20 @@ class AuthServiceTest {
             given(passwordEncoder.matches("Pass@1234", "encodedPassword")).willReturn(true);
             given(jwtTokenProvider.createAccessToken(any(Long.class), anyString(), anyString()))
                     .willReturn("mock.jwt.token");
+            given(jwtTokenProvider.getRefreshTokenValidityMs()).willReturn(604800000L);
+            given(refreshTokenRepository.save(any(RefreshToken.class)))
+                    .willAnswer(inv -> inv.getArgument(0));
 
             LoginResponse response = authService.login(request);
 
             assertThat(response.getAccessToken()).isEqualTo("mock.jwt.token");
+            assertThat(response.getRefreshToken()).isNotBlank();
             assertThat(response.getTokenType()).isEqualTo("Bearer");
             assertThat(response.isMustChangePassword()).isFalse();
         }
 
         @Test
-        @DisplayName("최초 로그인(임시 비밀번호) - mustChangePassword=true 반환")
+        @DisplayName("mustChangePassword=true - returned in response")
         void login_mustChangePassword_returnedInResponse() {
             LoginRequest request = mockLoginRequest("2026001@quoteguard.com", "QG-ABCD1234");
             given(userRepository.findByEmail("2026001@quoteguard.com"))
@@ -70,6 +86,9 @@ class AuthServiceTest {
             given(passwordEncoder.matches("QG-ABCD1234", "encodedPassword")).willReturn(true);
             given(jwtTokenProvider.createAccessToken(any(Long.class), anyString(), anyString()))
                     .willReturn("mock.jwt.token");
+            given(jwtTokenProvider.getRefreshTokenValidityMs()).willReturn(604800000L);
+            given(refreshTokenRepository.save(any(RefreshToken.class)))
+                    .willAnswer(inv -> inv.getArgument(0));
 
             LoginResponse response = authService.login(request);
 
@@ -77,7 +96,7 @@ class AuthServiceTest {
         }
 
         @Test
-        @DisplayName("존재하지 않는 이메일 - USER_NOT_FOUND 예외")
+        @DisplayName("USER_NOT_FOUND exception")
         void login_emailNotFound() {
             LoginRequest request = mockLoginRequest("none@quoteguard.com", "Pass@1234");
             given(userRepository.findByEmail("none@quoteguard.com")).willReturn(Optional.empty());
@@ -89,7 +108,7 @@ class AuthServiceTest {
         }
 
         @Test
-        @DisplayName("비밀번호 불일치 - INVALID_PASSWORD 예외")
+        @DisplayName("INVALID_PASSWORD exception")
         void login_invalidPassword() {
             LoginRequest request = mockLoginRequest("2026001@quoteguard.com", "wrongPass");
             given(userRepository.findByEmail("2026001@quoteguard.com"))
@@ -103,13 +122,13 @@ class AuthServiceTest {
         }
 
         @Test
-        @DisplayName("SUSPENDED 사용자 - USER_SUSPENDED 예외")
+        @DisplayName("SUSPENDED - USER_SUSPENDED exception")
         void login_suspendedUser() {
             assertLoginStatusException(UserStatus.SUSPENDED, ErrorCode.USER_SUSPENDED);
         }
 
         @Test
-        @DisplayName("DELETED 사용자 - USER_DELETED 예외")
+        @DisplayName("DELETED - USER_DELETED exception")
         void login_deletedUser() {
             assertLoginStatusException(UserStatus.DELETED, ErrorCode.USER_DELETED);
         }
@@ -124,6 +143,77 @@ class AuthServiceTest {
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(expectedCode));
+        }
+    }
+
+    @Nested
+    @DisplayName("refresh")
+    class Refresh {
+
+        @Test
+        @DisplayName("valid refresh token - new access token issued")
+        void refresh_success() throws Exception {
+            String raw = "valid-refresh-token";
+            RefreshToken stored = RefreshToken.of(1L, sha256(raw), LocalDateTime.now().plusDays(7));
+
+            RefreshTokenRequest request = new RefreshTokenRequest();
+            setField(request, "refreshToken", raw);
+
+            given(refreshTokenRepository.findByToken(sha256(raw)))
+                    .willReturn(Optional.of(stored));
+            given(userRepository.findById(1L))
+                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, false)));
+            given(jwtTokenProvider.createAccessToken(any(Long.class), anyString(), anyString()))
+                    .willReturn("new.access.token");
+
+            TokenRefreshResponse response = authService.refresh(request);
+
+            assertThat(response.getAccessToken()).isEqualTo("new.access.token");
+            assertThat(response.getTokenType()).isEqualTo("Bearer");
+        }
+
+        @Test
+        @DisplayName("REFRESH_TOKEN_NOT_FOUND exception")
+        void refresh_tokenNotFound() throws Exception {
+            String raw = "unknown-token";
+            RefreshTokenRequest request = new RefreshTokenRequest();
+            setField(request, "refreshToken", raw);
+            given(refreshTokenRepository.findByToken(sha256(raw))).willReturn(Optional.empty());
+
+            assertThatThrownBy(() -> authService.refresh(request))
+                    .isInstanceOf(CustomException.class)
+                    .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                            .isEqualTo(ErrorCode.REFRESH_TOKEN_NOT_FOUND));
+        }
+
+        @Test
+        @DisplayName("expired refresh token - REFRESH_TOKEN_EXPIRED exception")
+        void refresh_tokenExpired() throws Exception {
+            String raw = "expired-token";
+            RefreshToken expired = RefreshToken.of(1L, sha256(raw), LocalDateTime.now().minusDays(1));
+
+            RefreshTokenRequest request = new RefreshTokenRequest();
+            setField(request, "refreshToken", raw);
+            given(refreshTokenRepository.findByToken(sha256(raw)))
+                    .willReturn(Optional.of(expired));
+
+            assertThatThrownBy(() -> authService.refresh(request))
+                    .isInstanceOf(CustomException.class)
+                    .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                            .isEqualTo(ErrorCode.REFRESH_TOKEN_EXPIRED));
+        }
+    }
+
+    @Nested
+    @DisplayName("logout")
+    class Logout {
+
+        @Test
+        @DisplayName("logout - refresh token deleted from DB")
+        void logout_deletesRefreshToken() {
+            authService.logout(1L);
+
+            verify(refreshTokenRepository).deleteByUserId(1L);
         }
     }
 
@@ -144,7 +234,7 @@ class AuthServiceTest {
                 .memberNumber("2026001")
                 .email("2026001@quoteguard.com")
                 .password("encodedPassword")
-                .name("테스터")
+                .name("tester")
                 .role(UserRole.SALES_STAFF)
                 .status(status)
                 .mustChangePassword(mustChangePassword)
@@ -155,5 +245,15 @@ class AuthServiceTest {
         var field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private String sha256(String input) {
+        try {
+            byte[] hash = MessageDigest.getInstance("SHA-256")
+                    .digest(input.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 }
