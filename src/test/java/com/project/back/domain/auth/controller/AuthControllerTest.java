@@ -3,6 +3,7 @@ package com.project.back.domain.auth.controller;
 import tools.jackson.databind.json.JsonMapper;
 import com.project.back.domain.auth.dto.response.LoginResponse;
 import com.project.back.domain.auth.service.AuthService;
+import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +34,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private UserRepository userRepository;
 
     @Test
     @DisplayName("POST /api/auth/login - 200 OK (로그인 성공, mustChangePassword 포함)")

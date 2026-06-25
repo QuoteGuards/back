@@ -5,6 +5,7 @@ import com.project.back.domain.approval.service.ApprovalService;
 import com.project.back.domain.auth.controller.AuthController;
 import com.project.back.domain.auth.service.AuthService;
 import com.project.back.domain.user.controller.AdminUserController;
+import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.domain.user.service.UserManagementService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -58,6 +59,9 @@ class SecurityAccessControlTest {
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockitoBean
+    private UserRepository userRepository;
 
     /**
      * 테스트용 인증 객체 생성 — principal을 Long userId로 설정하여 @AuthenticationPrincipal Long userId 호환
