@@ -67,6 +67,7 @@ public class SecurityConfig {
 
                         // 승인 요청 (영업사원만)
                         .requestMatchers(HttpMethod.POST, "/api/quotes/*/approval-requests").hasRole("SALES_STAFF")
+                        .requestMatchers(HttpMethod.PATCH, "/api/quotes/*/approval-requests/*/memo").hasRole("SALES_STAFF")
                         .requestMatchers(HttpMethod.POST, "/api/quotes/*/resubmit").hasRole("SALES_STAFF")
 
                         // 승인 이력/사유 조회 (인증된 사용자 전체)
@@ -77,6 +78,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/approval-requests/**").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/admin/quotes/*/approve").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/admin/quotes/*/reject").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
+                        .requestMatchers("/api/admin/quotes/*/ai-summary").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/admin/users/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/admin/dashboard/**").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                             // 제품, 카테고리 관리는 관리자만

@@ -15,7 +15,6 @@ import com.project.back.domain.user.service.UserStatsUpdateService;
 import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
-import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,11 +47,11 @@ public class ApprovalService {
         // 이미 PENDING 상태 승인 요청이 있으면 중복 요청 방지
         if (approvalRequestRepository.existsByQuote_IdAndStatus(
                 quoteId, ApprovalRequest.ApprovalStatus.PENDING)) {
-            throw new IllegalStateException("이미 승인 대기 중인 요청이 있습니다.");
+            throw new CustomException(ErrorCode.APPROVAL_ALREADY_PENDING);
         }
 
         User requester = userRepository.findById(requesterId)
-                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         // 승인 요청 생성
         Quote quote = quoteRepository.findById(quoteId)
@@ -87,7 +86,7 @@ public class ApprovalService {
 
         ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
         User approver = userRepository.findById(approverId)
-                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         // PENDING 상태만 승인 가능
         validatePendingStatus(approvalRequest);
@@ -127,12 +126,12 @@ public class ApprovalService {
 
         // 반려 사유 필수 검증
         if (rejectReason == null || rejectReason.isBlank()) {
-            throw new IllegalArgumentException("반려 사유는 필수입니다.");
+            throw new CustomException(ErrorCode.REJECT_REASON_REQUIRED);
         }
 
         ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
         User approver = userRepository.findById(approverId)
-                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         // PENDING 상태만 반려 가능
         validatePendingStatus(approvalRequest);
@@ -171,16 +170,16 @@ public class ApprovalService {
 
         ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
         User requester = userRepository.findById(requesterId)
-                .orElseThrow(() -> new EntityNotFoundException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         // REJECTED 상태만 재요청 가능
         if (approvalRequest.getStatus() != ApprovalRequest.ApprovalStatus.REJECTED) {
-            throw new IllegalStateException("반려된 견적만 재요청할 수 있습니다.");
+            throw new CustomException(ErrorCode.APPROVAL_NOT_REJECTED);
         }
 
         // 본인 견적만 재요청 가능
         if (!approvalRequest.getRequester().getId().equals(requesterId)) {
-            throw new IllegalStateException("본인이 요청한 견적만 재요청할 수 있습니다.");
+            throw new CustomException(ErrorCode.APPROVAL_ACCESS_DENIED);
         }
 
         ApprovalRequest.ApprovalStatus beforeStatus = approvalRequest.getStatus();
@@ -202,7 +201,24 @@ public class ApprovalService {
         return approvalRequest;
     }
 
-    // ── 5. 승인 대기 목록 조회 (관리자용) ──
+    // ── 5. 승인 요청 메모 수정 ──
+    @Transactional
+    public void updateMemo(Long approvalRequestId, Long requesterId, String newMemo) {
+
+        ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
+
+        // PENDING 상태만 수정 가능
+        validatePendingStatus(approvalRequest);
+
+        // 본인 요청건만 수정 가능
+        if (!approvalRequest.getRequester().getId().equals(requesterId)) {
+            throw new CustomException(ErrorCode.APPROVAL_ACCESS_DENIED);
+        }
+
+        approvalRequest.updateMemo(newMemo);
+    }
+
+    // ── 6. 승인 대기 목록 조회 (관리자용) ──
     public List<ApprovalRequest> getPendingList() {
         return approvalRequestRepository.findByStatusOrderByRequestedAtAsc(
                 ApprovalRequest.ApprovalStatus.PENDING
@@ -223,12 +239,12 @@ public class ApprovalService {
 
     private ApprovalRequest findApprovalRequestById(Long approvalRequestId) {
         return approvalRequestRepository.findByIdWithUsers(approvalRequestId)
-                .orElseThrow(() -> new EntityNotFoundException("승인 요청을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.APPROVAL_REQUEST_NOT_FOUND));
     }
 
     private void validatePendingStatus(ApprovalRequest approvalRequest) {
         if (approvalRequest.getStatus() != ApprovalRequest.ApprovalStatus.PENDING) {
-            throw new IllegalStateException("승인 대기 상태의 요청만 처리할 수 있습니다.");
+            throw new CustomException(ErrorCode.APPROVAL_NOT_PENDING);
         }
     }
     public ApprovalRequestDetailResponse getApprovalDetail(Long approvalRequestId) {

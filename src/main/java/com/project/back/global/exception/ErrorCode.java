@@ -60,6 +60,14 @@ public enum ErrorCode {
     // Email
     EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_001", "이메일 발송에 실패했습니다."),
 
+    // Approval
+    APPROVAL_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "APPROVAL_001", "승인 요청을 찾을 수 없습니다."),
+    APPROVAL_ALREADY_PENDING(HttpStatus.CONFLICT, "APPROVAL_002", "이미 승인 대기 중인 요청이 있습니다."),
+    APPROVAL_NOT_PENDING(HttpStatus.BAD_REQUEST, "APPROVAL_003", "승인 대기 상태의 요청만 처리할 수 있습니다."),
+    APPROVAL_NOT_REJECTED(HttpStatus.BAD_REQUEST, "APPROVAL_004", "반려된 견적만 재요청할 수 있습니다."),
+    APPROVAL_ACCESS_DENIED(HttpStatus.FORBIDDEN, "APPROVAL_005", "본인이 요청한 승인 건만 재요청할 수 있습니다."),
+    REJECT_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "APPROVAL_006", "반려 사유는 필수입니다."),
+
     // Customer
     CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "CUSTOMER_001", "존재하지 않는 고객입니다."),
 

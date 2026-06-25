@@ -12,7 +12,9 @@ import org.springframework.test.context.TestPropertySource;
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.jpa.hibernate.ddl-auto=create-drop",
-        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect"
+        "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
+        "MAIL_USERNAME=noreply@quoteguard.com",
+        "mail.from-address=noreply@quoteguard.com"
 })
 class BackApplicationTests {
 
