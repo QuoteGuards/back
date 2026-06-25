@@ -3,9 +3,8 @@ package com.project.back.domain.quote.service;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.customer.repository.CustomerRepository;
 import com.project.back.domain.discount.entity.DiscountPolicy;
-// 💡 TODO: [2번 팀원 리포지토리 완료 시 변경할 곳] 아래 임시 레포지토리 패키지 경로를 팀원의 실제 경로로 맞추거나 주석을 해제하세요.
-// import com.project.back.domain.discount.repository.DiscountPolicyRepository;
 import com.project.back.domain.discount.repository.DiscountPolicyRepository;
+import com.project.back.domain.product.entity.Product;
 import com.project.back.domain.product.repository.ProductRepository;
 import com.project.back.domain.quote.dto.response.QuoteDetailResponse;
 import com.project.back.domain.quote.entity.Quote;
@@ -31,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -102,7 +102,7 @@ public class QuoteService {
 
         quoteRepository.save(quote);
 
-        List<QuoteItem> items = buildItems(quote, itemCommands);
+        List<QuoteItem> items = buildItems(quote, itemCommands, policy);
         quoteItemRepository.saveAll(items);
         calculationService.calculate(quote, items);
 
@@ -157,7 +157,6 @@ public class QuoteService {
 
         Customer customer = getCustomerOrThrow(customerId, requester.getId());
 
-        //고객 정보가 바뀌었을 때를 대비해 스냅샷을 새로 생성
         QuoteCustomer snapshot = QuoteCustomer.builder()
                 .companyName(customer.getCompanyName())
                 .contactName(customer.getContactName())
@@ -168,10 +167,13 @@ public class QuoteService {
 
         quote.updateInfo(customer, snapshot, internalMemo, issuedDate, validUntil, deliveryTerm);
 
-        quoteItemRepository.deleteByQuoteId(quoteId);
-        List<QuoteItem> items = buildItems(quote, itemCommands);
-        quoteItemRepository.saveAll(items);
-        calculationService.calculate(quote, items);
+
+        List<QuoteItem> newItems = buildItems(quote, itemCommands, quote.getDiscountPolicy());
+
+        //엔티티 내부에서 클리어하고 새로 추가 (JPA가 변경을 감지하여 DELETE/INSERT 쿼리 자동 생성)
+        quote.replaceItems(newItems);
+
+        calculationService.calculate(quote, newItems);
 
         return quote;
     }
@@ -259,10 +261,10 @@ public class QuoteService {
                 .build();
 
         quoteRepository.save(newQuote);
-        List<QuoteItem> copiedItems = copyItems(newQuote,
+        List<QuoteItem> rebuiltItems = rebuildItemsWithCurrentPrice(newQuote,
                 quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(expiredQuoteId));
-        quoteItemRepository.saveAll(copiedItems);
-        calculationService.calculate(newQuote, copiedItems);
+        quoteItemRepository.saveAll(rebuiltItems);
+        calculationService.calculate(newQuote, rebuiltItems);
 
         return newQuote;
     }
@@ -329,14 +331,15 @@ public class QuoteService {
                 .orElseThrow(() -> new CustomException(ErrorCode.DISCOUNT_POLICY_NOT_FOUND));
     }
 
-    private List<QuoteItem> buildItems(Quote quote, List<QuoteItemCommand> commands) {
+    private List<QuoteItem> buildItems(Quote quote, List<QuoteItemCommand> commands, DiscountPolicy policy) {
         int[] order = {0};
         return commands.stream()
                 .map(cmd -> {
-                    cmd.validateDiscountReason();
                     var product = productRepository.findById(cmd.productId())
                             .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
                     if (!product.isActive()) throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
+
+                    validateDiscountReasonAgainstPolicy(policy, cmd.discountRate(), cmd.discountReason(), cmd.quantity(), product);
 
                     QuoteItem item = QuoteItem.builder()
                             .quote(quote)
@@ -357,6 +360,106 @@ public class QuoteService {
                     return item;
                 })
                 .toList();
+    }
+
+     //할인율이 정책의 최대 할인율을 초과하거나,할인 적용 후 예상 이익률이 정책의 최소 이익률보다 낮으면 할인 사유를 필수로 요구한다.
+     // 정책이 없는 경우(discountPolicyId가 null)에는 검증을 생략한다.
+     // 기존 메서드를 수정하여 인자를 받도록 변경
+     private void validateDiscountReasonAgainstPolicy(DiscountPolicy policy,
+                                                      BigDecimal discountRate,
+                                                      String discountReason,
+                                                      BigDecimal quantity,
+                                                      Product product) {
+         if (policy == null) return;
+
+         BigDecimal rate = discountRate != null ? discountRate : BigDecimal.ZERO;
+
+         // 정책 위반 여부 계산 로직
+         boolean exceedsMaxDiscount = policy.getMaxDiscountRate() != null
+                 && rate.compareTo(policy.getMaxDiscountRate()) > 0;
+
+         BigDecimal base = product.getUnitPrice().multiply(quantity);
+         BigDecimal discountAmount = rate.compareTo(BigDecimal.ZERO) > 0
+                 ? base.multiply(rate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
+                 : BigDecimal.ZERO;
+         BigDecimal lineSupply = base.subtract(discountAmount);
+         BigDecimal lineCost = product.getCostPrice().multiply(quantity);
+         BigDecimal profit = lineSupply.subtract(lineCost);
+         BigDecimal profitRate = lineSupply.compareTo(BigDecimal.ZERO) == 0
+                 ? BigDecimal.ZERO
+                 : profit.multiply(BigDecimal.valueOf(100)).divide(lineSupply, 2, RoundingMode.HALF_UP);
+
+         boolean belowMinProfit = policy.getMinProfitRate() != null
+                 && profitRate.compareTo(policy.getMinProfitRate()) < 0;
+
+         // 사유 검증
+         if ((exceedsMaxDiscount || belowMinProfit)
+                 && (discountReason == null || discountReason.isBlank())) {
+             throw new CustomException(ErrorCode.DISCOUNT_REASON_REQUIRED);
+         }
+     }
+
+
+     //만료 견적 재작성(rewriteExpiredQuote) 시 사용.
+     //(견적 정합성: 만료 기간 이후 재작성은 금액이 바뀔 수 있어야 함 ->reuseQuote의 copyItems와 다르게 동작
+     private List<QuoteItem> rebuildItemsWithCurrentPrice(Quote newQuote, List<QuoteItem> sourceItems) {
+         int[] order = {0};
+         return sourceItems.stream()
+                 .map(src -> {
+                     //비활성 상품은 가져오지 않도록 filter 추가
+                     Product currentProduct = src.getProductId() != null
+                             ? productRepository.findById(src.getProductId())
+                               .filter(Product::isActive)
+                               .orElse(null)
+                             : null;
+
+                     // 만약 필수 제품이 비활성화되었다면 예외 처리하거나 null로 넘김
+                     if (src.getProductId() != null && currentProduct == null) {
+                         throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
+                     }
+
+                     //재작성 시에도 정책 검증 실시
+                     if (currentProduct != null) {
+                         validateDiscountReasonAgainstPolicy(
+                                 newQuote.getDiscountPolicy(),
+                                 src.getDiscountRate(),
+                                 src.getDiscountReason(),
+                                 src.getQuantity(),
+                                 currentProduct
+                         );
+                     }
+
+                     QuoteItem item = QuoteItem.builder()
+                             .quote(newQuote)
+                             .productId(src.getProductId())
+                             .productName(currentProduct != null ? currentProduct.getName() : src.getProductName())
+                             .productCode(currentProduct != null ? currentProduct.getCode() : src.getProductCode())
+                             .spec(currentProduct != null ? currentProduct.getSpec() : src.getSpec())
+                             .unitPrice(currentProduct != null ? currentProduct.getUnitPrice() : src.getUnitPrice())
+                             .costPrice(currentProduct != null ? currentProduct.getCostPrice() : src.getCostPrice())
+                             .quantity(src.getQuantity())
+                             .discountRate(src.getDiscountRate())
+                             .discountReason(src.getDiscountReason())
+                             .vatApplicable(src.getVatApplicable())
+                             .sortOrder(order[0]++)
+                             .build();
+
+                     newQuote.addItem(item);
+                     return item;
+                 })
+                 .toList();
+     }
+
+    //전체 이익률 검증 메서드
+    //항목별 검증과 견적 합계 검증이 어긋나지 않게 제출 시점에 quote.getProfitRate()를 기준으로 승인 여부를 재확인하는 로직을 추가하거나
+    // validation 메서드를 통일
+    private void validateTotalProfitAgainstPolicy(DiscountPolicy policy, Quote quote) {
+        if (policy == null) return;
+
+        // 견적 합계 이익률과 정책의 최소 이익률 비교
+        if (quote.getProfitRate().compareTo(policy.getMinProfitRate()) < 0) {
+            // 필요시 로직 처리
+        }
     }
 
     private List<QuoteItem> copyItems(Quote newQuote, List<QuoteItem> sourceItems) {
@@ -395,17 +498,8 @@ public class QuoteService {
             @DecimalMin("0") @DecimalMax("100") BigDecimal discountRate,
             @NotNull(message = "VAT 적용 여부는 필수입니다.") Boolean vatApplicable,
             @Size(max = 255, message = "할인 사유는 255자 이내로 입력해주세요.")
-            String discountReason // 할인 사유 필드
-    ) {
-        public void validateDiscountReason() {
-            // 할인율이 0보다 큰데 사유가 없으면 에러
-            if (discountRate != null && discountRate.compareTo(BigDecimal.ZERO) > 0) {
-                if (discountReason == null || discountReason.isBlank()) {
-                    throw new CustomException(ErrorCode.DISCOUNT_REASON_REQUIRED);
-                }
-            }
-        }
-    }
+            String discountReason
+    ) {}
 
     private User findUser(Long userId) {
         return userRepository.findById(userId)
