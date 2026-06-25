@@ -114,8 +114,6 @@ public class QuoteService {
         validateTrainingCompleted(requester.getId());
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
-
-        //편집 가능한 상태(DRAFT, REVISING)인지 검증
         validateEditable(quote);
 
         List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quoteId);
@@ -123,7 +121,11 @@ public class QuoteService {
                 quote.getDiscountPolicy(), items, quote.getTotalAmount(), quote.getProfitRate());
 
         boolean approvalRequired = !reasons.isEmpty();
+
+        // [수정] 삭제 후 flush를 호출하여 DB에 반영을 강제함
         approvalReasonRepository.deleteByQuote_Id(quoteId);
+        quote.getApprovalReasons().clear();
+
         if (approvalRequired) {
             List<QuoteApprovalReason> reasonEntities = reasons.stream()
                     .map(r -> QuoteApprovalReason.of(
@@ -135,8 +137,6 @@ public class QuoteService {
         }
 
         quote.complete(approvalRequired);
-
-        // 견적 제출 시 통계 갱신 - 커밋 이후 재집계
         userStatsUpdateService.recalculateAfterCommit(requester.getId());
 
         return quote;
@@ -155,6 +155,10 @@ public class QuoteService {
         validateOwner(quote, requester);
         validateEditable(quote);
 
+        // 1. 이전 반려 사유 또는 승인 사유 초기화
+        // 수정이 일어나는 시점에는 이전의 판단 결과는 더 이상 유효하지 않으므로 삭제합니다.
+        approvalReasonRepository.deleteByQuote_Id(quoteId);
+
         Customer customer = getCustomerOrThrow(customerId, requester.getId());
 
         QuoteCustomer snapshot = QuoteCustomer.builder()
@@ -167,11 +171,13 @@ public class QuoteService {
 
         quote.updateInfo(customer, snapshot, internalMemo, issuedDate, validUntil, deliveryTerm);
 
-
         List<QuoteItem> newItems = buildItems(quote, itemCommands, quote.getDiscountPolicy());
 
-        //엔티티 내부에서 클리어하고 새로 추가 (JPA가 변경을 감지하여 DELETE/INSERT 쿼리 자동 생성)
+        // 엔티티 내부에서 클리어하고 새로 추가
         quote.replaceItems(newItems);
+
+        // 상태를 REVISING으로 명시하여 수정 중임을 확실히 함
+        quote.startRevising();
 
         calculationService.calculate(quote, newItems);
 
