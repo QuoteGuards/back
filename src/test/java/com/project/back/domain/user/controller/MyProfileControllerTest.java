@@ -158,7 +158,7 @@ class MyProfileControllerTest {
                             ))))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.status").value("fail"))
-                    .andExpect(jsonPath("$.code").value("USER_005"));
+                    .andExpect(jsonPath("$.code").value("USER_004"));
         }
 
         @Test
@@ -266,7 +266,7 @@ class MyProfileControllerTest {
                                     "newPasswordConfirm", "DifferentPass@1"
                             ))))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("USER_007"));
+                    .andExpect(jsonPath("$.code").value("USER_006"));
         }
 
         @Test
@@ -285,7 +285,7 @@ class MyProfileControllerTest {
                                     "newPasswordConfirm", "OldPass@1"
                             ))))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("USER_006"));
+                    .andExpect(jsonPath("$.code").value("USER_005"));
         }
 
         @Test

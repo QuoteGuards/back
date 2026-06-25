@@ -161,7 +161,7 @@ class SecurityAccessControlTest {
                             .with(asUser(1L, "SALES_STAFF")))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.status").value("fail"))
-                    .andExpect(jsonPath("$.code").value("AUTH_007"));
+                    .andExpect(jsonPath("$.code").value("AUTH_006"));
         }
 
         @Test
@@ -171,7 +171,7 @@ class SecurityAccessControlTest {
                             .with(asUser(1L, "SALES_MANAGER")))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.status").value("fail"))
-                    .andExpect(jsonPath("$.code").value("AUTH_007"));
+                    .andExpect(jsonPath("$.code").value("AUTH_006"));
         }
 
         @Test
@@ -202,7 +202,7 @@ class SecurityAccessControlTest {
                             .with(asUser(1L, "SALES_STAFF")))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.status").value("fail"))
-                    .andExpect(jsonPath("$.code").value("AUTH_007"));
+                    .andExpect(jsonPath("$.code").value("AUTH_006"));
         }
 
         @Test
@@ -241,7 +241,7 @@ class SecurityAccessControlTest {
                             .with(asUser(1L, "SALES_STAFF")))
                     .andExpect(status().isForbidden())
                     .andExpect(jsonPath("$.status").value("fail"))
-                    .andExpect(jsonPath("$.code").value("AUTH_007"));
+                    .andExpect(jsonPath("$.code").value("AUTH_006"));
         }
 
         @Test
