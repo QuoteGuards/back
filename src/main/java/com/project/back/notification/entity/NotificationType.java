@@ -1,9 +1,10 @@
 package com.project.back.notification.entity;
 
 public enum NotificationType {
-    USER_APPROVED,
-    USER_REJECTED,
+    USER_CREATED,
     USER_SUSPENDED,
+    USER_REACTIVATED,
+    PASSWORD_RESET,
     ROLE_CHANGED,
     APPROVAL_REQUESTED,
     QUOTE_APPROVED,
