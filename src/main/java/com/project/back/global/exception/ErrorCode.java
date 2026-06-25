@@ -24,6 +24,7 @@ public enum ErrorCode {
     SAME_AS_CURRENT_PASSWORD(HttpStatus.BAD_REQUEST, "USER_005", "새 비밀번호는 현재 비밀번호와 달라야 합니다."),
     PASSWORD_CONFIRM_MISMATCH(HttpStatus.BAD_REQUEST, "USER_006", "새 비밀번호와 비밀번호 확인이 일치하지 않습니다."),
     DUPLICATE_MEMBER_NUMBER(HttpStatus.CONFLICT, "USER_007", "이미 사용 중인 회원번호입니다."),
+    MEMBER_NUMBER_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "USER_008", "회원번호 생성에 실패했습니다. 잠시 후 다시 시도해주세요."),
 
     // JWT
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "JWT_001", "유효하지 않은 토큰입니다."),

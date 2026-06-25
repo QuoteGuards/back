@@ -20,8 +20,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
 import java.time.LocalDate;
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +32,9 @@ public class UserManagementService {
 
     @Value("${account.email-domain:quoteguard.com}")
     private String emailDomain;
+
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String PASSWORD_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
 
     // 관리자가 신규 사원 계정을 직접 생성
     @Transactional
@@ -45,17 +48,22 @@ public class UserManagementService {
             throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
         }
 
-        // 3. 전화번호 중복 검사
+        // 3. SUPER_ADMIN 역할 생성 차단
+        if (request.getRole() == UserRole.SUPER_ADMIN) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+
+        // 4. 전화번호 중복 검사
         if (request.getPhone() != null && !request.getPhone().isBlank()) {
             if (userRepository.existsByPhone(request.getPhone())) {
                 throw new CustomException(ErrorCode.DUPLICATE_PHONE);
             }
         }
 
-        // 4. 임시 비밀번호 생성 (원문은 응답에 1회만 포함, 로그에 출력 금지)
+        // 5. 임시 비밀번호 생성 (원문은 응답에 1회만 포함, 로그에 출력 금지)
         String temporaryPassword = generateTemporaryPassword();
 
-        // 5. 계정 생성 - ACTIVE 상태, mustChangePassword=true
+        // 6. 계정 생성 - ACTIVE 상태, mustChangePassword=true
         User user = User.builder()
                 .memberNumber(memberNumber)
                 .email(email)
@@ -132,19 +140,25 @@ public class UserManagementService {
     }
 
     /**
-     * 회원번호 자동 생성: YYYY + 3자리 순번 (예: 2026001)
-     * 동시성 이슈는 DB unique 제약 + @Transactional로 보호한다.
+     * 회원번호 자동 생성: YY(년도 뒤 2자리) + 5자리 난수 (예: 2684921)
+     * 중복 시 최대 5회 재시도한다.
      */
     private String generateMemberNumber() {
-        String yearPrefix = String.valueOf(LocalDate.now().getYear());
-        int nextSeq = userRepository.findMaxMemberNumberByYearPrefix(yearPrefix)
-                .map(max -> Integer.parseInt(max.substring(yearPrefix.length())) + 1)
-                .orElse(1);
-        return yearPrefix + String.format("%03d", nextSeq);
+        String yearPrefix = String.valueOf(LocalDate.now().getYear() % 100);
+        for (int attempt = 0; attempt < 5; attempt++) {
+            String candidate = yearPrefix + String.format("%05d", SECURE_RANDOM.nextInt(100_000));
+            if (!userRepository.existsByMemberNumber(candidate)) {
+                return candidate;
+            }
+        }
+        throw new CustomException(ErrorCode.MEMBER_NUMBER_GENERATION_FAILED);
     }
 
     private String generateTemporaryPassword() {
-        String raw = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        StringBuilder raw = new StringBuilder(12);
+        for (int i = 0; i < 12; i++) {
+            raw.append(PASSWORD_CHARS.charAt(SECURE_RANDOM.nextInt(PASSWORD_CHARS.length())));
+        }
         return "QG-" + raw;
     }
 

@@ -173,7 +173,7 @@ class MyProfileServiceTest {
             MyProfileResponse result = myProfileService.updateMyProfile(1L, request);
 
             assertThat(result.getRole()).isEqualTo("SALES_STAFF");
-            assertThat(result.getStatus()).isEqualTo("APPROVED");
+            assertThat(result.getStatus()).isEqualTo("ACTIVE");
             assertThat(result.getDepartment()).isEqualTo("영업1팀");
             assertThat(result.getPosition()).isEqualTo("대리");
             assertThat(result.getEmail()).isEqualTo("user@test.com");

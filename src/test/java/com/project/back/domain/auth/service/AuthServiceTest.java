@@ -140,6 +140,7 @@ class AuthServiceTest {
 
     private User buildUser(UserStatus status, boolean mustChangePassword) {
         return User.builder()
+                .id(1L)
                 .memberNumber("2026001")
                 .email("2026001@quoteguard.com")
                 .password("encodedPassword")

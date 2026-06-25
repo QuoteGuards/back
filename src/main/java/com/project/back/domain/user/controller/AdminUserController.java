@@ -41,7 +41,7 @@ public class AdminUserController {
     ) {
         AdminCreateUserResponse result = userManagementService.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("사용자 계정이 생성되었습니다.", result));
+                .body(ApiResponse.created("사용자 계정이 생성되었습니다.", result));
     }
 
     /**

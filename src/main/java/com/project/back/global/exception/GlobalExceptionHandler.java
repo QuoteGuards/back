@@ -37,8 +37,10 @@ public class GlobalExceptionHandler {
             errorCode = ErrorCode.DUPLICATE_PHONE;
         } else if (msg.contains("member_number") || causeMsg.contains("member_number")) {
             errorCode = ErrorCode.DUPLICATE_MEMBER_NUMBER;
-        } else {
+        } else if (msg.contains("email") || causeMsg.contains("email")) {
             errorCode = ErrorCode.DUPLICATE_EMAIL;
+        } else {
+            errorCode = ErrorCode.INVALID_INPUT;
         }
         return ResponseEntity
                 .status(errorCode.getHttpStatus())

@@ -7,11 +7,17 @@ import com.project.back.domain.user.entity.UserStatus;
 import com.project.back.domain.user.service.UserManagementService;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
+import com.project.back.global.security.JwtAccessDeniedHandler;
+import com.project.back.global.security.JwtAuthenticationEntryPoint;
+import com.project.back.global.security.JwtTokenProvider;
+import com.project.back.global.security.SecurityConfig;
+import com.project.back.global.security.SecurityErrorResponseWriter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -27,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AdminUserController.class)
+@Import({SecurityConfig.class, JwtAuthenticationEntryPoint.class, JwtAccessDeniedHandler.class, SecurityErrorResponseWriter.class})
 @DisplayName("POST /api/admin/users - 관리자 계정 생성 API 테스트")
 class AdminUserControllerTest {
 
@@ -38,6 +45,9 @@ class AdminUserControllerTest {
 
     @MockitoBean
     private UserManagementService userManagementService;
+
+    @MockitoBean
+    private JwtTokenProvider jwtTokenProvider;
 
     // ── 성공 케이스 ────────────────────────────────────────────────────────
 
