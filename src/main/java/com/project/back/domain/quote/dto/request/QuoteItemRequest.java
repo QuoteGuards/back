@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 
 public record QuoteItemRequest(
 
+        @NotNull(message = "제품 ID는 필수입니다.")
         Long productId,
 
         @NotBlank(message = "제품명은 필수입니다.")
