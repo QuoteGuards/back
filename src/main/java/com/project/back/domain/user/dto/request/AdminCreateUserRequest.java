@@ -3,6 +3,7 @@ package com.project.back.domain.user.dto.request;
 import com.project.back.domain.user.entity.UserRole;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 
@@ -23,7 +24,8 @@ public class AdminCreateUserRequest {
     @Size(max = 50, message = "직급은 50자 이하여야 합니다.")
     private String position;
 
-    @Size(max = 20, message = "연락처는 20자 이하여야 합니다.")
+    @NotBlank(message = "연락처는 필수입니다.")
+    @Pattern(regexp = "^01[016789]-\\d{3,4}-\\d{4}$", message = "올바른 휴대폰 번호 형식이 아닙니다. (예: 010-1234-5678)")
     private String phone;
 
     @NotNull(message = "권한은 필수입니다.")

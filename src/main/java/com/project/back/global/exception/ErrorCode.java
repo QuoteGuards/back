@@ -15,6 +15,7 @@ public enum ErrorCode {
     USER_SUSPENDED(HttpStatus.FORBIDDEN, "AUTH_004", "정지된 계정입니다. 관리자에게 문의하세요."),
     USER_DELETED(HttpStatus.FORBIDDEN, "AUTH_005", "삭제된 계정입니다. 관리자에게 문의하세요."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "AUTH_006", "접근 권한이 없습니다."),
+    MUST_CHANGE_PASSWORD(HttpStatus.FORBIDDEN, "AUTH_007", "초기 비밀번호를 변경해야 합니다."),
 
     // User Management
     CANNOT_MODIFY_SELF(HttpStatus.BAD_REQUEST, "USER_001", "자기 자신의 권한 변경 또는 비활성화는 불가합니다."),

@@ -7,6 +7,7 @@ import com.project.back.domain.user.entity.UserStatus;
 import com.project.back.domain.user.service.UserManagementService;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
+import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.security.JwtAccessDeniedHandler;
 import com.project.back.global.security.JwtAuthenticationEntryPoint;
 import com.project.back.global.security.JwtTokenProvider;
@@ -53,6 +54,9 @@ class AdminUserControllerTest {
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockitoBean
+    private UserRepository userRepository;
 
     private RequestPostProcessor asUser(Long userId, String role) {
         Authentication auth = new UsernamePasswordAuthenticationToken(
