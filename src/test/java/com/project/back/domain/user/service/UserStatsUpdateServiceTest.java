@@ -58,7 +58,7 @@ class UserStatsUpdateServiceTest {
         User user = User.builder()
                 .id(id).email("user" + id + "@test.com").password("encoded")
                 .name("테스터" + id).department("영업1팀").position("대리")
-                .phone("010-1234-5678").status(UserStatus.APPROVED)
+                .phone("010-1234-5678").status(UserStatus.ACTIVE)
                 .role(UserRole.SALES_STAFF).build();
         setField(user, "createdAt", LocalDateTime.now());
         setField(user, "updatedAt", LocalDateTime.now());

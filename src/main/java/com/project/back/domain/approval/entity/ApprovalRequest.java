@@ -86,6 +86,10 @@ public class ApprovalRequest {
         this.processedAt = LocalDateTime.now();
     }
 
+    public void updateMemo(String memo) {
+        this.requestMemo = memo;
+    }
+
     @PrePersist
     public void prePersist() {
         this.requestedAt = LocalDateTime.now();

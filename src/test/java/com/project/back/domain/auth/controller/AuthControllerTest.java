@@ -2,11 +2,8 @@ package com.project.back.domain.auth.controller;
 
 import tools.jackson.databind.json.JsonMapper;
 import com.project.back.domain.auth.dto.response.LoginResponse;
-import com.project.back.domain.auth.dto.response.SignUpResponse;
 import com.project.back.domain.auth.service.AuthService;
-import com.project.back.domain.user.entity.User;
-import com.project.back.domain.user.entity.UserRole;
-import com.project.back.domain.user.entity.UserStatus;
+import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import org.junit.jupiter.api.DisplayName;
@@ -38,93 +35,72 @@ class AuthControllerTest {
     @MockitoBean
     private AuthService authService;
 
-    @Test
-    @DisplayName("POST /api/auth/signup - 201 Created")
-    @WithMockUser
-    void signUp_success() throws Exception {
-        User mockUser = User.builder().email("new@example.com").password("encoded").name("홍길동").build();
-        given(authService.signUp(any())).willReturn(SignUpResponse.from(mockUser));
+    @MockitoBean
+    private UserRepository userRepository;
 
-        mockMvc.perform(post("/api/auth/signup")
+    @Test
+    @DisplayName("POST /api/auth/login - 200 OK (로그인 성공, mustChangePassword 포함)")
+    @WithMockUser
+    void login_success() throws Exception {
+        given(authService.login(any())).willReturn(LoginResponse.of("mock.jwt.token", false));
+
+        mockMvc.perform(post("/api/auth/login")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "email", "new@example.com",
-                                "password", "Pass@1234",
-                                "name", "홍길동"
+                                "email", "2026001@quoteguard.com",
+                                "password", "QG-ABCD1234"
                         ))))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("success"))
-                .andExpect(jsonPath("$.data.email").value("new@example.com"))
-                .andExpect(jsonPath("$.data.role").value(UserRole.SALES_STAFF.name()))
-                .andExpect(jsonPath("$.data.status").value(UserStatus.PENDING.name()));
+                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.data.accessToken").value("mock.jwt.token"))
+                .andExpect(jsonPath("$.data.mustChangePassword").value(false));
     }
 
     @Test
-    @DisplayName("POST /api/auth/signup - 400 Bad Request (validation 실패)")
+    @DisplayName("POST /api/auth/login - 200 OK (최초 로그인 - mustChangePassword=true)")
     @WithMockUser
-    void signUp_validationFail() throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
+    void login_mustChangePassword() throws Exception {
+        given(authService.login(any())).willReturn(LoginResponse.of("mock.jwt.token", true));
+
+        mockMvc.perform(post("/api/auth/login")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "email", "invalid-email",
-                                "password", "short",
-                                "name", ""
+                                "email", "2026001@quoteguard.com",
+                                "password", "QG-ABCD1234"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.mustChangePassword").value(true));
+    }
+
+    @Test
+    @DisplayName("POST /api/auth/login - 400 Bad Request (이메일 형식 오류)")
+    @WithMockUser
+    void login_invalidEmail() throws Exception {
+        mockMvc.perform(post("/api/auth/login")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "email", "not-an-email",
+                                "password", "Pass@1234"
                         ))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value("fail"));
     }
 
     @Test
-    @DisplayName("POST /api/auth/signup - 409 Conflict (중복 이메일)")
+    @DisplayName("POST /api/auth/login - 403 Forbidden (SUSPENDED 사용자)")
     @WithMockUser
-    void signUp_duplicateEmail() throws Exception {
-        given(authService.signUp(any())).willThrow(new CustomException(ErrorCode.DUPLICATE_EMAIL));
-
-        mockMvc.perform(post("/api/auth/signup")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "email", "exist@example.com",
-                                "password", "Pass@1234",
-                                "name", "홍길동"
-                        ))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.status").value("fail"))
-                .andExpect(jsonPath("$.code").value("AUTH_001"));
-    }
-
-    @Test
-    @DisplayName("POST /api/auth/login - 200 OK (로그인 성공)")
-    @WithMockUser
-    void login_success() throws Exception {
-        given(authService.login(any())).willReturn(LoginResponse.of("mock.jwt.token"));
+    void login_suspendedUser() throws Exception {
+        given(authService.login(any())).willThrow(new CustomException(ErrorCode.USER_SUSPENDED));
 
         mockMvc.perform(post("/api/auth/login")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "email", "approved@example.com",
-                                "password", "Pass@1234"
-                        ))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("success"))
-                .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
-                .andExpect(jsonPath("$.data.accessToken").value("mock.jwt.token"));
-    }
-
-    @Test
-    @DisplayName("POST /api/auth/login - 403 Forbidden (PENDING 사용자)")
-    @WithMockUser
-    void login_pendingUser() throws Exception {
-        given(authService.login(any())).willThrow(new CustomException(ErrorCode.USER_PENDING));
-
-        mockMvc.perform(post("/api/auth/login")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "email", "pending@example.com",
+                                "email", "2026001@quoteguard.com",
                                 "password", "Pass@1234"
                         ))))
                 .andExpect(status().isForbidden())

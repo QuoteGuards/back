@@ -45,13 +45,14 @@ class MyProfileServiceTest {
         try {
             User user = User.builder()
                     .id(id)
+                    .memberNumber("202600" + id)
                     .email("user@test.com")
                     .password("encodedOldPassword")
                     .name("홍길동")
                     .department("영업1팀")
                     .position("대리")
                     .phone("010-1234-5678")
-                    .status(UserStatus.APPROVED)
+                    .status(UserStatus.ACTIVE)
                     .role(UserRole.SALES_STAFF)
                     .build();
             setField(user, "createdAt", LocalDateTime.now());
@@ -172,7 +173,7 @@ class MyProfileServiceTest {
             MyProfileResponse result = myProfileService.updateMyProfile(1L, request);
 
             assertThat(result.getRole()).isEqualTo("SALES_STAFF");
-            assertThat(result.getStatus()).isEqualTo("APPROVED");
+            assertThat(result.getStatus()).isEqualTo("ACTIVE");
             assertThat(result.getDepartment()).isEqualTo("영업1팀");
             assertThat(result.getPosition()).isEqualTo("대리");
             assertThat(result.getEmail()).isEqualTo("user@test.com");

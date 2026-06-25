@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class UserSummaryResponse {
 
     private final Long id;
+    private final String memberNumber;
     private final String email;
     private final String name;
     private final String department;
@@ -18,11 +19,13 @@ public class UserSummaryResponse {
     private final String phone;
     private final String role;
     private final String status;
+    private final boolean mustChangePassword;
     private final LocalDateTime createdAt;
 
     public static UserSummaryResponse from(User user) {
         return UserSummaryResponse.builder()
                 .id(user.getId())
+                .memberNumber(user.getMemberNumber())
                 .email(user.getEmail())
                 .name(user.getName())
                 .department(user.getDepartment())
@@ -30,6 +33,7 @@ public class UserSummaryResponse {
                 .phone(user.getPhone())
                 .role(user.getRole().name())
                 .status(user.getStatus().name())
+                .mustChangePassword(user.isMustChangePassword())
                 .createdAt(user.getCreatedAt())
                 .build();
     }
