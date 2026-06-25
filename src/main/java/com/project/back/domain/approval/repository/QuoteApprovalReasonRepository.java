@@ -2,6 +2,8 @@ package com.project.back.domain.approval.repository;
 
 import com.project.back.domain.approval.entity.QuoteApprovalReason;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
 
@@ -16,6 +18,7 @@ public interface QuoteApprovalReasonRepository extends JpaRepository<QuoteApprov
             QuoteApprovalReason.ReasonType reasonType
     );
 
-    // 특정 견적의 승인 필요 사유 전체 삭제 (재요청 시 사유 초기화)
+    @Modifying(clearAutomatically = true)
+    @Query("DELETE FROM QuoteApprovalReason r WHERE r.quote.id = :quoteId")
     void deleteByQuote_Id(Long quoteId);
 }
