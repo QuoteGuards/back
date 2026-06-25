@@ -65,7 +65,7 @@ public class GlobalExceptionHandler {
         log.warn("IllegalStateException: {}", e.getMessage());
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(ApiResponse.fail("CONFLICT_001", e.getMessage()));
+                .body(ApiResponse.fail("CONFLICT_001", "요청하신 작업을 수행할 수 없는 상태입니다."));
     }
 
     // 잘못된 인자/필수값 누락 등 (예: 반려 사유 미입력)
@@ -74,7 +74,7 @@ public class GlobalExceptionHandler {
         log.warn("IllegalArgumentException: {}", e.getMessage());
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.fail("COMMON_001", e.getMessage()));
+                .body(ApiResponse.fail(ErrorCode.INVALID_INPUT.getCode(), ErrorCode.INVALID_INPUT.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
