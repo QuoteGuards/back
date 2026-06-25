@@ -34,6 +34,7 @@ import java.io.IOException;
 public class MustChangePasswordFilter extends OncePerRequestFilter {
 
     private static final String CHANGE_PASSWORD_PATH = "/api/users/me/password";
+    private static final String LOGOUT_PATH = "/api/auth/logout";
 
     private final UserRepository userRepository;
     private final SecurityErrorResponseWriter securityErrorResponseWriter;
@@ -54,6 +55,13 @@ public class MustChangePasswordFilter extends OncePerRequestFilter {
         // 비밀번호 변경 엔드포인트 통과
         if (HttpMethod.PATCH.matches(request.getMethod())
                 && CHANGE_PASSWORD_PATH.equals(request.getRequestURI())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // 로그아웃 엔드포인트 통과 (초기 비밀번호 변경 전에도 로그아웃 허용)
+        if (HttpMethod.POST.matches(request.getMethod())
+                && LOGOUT_PATH.equals(request.getRequestURI())) {
             filterChain.doFilter(request, response);
             return;
         }

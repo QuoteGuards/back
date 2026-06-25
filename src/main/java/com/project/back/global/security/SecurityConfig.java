@@ -55,7 +55,7 @@ public class SecurityConfig {
                         .accessDeniedHandler(jwtAccessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/signup", "/api/auth/login").permitAll()
+                        .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/refresh").permitAll()
 
                         // 사용자 통계 조회 (본인)
                         .requestMatchers(HttpMethod.GET, "/api/users/me/stats").authenticated()
