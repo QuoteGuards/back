@@ -21,6 +21,7 @@ public class UserSummaryResponse {
     private final String status;
     private final boolean mustChangePassword;
     private final LocalDateTime createdAt;
+    private final LocalDateTime updatedAt;
 
     public static UserSummaryResponse from(User user) {
         return UserSummaryResponse.builder()
@@ -35,6 +36,7 @@ public class UserSummaryResponse {
                 .status(user.getStatus().name())
                 .mustChangePassword(user.isMustChangePassword())
                 .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
                 .build();
     }
 }

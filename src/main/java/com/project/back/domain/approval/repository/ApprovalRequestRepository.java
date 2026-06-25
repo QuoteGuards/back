@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,4 +48,10 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
         WHERE ar.id = :id
         """)
     Optional<ApprovalRequest> findByIdWithUsers(@Param("id") Long id);
+
+    long countByStatusAndProcessedAtBetween(
+            ApprovalRequest.ApprovalStatus status,
+            LocalDateTime from,
+            LocalDateTime to
+    );
 }

@@ -29,7 +29,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
             SELECT u FROM User u
             WHERE (:role IS NULL OR u.role = :role)
               AND (:status IS NULL OR u.status = :status)
-              AND (:keyword IS NULL OR u.name LIKE %:keyword% OR u.memberNumber LIKE %:keyword%)
+              AND (:keyword IS NULL OR u.name LIKE %:keyword% OR u.memberNumber LIKE %:keyword% OR u.email LIKE %:keyword%)
             """)
     Page<User> findAllWithFilters(
             @Param("role") UserRole role,

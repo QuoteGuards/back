@@ -112,4 +112,16 @@ public class AdminUserController {
         UserDetailResponse result = userManagementService.reactivateUser(userId);
         return ResponseEntity.ok(ApiResponse.success("사용자가 재활성화되었습니다.", result));
     }
+
+    /**
+     * 사용자 삭제 (소프트 삭제: DELETED 상태로 변경)
+     */
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<ApiResponse<Void>> deleteUser(
+            @AuthenticationPrincipal Long requesterId,
+            @PathVariable Long userId
+    ) {
+        userManagementService.deleteUser(requesterId, userId);
+        return ResponseEntity.ok(ApiResponse.success("사용자가 삭제되었습니다.", null));
+    }
 }

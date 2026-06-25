@@ -100,7 +100,8 @@ public class UserManagementService {
     public UserDetailResponse updateUserInfo(Long userId, UpdateUserInfoRequest request) {
         User user = findUserById(userId);
         user.updateInfo(request.getName(), request.getPhone(), request.getDepartment(), request.getPosition());
-        return UserDetailResponse.from(user);
+        User saved = userRepository.saveAndFlush(user);
+        return UserDetailResponse.from(saved);
     }
 
     // 사용자 권한 변경 (자기 자신 변경 불가)
@@ -111,7 +112,8 @@ public class UserManagementService {
         }
         User user = findUserById(userId);
         user.changeRole(request.getRole());
-        return UserDetailResponse.from(user);
+        User saved = userRepository.saveAndFlush(user);
+        return UserDetailResponse.from(saved);
     }
 
     // 사용자 비활성화 (ACTIVE → SUSPENDED)
@@ -125,7 +127,8 @@ public class UserManagementService {
             throw new CustomException(ErrorCode.USER_NOT_ACTIVE);
         }
         user.suspend(requesterId);
-        return UserDetailResponse.from(user);
+        User saved = userRepository.saveAndFlush(user);
+        return UserDetailResponse.from(saved);
     }
 
     // 사용자 재활성화 (SUSPENDED → ACTIVE)
@@ -136,7 +139,21 @@ public class UserManagementService {
             throw new CustomException(ErrorCode.USER_NOT_SUSPENDED);
         }
         user.reactivate();
-        return UserDetailResponse.from(user);
+        User saved = userRepository.saveAndFlush(user);
+        return UserDetailResponse.from(saved);
+    }
+
+    // 사용자 삭제 (소프트 삭제: → DELETED), 자기 자신 삭제 불가
+    @Transactional
+    public void deleteUser(Long requesterId, Long userId) {
+        if (requesterId.equals(userId)) {
+            throw new CustomException(ErrorCode.CANNOT_MODIFY_SELF);
+        }
+        User user = findUserById(userId);
+        if (user.getStatus() == UserStatus.DELETED) {
+            throw new CustomException(ErrorCode.USER_NOT_FOUND);
+        }
+        user.delete();
     }
 
     /**
