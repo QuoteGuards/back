@@ -2,16 +2,19 @@ package com.project.back.domain.user.controller;
 
 import tools.jackson.databind.json.JsonMapper;
 import com.project.back.domain.user.dto.response.MyProfileResponse;
+import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
 import com.project.back.domain.user.service.MyProfileService;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
+import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.security.JwtAccessDeniedHandler;
 import com.project.back.global.security.JwtAuthenticationEntryPoint;
 import com.project.back.global.security.JwtTokenProvider;
 import com.project.back.global.security.SecurityConfig;
 import com.project.back.global.security.SecurityErrorResponseWriter;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -29,8 +32,10 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.doThrow;
@@ -56,6 +61,23 @@ class MyProfileControllerTest {
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
 
+    @MockitoBean
+    private UserRepository userRepository;
+
+    @BeforeEach
+    void stubUserRepository() {
+        User activeUser = User.builder()
+                .memberNumber("2600001")
+                .email("2600001@quoteguard.com")
+                .password("encoded")
+                .name("테스트")
+                .role(UserRole.SALES_STAFF)
+                .status(UserStatus.ACTIVE)
+                .mustChangePassword(false)
+                .build();
+        given(userRepository.findById(anyLong())).willReturn(Optional.of(activeUser));
+    }
+
     private RequestPostProcessor asUser(Long userId, String role) {
         Authentication auth = new UsernamePasswordAuthenticationToken(
                 userId, null, List.of(new SimpleGrantedAuthority("ROLE_" + role))
@@ -72,7 +94,7 @@ class MyProfileControllerTest {
                 .position("대리")
                 .phone("010-1234-5678")
                 .role(UserRole.SALES_STAFF.name())
-                .status(UserStatus.APPROVED.name())
+                .status(UserStatus.ACTIVE.name())
                 .lastLoginAt(null)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
@@ -158,7 +180,7 @@ class MyProfileControllerTest {
                             ))))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.status").value("fail"))
-                    .andExpect(jsonPath("$.code").value("USER_005"));
+                    .andExpect(jsonPath("$.code").value("USER_004"));
         }
 
         @Test
@@ -266,7 +288,7 @@ class MyProfileControllerTest {
                                     "newPasswordConfirm", "DifferentPass@1"
                             ))))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("USER_007"));
+                    .andExpect(jsonPath("$.code").value("USER_006"));
         }
 
         @Test
@@ -285,7 +307,7 @@ class MyProfileControllerTest {
                                     "newPasswordConfirm", "OldPass@1"
                             ))))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("USER_006"));
+                    .andExpect(jsonPath("$.code").value("USER_005"));
         }
 
         @Test

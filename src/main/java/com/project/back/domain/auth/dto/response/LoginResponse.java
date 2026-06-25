@@ -7,12 +7,14 @@ public class LoginResponse {
 
     private final String tokenType = "Bearer";
     private final String accessToken;
+    private final boolean mustChangePassword;
 
-    private LoginResponse(String accessToken) {
+    private LoginResponse(String accessToken, boolean mustChangePassword) {
         this.accessToken = accessToken;
+        this.mustChangePassword = mustChangePassword;
     }
 
-    public static LoginResponse of(String accessToken) {
-        return new LoginResponse(accessToken);
+    public static LoginResponse of(String accessToken, boolean mustChangePassword) {
+        return new LoginResponse(accessToken, mustChangePassword);
     }
 }

@@ -13,21 +13,23 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
+    Optional<User> findByMemberNumber(String memberNumber);
+
     Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);
 
     boolean existsByPhone(String phone);
 
-    boolean existsByPhoneAndIdNot(String phone, Long id);
+    boolean existsByMemberNumber(String memberNumber);
 
-    Page<User> findByStatus(UserStatus status, Pageable pageable);
+    boolean existsByPhoneAndIdNot(String phone, Long id);
 
     @Query("""
             SELECT u FROM User u
             WHERE (:role IS NULL OR u.role = :role)
               AND (:status IS NULL OR u.status = :status)
-              AND (:keyword IS NULL OR u.name LIKE %:keyword% OR u.email LIKE %:keyword%)
+              AND (:keyword IS NULL OR u.name LIKE %:keyword% OR u.memberNumber LIKE %:keyword%)
             """)
     Page<User> findAllWithFilters(
             @Param("role") UserRole role,

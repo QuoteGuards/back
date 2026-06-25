@@ -1,9 +1,7 @@
 package com.project.back.domain.auth.service;
 
 import com.project.back.domain.auth.dto.request.LoginRequest;
-import com.project.back.domain.auth.dto.request.SignUpRequest;
 import com.project.back.domain.auth.dto.response.LoginResponse;
-import com.project.back.domain.auth.dto.response.SignUpResponse;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserStatus;
 import com.project.back.domain.user.repository.UserRepository;
@@ -23,35 +21,8 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
-    // 회원가입
-    @Transactional
-    public SignUpResponse signUp(SignUpRequest request) {
-        // 1. 중복 이메일 검사
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new CustomException(ErrorCode.DUPLICATE_EMAIL);
-        }
-
-        // 2. 중복 전화번호 검사 (전화번호가 입력된 경우에만)
-        if (request.getPhone() != null && !request.getPhone().isBlank()) {
-            if (userRepository.existsByPhone(request.getPhone())) {
-                throw new CustomException(ErrorCode.DUPLICATE_PHONE);
-            }
-        }
-
-        // 3. 비밀번호 암호화 및 유저 객체 생성
-        User user = User.builder()
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .name(request.getName())
-                .department(request.getDepartment())
-                .position(request.getPosition())
-                .phone(request.getPhone())
-                .build();
-
-        return SignUpResponse.from(userRepository.save(user));
-    }
-
-    // 로그인
+    // 로그인 (이메일 + 비밀번호)
+    // 이메일은 관리자가 계정 생성 시 {memberNumber}@domain 형식으로 자동 생성된다.
     @Transactional
     public LoginResponse login(LoginRequest request) {
         // 1. 이메일로 유저 찾기
@@ -63,7 +34,7 @@ public class AuthService {
             throw new CustomException(ErrorCode.INVALID_PASSWORD);
         }
 
-        // 3. 유저 상태 검사 (정지된 유저인지, 승인 대기 유저인지 등)
+        // 3. 유저 상태 검사
         validateUserStatus(user.getStatus());
 
         // 4. 마지막 로그인 일시 기록
@@ -76,15 +47,14 @@ public class AuthService {
                 user.getRole().name()
         );
 
-        return LoginResponse.of(accessToken);
+        return LoginResponse.of(accessToken, user.isMustChangePassword());
     }
 
     private void validateUserStatus(UserStatus status) {
         switch (status) {
-            case PENDING -> throw new CustomException(ErrorCode.USER_PENDING);
-            case REJECTED -> throw new CustomException(ErrorCode.USER_REJECTED);
             case SUSPENDED -> throw new CustomException(ErrorCode.USER_SUSPENDED);
-            case APPROVED -> { /* 정상 유저면 아무 일 없이 패스 */ }
+            case DELETED -> throw new CustomException(ErrorCode.USER_DELETED);
+            case ACTIVE -> { /* 정상 유저 */ }
         }
     }
 }

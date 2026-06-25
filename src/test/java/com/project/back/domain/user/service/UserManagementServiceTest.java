@@ -1,7 +1,6 @@
 package com.project.back.domain.user.service;
 
 import com.project.back.domain.user.dto.request.ChangeUserRoleRequest;
-import com.project.back.domain.user.dto.request.RejectUserRequest;
 import com.project.back.domain.user.dto.request.UpdateUserInfoRequest;
 import com.project.back.domain.user.dto.response.UserDetailResponse;
 import com.project.back.domain.user.dto.response.UserSummaryResponse;
@@ -45,16 +44,17 @@ class UserManagementServiceTest {
     private User buildUser(Long id, UserStatus status, UserRole role) {
         try {
             User user = User.builder()
-                    .id(id)
-                    .email("user" + id + "@test.com")
+                    .memberNumber("202600" + id)
+                    .email("202600" + id + "@quoteguard.com")
                     .password("encoded")
                     .name("테스터" + id)
                     .department("영업1팀")
                     .position("대리")
-                    .phone("010-1234-5678")
+                    .phone("010-1234-567" + id)
                     .status(status)
                     .role(role)
                     .build();
+            setField(user, "id", id);
             setField(user, "createdAt", LocalDateTime.now());
             setField(user, "updatedAt", LocalDateTime.now());
             return user;
@@ -79,29 +79,6 @@ class UserManagementServiceTest {
         }
     }
 
-    // ── 승인 대기 목록 조회 ────────────────────────────────────────────────
-
-    @Nested
-    @DisplayName("승인 대기 사용자 목록 조회")
-    class GetPendingUsers {
-
-        @Test
-        @DisplayName("PENDING 사용자 목록 반환 성공")
-        void getPendingUsers_success() {
-            Pageable pageable = PageRequest.of(0, 20);
-            User pending = buildUser(1L, UserStatus.PENDING, UserRole.SALES_STAFF);
-            given(userRepository.findByStatus(UserStatus.PENDING, pageable))
-                    .willReturn(new PageImpl<>(List.of(pending)));
-
-            Page<UserSummaryResponse> result = userManagementService.getPendingUsers(pageable);
-
-            assertThat(result.getContent()).hasSize(1);
-            assertThat(result.getContent().getFirst().getStatus()).isEqualTo("PENDING");
-            assertThat(result.getContent().getFirst().getDepartment()).isEqualTo("영업1팀");
-            assertThat(result.getContent().getFirst().getPosition()).isEqualTo("대리");
-        }
-    }
-
     // ── 전체 사용자 목록 조회 ──────────────────────────────────────────────
 
     @Nested
@@ -112,25 +89,26 @@ class UserManagementServiceTest {
         @DisplayName("필터 없이 전체 조회 성공")
         void getAllUsers_noFilter_success() {
             Pageable pageable = PageRequest.of(0, 20);
-            User user = buildUser(1L, UserStatus.APPROVED, UserRole.SALES_STAFF);
+            User user = buildUser(1L, UserStatus.ACTIVE, UserRole.SALES_STAFF);
             given(userRepository.findAllWithFilters(null, null, null, pageable))
                     .willReturn(new PageImpl<>(List.of(user)));
 
             Page<UserSummaryResponse> result = userManagementService.getAllUsers(null, null, null, pageable);
 
             assertThat(result.getContent()).hasSize(1);
+            assertThat(result.getContent().getFirst().getMemberNumber()).isEqualTo("2026001");
         }
 
         @Test
         @DisplayName("role + status + keyword 필터 적용 성공")
         void getAllUsers_withFilters_success() {
             Pageable pageable = PageRequest.of(0, 20);
-            User user = buildUser(2L, UserStatus.APPROVED, UserRole.SALES_MANAGER);
-            given(userRepository.findAllWithFilters(UserRole.SALES_MANAGER, UserStatus.APPROVED, "테스터", pageable))
+            User user = buildUser(2L, UserStatus.ACTIVE, UserRole.SALES_MANAGER);
+            given(userRepository.findAllWithFilters(UserRole.SALES_MANAGER, UserStatus.ACTIVE, "테스터", pageable))
                     .willReturn(new PageImpl<>(List.of(user)));
 
             Page<UserSummaryResponse> result = userManagementService.getAllUsers(
-                    UserRole.SALES_MANAGER, UserStatus.APPROVED, "테스터", pageable);
+                    UserRole.SALES_MANAGER, UserStatus.ACTIVE, "테스터", pageable);
 
             assertThat(result.getContent()).hasSize(1);
             assertThat(result.getContent().getFirst().getRole()).isEqualTo("SALES_MANAGER");
@@ -144,15 +122,15 @@ class UserManagementServiceTest {
     class GetUserDetail {
 
         @Test
-        @DisplayName("존재하는 사용자 상세 조회 성공 - department/position 포함")
+        @DisplayName("존재하는 사용자 상세 조회 성공")
         void getUserDetail_success() {
-            User user = buildUser(1L, UserStatus.APPROVED, UserRole.SALES_STAFF);
+            User user = buildUser(1L, UserStatus.ACTIVE, UserRole.SALES_STAFF);
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
             UserDetailResponse result = userManagementService.getUserDetail(1L);
 
             assertThat(result.getId()).isEqualTo(1L);
-            assertThat(result.getEmail()).isEqualTo("user1@test.com");
+            assertThat(result.getMemberNumber()).isEqualTo("2026001");
             assertThat(result.getDepartment()).isEqualTo("영업1팀");
             assertThat(result.getPosition()).isEqualTo("대리");
         }
@@ -169,76 +147,6 @@ class UserManagementServiceTest {
         }
     }
 
-    // ── 가입 승인 ─────────────────────────────────────────────────────────
-
-    @Nested
-    @DisplayName("가입 승인")
-    class ApproveUser {
-
-        @Test
-        @DisplayName("PENDING 사용자 승인 성공 - status APPROVED, approvedBy/approvedAt 기록")
-        void approveUser_success() {
-            User user = buildUser(1L, UserStatus.PENDING, UserRole.SALES_STAFF);
-            given(userRepository.findById(1L)).willReturn(Optional.of(user));
-
-            UserDetailResponse result = userManagementService.approveUser(99L, 1L);
-
-            assertThat(result.getStatus()).isEqualTo("APPROVED");
-            assertThat(result.getApprovedBy()).isEqualTo(99L);
-            assertThat(result.getApprovedAt()).isNotNull();
-        }
-
-        @Test
-        @DisplayName("PENDING이 아닌 사용자 승인 - USER_NOT_PENDING 예외")
-        void approveUser_notPending() {
-            User user = buildUser(1L, UserStatus.APPROVED, UserRole.SALES_STAFF);
-            given(userRepository.findById(1L)).willReturn(Optional.of(user));
-
-            assertThatThrownBy(() -> userManagementService.approveUser(99L, 1L))
-                    .isInstanceOf(CustomException.class)
-                    .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
-                            .isEqualTo(ErrorCode.USER_NOT_PENDING));
-        }
-    }
-
-    // ── 가입 반려 ─────────────────────────────────────────────────────────
-
-    @Nested
-    @DisplayName("가입 반려")
-    class RejectUser {
-
-        @Test
-        @DisplayName("PENDING 사용자 반려 성공 - status REJECTED, rejectReason/rejectedAt 기록")
-        void rejectUser_success() {
-            User user = buildUser(1L, UserStatus.PENDING, UserRole.SALES_STAFF);
-            given(userRepository.findById(1L)).willReturn(Optional.of(user));
-
-            RejectUserRequest request = new RejectUserRequest();
-            setRequestField(request, "rejectReason", "영업팀 인원 초과");
-
-            UserDetailResponse result = userManagementService.rejectUser(1L, request);
-
-            assertThat(result.getStatus()).isEqualTo("REJECTED");
-            assertThat(result.getRejectReason()).isEqualTo("영업팀 인원 초과");
-            assertThat(result.getRejectedAt()).isNotNull();
-        }
-
-        @Test
-        @DisplayName("PENDING이 아닌 사용자 반려 - USER_NOT_PENDING 예외")
-        void rejectUser_notPending() {
-            User user = buildUser(1L, UserStatus.REJECTED, UserRole.SALES_STAFF);
-            given(userRepository.findById(1L)).willReturn(Optional.of(user));
-
-            RejectUserRequest request = new RejectUserRequest();
-            setRequestField(request, "rejectReason", "사유");
-
-            assertThatThrownBy(() -> userManagementService.rejectUser(1L, request))
-                    .isInstanceOf(CustomException.class)
-                    .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
-                            .isEqualTo(ErrorCode.USER_NOT_PENDING));
-        }
-    }
-
     // ── 사용자 정보 수정 ───────────────────────────────────────────────────
 
     @Nested
@@ -248,7 +156,7 @@ class UserManagementServiceTest {
         @Test
         @DisplayName("이름/부서/직급/전화번호 수정 성공")
         void updateUserInfo_success() {
-            User user = buildUser(1L, UserStatus.APPROVED, UserRole.SALES_STAFF);
+            User user = buildUser(1L, UserStatus.ACTIVE, UserRole.SALES_STAFF);
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
             UpdateUserInfoRequest request = new UpdateUserInfoRequest();
@@ -287,7 +195,7 @@ class UserManagementServiceTest {
         @Test
         @DisplayName("권한 변경 성공")
         void changeRole_success() {
-            User user = buildUser(2L, UserStatus.APPROVED, UserRole.SALES_STAFF);
+            User user = buildUser(2L, UserStatus.ACTIVE, UserRole.SALES_STAFF);
             given(userRepository.findById(2L)).willReturn(Optional.of(user));
 
             ChangeUserRoleRequest request = new ChangeUserRoleRequest();
@@ -318,9 +226,9 @@ class UserManagementServiceTest {
     class SuspendUser {
 
         @Test
-        @DisplayName("APPROVED 사용자 비활성화 성공 - status SUSPENDED, suspendedBy/suspendedAt 기록")
+        @DisplayName("ACTIVE 사용자 비활성화 성공 - status SUSPENDED")
         void suspendUser_success() {
-            User user = buildUser(2L, UserStatus.APPROVED, UserRole.SALES_STAFF);
+            User user = buildUser(2L, UserStatus.ACTIVE, UserRole.SALES_STAFF);
             given(userRepository.findById(2L)).willReturn(Optional.of(user));
 
             UserDetailResponse result = userManagementService.suspendUser(1L, 2L);
@@ -340,15 +248,15 @@ class UserManagementServiceTest {
         }
 
         @Test
-        @DisplayName("APPROVED가 아닌 사용자 비활성화 - USER_NOT_APPROVED 예외")
-        void suspendUser_notApproved() {
-            User user = buildUser(2L, UserStatus.PENDING, UserRole.SALES_STAFF);
+        @DisplayName("ACTIVE가 아닌 사용자 비활성화 - USER_NOT_ACTIVE 예외")
+        void suspendUser_notActive() {
+            User user = buildUser(2L, UserStatus.SUSPENDED, UserRole.SALES_STAFF);
             given(userRepository.findById(2L)).willReturn(Optional.of(user));
 
             assertThatThrownBy(() -> userManagementService.suspendUser(1L, 2L))
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
-                            .isEqualTo(ErrorCode.USER_NOT_APPROVED));
+                            .isEqualTo(ErrorCode.USER_NOT_ACTIVE));
         }
     }
 
@@ -359,14 +267,14 @@ class UserManagementServiceTest {
     class ReactivateUser {
 
         @Test
-        @DisplayName("SUSPENDED 사용자 재활성화 성공 - status APPROVED, suspendedBy/suspendedAt 초기화")
+        @DisplayName("SUSPENDED 사용자 재활성화 성공 - status ACTIVE, suspendedBy/suspendedAt 초기화")
         void reactivateUser_success() {
             User user = buildUser(1L, UserStatus.SUSPENDED, UserRole.SALES_STAFF);
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
             UserDetailResponse result = userManagementService.reactivateUser(1L);
 
-            assertThat(result.getStatus()).isEqualTo("APPROVED");
+            assertThat(result.getStatus()).isEqualTo("ACTIVE");
             assertThat(result.getSuspendedBy()).isNull();
             assertThat(result.getSuspendedAt()).isNull();
         }
@@ -374,7 +282,7 @@ class UserManagementServiceTest {
         @Test
         @DisplayName("SUSPENDED가 아닌 사용자 재활성화 - USER_NOT_SUSPENDED 예외")
         void reactivateUser_notSuspended() {
-            User user = buildUser(1L, UserStatus.APPROVED, UserRole.SALES_STAFF);
+            User user = buildUser(1L, UserStatus.ACTIVE, UserRole.SALES_STAFF);
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
             assertThatThrownBy(() -> userManagementService.reactivateUser(1L))
