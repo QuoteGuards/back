@@ -157,7 +157,6 @@ public class QuoteService {
 
         Customer customer = getCustomerOrThrow(customerId, requester.getId());
 
-        //고객 정보가 바뀌었을 때를 대비해 스냅샷을 새로 생성
         QuoteCustomer snapshot = QuoteCustomer.builder()
                 .companyName(customer.getCompanyName())
                 .contactName(customer.getContactName())
@@ -168,11 +167,13 @@ public class QuoteService {
 
         quote.updateInfo(customer, snapshot, internalMemo, issuedDate, validUntil, deliveryTerm);
 
-        quoteItemRepository.deleteByQuoteId(quoteId);
-        quoteItemRepository.flush();
-        List<QuoteItem> items = buildItems(quote, itemCommands, quote.getDiscountPolicy());
-        quoteItemRepository.saveAll(items);
-        calculationService.calculate(quote, items);
+
+        List<QuoteItem> newItems = buildItems(quote, itemCommands, quote.getDiscountPolicy());
+
+        //엔티티 내부에서 클리어하고 새로 추가 (JPA가 변경을 감지하여 DELETE/INSERT 쿼리 자동 생성)
+        quote.replaceItems(newItems);
+
+        calculationService.calculate(quote, newItems);
 
         return quote;
     }

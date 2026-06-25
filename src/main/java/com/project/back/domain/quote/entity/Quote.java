@@ -214,4 +214,12 @@ public class Quote {
         items.add(item);
         item.assignQuote(this);
     }
+
+    //리스트 교체용 메서드
+    public void replaceItems(List<QuoteItem> newItems) {
+        this.items.clear();
+        if (newItems != null) {
+            newItems.forEach(this::addItem);
+        }
+    }
 }
