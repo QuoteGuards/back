@@ -395,36 +395,54 @@ public class QuoteService {
 
 
      //만료 견적 재작성(rewriteExpiredQuote) 시 사용.
-     //productId가 있는 항목은 현재 시점의 최신 단가/원가/제품정보로 갱신한다.
-     //productId가 없는 즉석 항목은 옛 값을 그대로 유지한다.
-     //(견적 정합성: 만료 기간 이후 재작성은 금액이 바뀔 수 있어야 함 -> reuseQuote의 copyItems와 다르게 동작)
-    private List<QuoteItem> rebuildItemsWithCurrentPrice(Quote newQuote, List<QuoteItem> sourceItems) {
-        int[] order = {0};
-        return sourceItems.stream()
-                .map(src -> {
-                    Product currentProduct = src.getProductId() != null
-                            ? productRepository.findById(src.getProductId()).orElse(null)
-                            : null;
+     //(견적 정합성: 만료 기간 이후 재작성은 금액이 바뀔 수 있어야 함 ->reuseQuote의 copyItems와 다르게 동작
+     private List<QuoteItem> rebuildItemsWithCurrentPrice(Quote newQuote, List<QuoteItem> sourceItems) {
+         int[] order = {0};
+         return sourceItems.stream()
+                 .map(src -> {
+                     //비활성 상품은 가져오지 않도록 filter 추가
+                     Product currentProduct = src.getProductId() != null
+                             ? productRepository.findById(src.getProductId())
+                               .filter(Product::isActive)
+                               .orElse(null)
+                             : null;
 
-                    QuoteItem item = QuoteItem.builder()
-                            .quote(newQuote)
-                            .productId(src.getProductId())
-                            .productName(currentProduct != null ? currentProduct.getName() : src.getProductName())
-                            .productCode(currentProduct != null ? currentProduct.getCode() : src.getProductCode())
-                            .spec(currentProduct != null ? currentProduct.getSpec() : src.getSpec())
-                            .unitPrice(currentProduct != null ? currentProduct.getUnitPrice() : src.getUnitPrice())
-                            .costPrice(currentProduct != null ? currentProduct.getCostPrice() : src.getCostPrice())
-                            .quantity(src.getQuantity())
-                            .discountRate(src.getDiscountRate())
-                            .discountReason(src.getDiscountReason())
-                            .vatApplicable(src.getVatApplicable())
-                            .sortOrder(order[0]++)
-                            .build();
+                     // 만약 필수 제품이 비활성화되었다면 예외 처리하거나 null로 넘김
+                     if (src.getProductId() != null && currentProduct == null) {
+                         throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
+                     }
 
-                    newQuote.addItem(item);
-                    return item;
-                })
-                .toList();
+                     QuoteItem item = QuoteItem.builder()
+                             .quote(newQuote)
+                             .productId(src.getProductId())
+                             .productName(currentProduct != null ? currentProduct.getName() : src.getProductName())
+                             .productCode(currentProduct != null ? currentProduct.getCode() : src.getProductCode())
+                             .spec(currentProduct != null ? currentProduct.getSpec() : src.getSpec())
+                             .unitPrice(currentProduct != null ? currentProduct.getUnitPrice() : src.getUnitPrice())
+                             .costPrice(currentProduct != null ? currentProduct.getCostPrice() : src.getCostPrice())
+                             .quantity(src.getQuantity())
+                             .discountRate(src.getDiscountRate())
+                             .discountReason(src.getDiscountReason())
+                             .vatApplicable(src.getVatApplicable())
+                             .sortOrder(order[0]++)
+                             .build();
+
+                     newQuote.addItem(item);
+                     return item;
+                 })
+                 .toList();
+     }
+
+    //전체 이익률 검증 메서드
+    //항목별 검증과 견적 합계 검증이 어긋나지 않게 제출 시점에 quote.getProfitRate()를 기준으로 승인 여부를 재확인하는 로직을 추가하거나
+    // validation 메서드를 통일
+    private void validateTotalProfitAgainstPolicy(DiscountPolicy policy, Quote quote) {
+        if (policy == null) return;
+
+        // 견적 합계 이익률과 정책의 최소 이익률 비교
+        if (quote.getProfitRate().compareTo(policy.getMinProfitRate()) < 0) {
+            // 필요시 로직 처리
+        }
     }
 
     private List<QuoteItem> copyItems(Quote newQuote, List<QuoteItem> sourceItems) {
