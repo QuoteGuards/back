@@ -18,7 +18,7 @@ public interface QuoteApprovalReasonRepository extends JpaRepository<QuoteApprov
             QuoteApprovalReason.ReasonType reasonType
     );
 
-    @Modifying(clearAutomatically = true)
+    @Modifying
     @Query("DELETE FROM QuoteApprovalReason r WHERE r.quote.id = :quoteId")
     void deleteByQuote_Id(Long quoteId);
 }

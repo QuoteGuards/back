@@ -124,7 +124,7 @@ public class QuoteService {
 
         // [수정] 삭제 후 flush를 호출하여 DB에 반영을 강제함
         approvalReasonRepository.deleteByQuote_Id(quoteId);
-        approvalReasonRepository.flush();
+        quote.getApprovalReasons().clear();
 
         if (approvalRequired) {
             List<QuoteApprovalReason> reasonEntities = reasons.stream()
