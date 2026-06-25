@@ -144,7 +144,7 @@ public class UserManagementService {
      * 중복 시 최대 5회 재시도한다.
      */
     private String generateMemberNumber() {
-        String yearPrefix = String.valueOf(LocalDate.now().getYear() % 100);
+        String yearPrefix = String.format("%02d", LocalDate.now().getYear() % 100);
         for (int attempt = 0; attempt < 5; attempt++) {
             String candidate = yearPrefix + String.format("%05d", SECURE_RANDOM.nextInt(100_000));
             if (!userRepository.existsByMemberNumber(candidate)) {

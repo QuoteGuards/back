@@ -19,15 +19,20 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -49,6 +54,13 @@ class AdminUserControllerTest {
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
 
+    private RequestPostProcessor asUser(Long userId, String role) {
+        Authentication auth = new UsernamePasswordAuthenticationToken(
+                userId, null, List.of(new SimpleGrantedAuthority("ROLE_" + role))
+        );
+        return authentication(auth);
+    }
+
     // ── 성공 케이스 ────────────────────────────────────────────────────────
 
     @Nested
@@ -56,7 +68,6 @@ class AdminUserControllerTest {
     class Success {
 
         @Test
-        @WithMockUser(roles = "SUPER_ADMIN")
         @DisplayName("SUPER_ADMIN - 계정 생성 성공 시 201 Created + temporaryPassword 반환")
         void createUser_superAdmin_success() throws Exception {
             AdminCreateUserResponse mockResponse = AdminCreateUserResponse.builder()
@@ -75,6 +86,7 @@ class AdminUserControllerTest {
             given(userManagementService.createUser(any())).willReturn(mockResponse);
 
             mockMvc.perform(post("/api/admin/users")
+                            .with(asUser(1L, "SUPER_ADMIN"))
                             .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(Map.of(
@@ -99,10 +111,10 @@ class AdminUserControllerTest {
     class AccessControl {
 
         @Test
-        @WithMockUser(roles = "SALES_STAFF")
         @DisplayName("SALES_STAFF - 계정 생성 API 접근 시 403 Forbidden")
         void createUser_salesStaff_forbidden() throws Exception {
             mockMvc.perform(post("/api/admin/users")
+                            .with(asUser(1L, "SALES_STAFF"))
                             .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(Map.of(
@@ -113,10 +125,10 @@ class AdminUserControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "SALES_MANAGER")
         @DisplayName("SALES_MANAGER - 계정 생성 API 접근 시 403 Forbidden")
         void createUser_salesManager_forbidden() throws Exception {
             mockMvc.perform(post("/api/admin/users")
+                            .with(asUser(1L, "SALES_MANAGER"))
                             .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(Map.of(
@@ -147,10 +159,10 @@ class AdminUserControllerTest {
     class Validation {
 
         @Test
-        @WithMockUser(roles = "SUPER_ADMIN")
         @DisplayName("이름 누락 시 400 Bad Request")
         void createUser_missingName_badRequest() throws Exception {
             mockMvc.perform(post("/api/admin/users")
+                            .with(asUser(1L, "SUPER_ADMIN"))
                             .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(Map.of(
@@ -161,10 +173,10 @@ class AdminUserControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "SUPER_ADMIN")
         @DisplayName("권한 누락 시 400 Bad Request")
         void createUser_missingRole_badRequest() throws Exception {
             mockMvc.perform(post("/api/admin/users")
+                            .with(asUser(1L, "SUPER_ADMIN"))
                             .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(Map.of(
@@ -175,13 +187,13 @@ class AdminUserControllerTest {
         }
 
         @Test
-        @WithMockUser(roles = "SUPER_ADMIN")
         @DisplayName("이메일 중복(자동 생성 충돌) 시 409 Conflict")
         void createUser_duplicateEmail_conflict() throws Exception {
             given(userManagementService.createUser(any()))
                     .willThrow(new CustomException(ErrorCode.DUPLICATE_EMAIL));
 
             mockMvc.perform(post("/api/admin/users")
+                            .with(asUser(1L, "SUPER_ADMIN"))
                             .with(csrf())
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(Map.of(
