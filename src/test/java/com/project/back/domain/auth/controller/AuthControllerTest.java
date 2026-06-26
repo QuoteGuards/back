@@ -4,13 +4,20 @@ import tools.jackson.databind.json.JsonMapper;
 import com.project.back.domain.auth.dto.response.LoginResponse;
 import com.project.back.domain.auth.dto.response.TokenRefreshResponse;
 import com.project.back.domain.auth.service.AuthService;
+import com.project.back.domain.auth.service.PasswordResetService;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
+import com.project.back.global.security.JwtAccessDeniedHandler;
+import com.project.back.global.security.JwtAuthenticationEntryPoint;
+import com.project.back.global.security.JwtTokenProvider;
+import com.project.back.global.security.SecurityConfig;
+import com.project.back.global.security.SecurityErrorResponseWriter;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -18,7 +25,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
 
-import com.project.back.global.security.JwtTokenProvider;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willDoNothing;
@@ -28,6 +34,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(AuthController.class)
+@Import({SecurityConfig.class, JwtTokenProvider.class, JwtAuthenticationEntryPoint.class, JwtAccessDeniedHandler.class, SecurityErrorResponseWriter.class})
 class AuthControllerTest {
 
     @Autowired
@@ -38,6 +45,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private AuthService authService;
+
+    @MockitoBean
+    private PasswordResetService passwordResetService;
 
     @MockitoBean
     private UserRepository userRepository;
