@@ -19,6 +19,12 @@ public class MyProfileService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    @Transactional(readOnly = true)
+    public MyProfileResponse getMyProfile(Long userId) {
+        User user = findUserById(userId);
+        return MyProfileResponse.from(user);
+    }
+
     @Transactional
     public MyProfileResponse updateMyProfile(Long userId, UpdateMyProfileRequest request) {
         User user = findUserById(userId);

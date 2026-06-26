@@ -19,6 +19,17 @@ public class MyProfileController {
     private final MyProfileService myProfileService;
 
     /**
+     * 내 프로필 조회
+     */
+    @GetMapping
+    public ResponseEntity<ApiResponse<MyProfileResponse>> getMyProfile(
+            @AuthenticationPrincipal Long userId
+    ) {
+        MyProfileResponse result = myProfileService.getMyProfile(userId);
+        return ResponseEntity.ok(ApiResponse.success("프로필 조회 성공", result));
+    }
+
+    /**
      * 내 프로필 수정 (이름, 전화번호)
      */
     @PatchMapping
