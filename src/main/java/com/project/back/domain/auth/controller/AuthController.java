@@ -15,6 +15,7 @@ import com.project.back.global.exception.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.StringUtils;
@@ -28,6 +29,13 @@ public class AuthController {
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
     private final PasswordResetRateLimiter passwordResetRateLimiter;
+
+    /**
+     * 신뢰할 수 있는 리버스 프록시(nginx, ALB 등) 뒤에 배포된 경우에만 {@code true}로 설정한다.
+     * {@code false}(기본값)이면 X-Forwarded-For/X-Real-IP를 무시하고 RemoteAddr만 사용한다.
+     */
+    @Value("${app.trust-proxy-headers:false}")
+    private boolean trustProxyHeaders;
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
@@ -87,16 +95,22 @@ public class AuthController {
 
     /**
      * 실제 클라이언트 IP를 추출한다.
-     * 리버스 프록시(nginx, ALB 등) 환경에서 X-Forwarded-For 헤더를 우선 사용한다.
+     *
+     * <p>{@code app.trust-proxy-headers=true}일 때만 {@code X-Forwarded-For} / {@code X-Real-IP}를 신뢰한다.
+     * 이 설정은 신뢰할 수 있는 리버스 프록시(nginx, ALB 등) 뒤에 배포된 환경에서만 활성화해야 한다.
+     * 그 외 환경에서는 클라이언트가 헤더를 조작하여 Rate Limiter를 우회할 수 있으므로
+     * {@code request.getRemoteAddr()}만 사용한다.</p>
      */
     private String extractClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (StringUtils.hasText(xff)) {
-            return xff.split(",")[0].trim();
-        }
-        String xri = request.getHeader("X-Real-IP");
-        if (StringUtils.hasText(xri)) {
-            return xri.trim();
+        if (trustProxyHeaders) {
+            String xff = request.getHeader("X-Forwarded-For");
+            if (StringUtils.hasText(xff)) {
+                return xff.split(",")[0].trim();
+            }
+            String xri = request.getHeader("X-Real-IP");
+            if (StringUtils.hasText(xri)) {
+                return xri.trim();
+            }
         }
         return request.getRemoteAddr();
     }
