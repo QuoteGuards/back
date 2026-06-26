@@ -3,6 +3,7 @@ package com.project.back.global.security;
 import com.project.back.domain.approval.controller.ApprovalController;
 import com.project.back.domain.approval.service.ApprovalService;
 import com.project.back.domain.auth.controller.AuthController;
+import com.project.back.domain.auth.ratelimit.PasswordResetRateLimiter;
 import com.project.back.domain.auth.service.AuthService;
 import com.project.back.domain.auth.service.PasswordResetService;
 import com.project.back.domain.user.controller.AdminUserController;
@@ -67,6 +68,9 @@ class SecurityAccessControlTest {
 
     @MockitoBean
     private ApprovalService approvalService;
+
+    @MockitoBean
+    private PasswordResetRateLimiter passwordResetRateLimiter;
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;

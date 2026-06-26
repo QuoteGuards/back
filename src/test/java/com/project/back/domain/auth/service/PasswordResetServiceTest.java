@@ -1,6 +1,7 @@
 package com.project.back.domain.auth.service;
 
 import com.project.back.domain.auth.entity.PasswordResetToken;
+import com.project.back.domain.auth.event.PasswordResetEmailEvent;
 import com.project.back.domain.auth.repository.PasswordResetTokenRepository;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
@@ -17,11 +18,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import jakarta.mail.internet.MimeMessage;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
@@ -51,13 +51,10 @@ class PasswordResetServiceTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private JavaMailSender mailSender;
+    private ApplicationEventPublisher eventPublisher;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(passwordResetService, "fromAddress", "no-reply@quoteguard.com");
-        ReflectionTestUtils.setField(passwordResetService, "fromName", "QuoteGuard");
-        ReflectionTestUtils.setField(passwordResetService, "frontendUrl", "http://localhost:5173");
         ReflectionTestUtils.setField(passwordResetService, "tokenExpiryMinutes", 30);
     }
 
@@ -68,18 +65,17 @@ class PasswordResetServiceTest {
     class RequestReset {
 
         @Test
-        @DisplayName("등록된 이메일 - 기존 토큰 무효화 후 새 토큰 저장 및 이메일 발송")
-        void existingEmail_invalidatesOldTokens_savesNew_sendsEmail() throws Exception {
+        @DisplayName("등록된 이메일 - 기존 토큰 무효화 후 새 토큰 저장 및 이메일 발송 이벤트 발행")
+        void existingEmail_invalidatesOldTokens_savesNew_publishesEvent() {
             User user = buildUser();
-            MimeMessage mimeMessage = mock(MimeMessage.class);
             given(userRepository.findByEmail("test@quoteguard.com")).willReturn(Optional.of(user));
-            given(mailSender.createMimeMessage()).willReturn(mimeMessage);
 
             passwordResetService.requestReset("test@quoteguard.com");
 
             verify(passwordResetTokenRepository).expireAllActiveByUserId(eq(1L), any(LocalDateTime.class));
             verify(passwordResetTokenRepository).save(any(PasswordResetToken.class));
-            verify(mailSender).send(mimeMessage);
+            // 이메일 발송이 트랜잭션 외부(AFTER_COMMIT)로 위임되었는지 이벤트 발행으로 검증
+            verify(eventPublisher).publishEvent(any(PasswordResetEmailEvent.class));
         }
 
         @Test
@@ -87,19 +83,34 @@ class PasswordResetServiceTest {
         void unknownEmail_noExceptionThrown() {
             given(userRepository.findByEmail("unknown@email.com")).willReturn(Optional.empty());
 
-            // 예외 없이 종료되어야 한다
             passwordResetService.requestReset("unknown@email.com");
 
-            verifyNoInteractions(passwordResetTokenRepository, mailSender);
+            verifyNoInteractions(passwordResetTokenRepository, eventPublisher);
+        }
+
+        @Test
+        @DisplayName("발행된 이벤트에 userId, userEmail, rawToken이 포함된다")
+        void publishedEvent_containsExpectedFields() {
+            User user = buildUser();
+            given(userRepository.findByEmail("test@quoteguard.com")).willReturn(Optional.of(user));
+
+            passwordResetService.requestReset("test@quoteguard.com");
+
+            ArgumentCaptor<PasswordResetEmailEvent> eventCaptor =
+                    ArgumentCaptor.forClass(PasswordResetEmailEvent.class);
+            verify(eventPublisher).publishEvent(eventCaptor.capture());
+
+            PasswordResetEmailEvent event = eventCaptor.getValue();
+            assertThat(event.userId()).isEqualTo(1L);
+            assertThat(event.userEmail()).isEqualTo("test@quoteguard.com");
+            assertThat(event.rawToken()).isNotBlank();
         }
 
         @Test
         @DisplayName("저장된 토큰은 원문이 아닌 SHA-256 해시")
         void savedToken_isHashed_notPlaintext() {
             User user = buildUser();
-            MimeMessage mimeMessage = mock(MimeMessage.class);
             given(userRepository.findByEmail("test@quoteguard.com")).willReturn(Optional.of(user));
-            given(mailSender.createMimeMessage()).willReturn(mimeMessage);
 
             passwordResetService.requestReset("test@quoteguard.com");
 
@@ -107,10 +118,8 @@ class PasswordResetServiceTest {
             verify(passwordResetTokenRepository).save(captor.capture());
 
             String savedHash = captor.getValue().getTokenHash();
-            // 해시는 64자 hex 문자열이어야 한다 (SHA-256: 32 bytes = 64 hex chars)
-            assertThat(savedHash).hasSize(64);
-            // 해시가 0-9, a-f 문자로만 구성되어야 한다
-            assertThat(savedHash).matches("[0-9a-f]{64}");
+            // SHA-256: 32 bytes = 64 hex chars
+            assertThat(savedHash).hasSize(64).matches("[0-9a-f]{64}");
         }
     }
 
@@ -121,22 +130,25 @@ class PasswordResetServiceTest {
     class ConfirmReset {
 
         @Test
-        @DisplayName("유효한 토큰 - 비밀번호 변경 및 토큰 사용 처리")
-        void validToken_changesPasswordAndMarksUsed() {
-            String rawToken = "a".repeat(64); // 임의의 64자 토큰
+        @DisplayName("유효한 토큰 - 원자적 UPDATE 성공 후 비밀번호 변경")
+        void validToken_atomicUpdateSucceeds_changesPassword() {
+            String rawToken = "a".repeat(64);
             String tokenHash = sha256(rawToken);
+            LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(30);
 
-            PasswordResetToken token = PasswordResetToken.of(1L, tokenHash,
-                    LocalDateTime.now().plusMinutes(30));
+            PasswordResetToken token = PasswordResetToken.of(1L, tokenHash, expiresAt);
             User user = buildUser();
 
+            // markUsedIfValid: 1 반환 → 원자적 UPDATE 성공
+            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), any(LocalDateTime.class)))
+                    .willReturn(1);
+            // UPDATE 성공 후 userId 조회용 findByTokenHash
             given(passwordResetTokenRepository.findByTokenHash(tokenHash)).willReturn(Optional.of(token));
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
             given(passwordEncoder.encode("NewPass1!")).willReturn("encodedNewPass");
 
             passwordResetService.confirmReset(rawToken, "NewPass1!");
 
-            assertThat(token.isUsed()).isTrue();
             verify(passwordEncoder).encode("NewPass1!");
         }
 
@@ -146,6 +158,10 @@ class PasswordResetServiceTest {
             String rawToken = "b".repeat(64);
             String tokenHash = sha256(rawToken);
 
+            // markUsedIfValid: 0 반환 → 조건 불충족
+            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), any(LocalDateTime.class)))
+                    .willReturn(0);
+            // 세부 원인 파악을 위해 findByTokenHash 호출 → 토큰 없음
             given(passwordResetTokenRepository.findByTokenHash(tokenHash)).willReturn(Optional.empty());
 
             assertThatThrownBy(() -> passwordResetService.confirmReset(rawToken, "NewPass1!"))
@@ -160,11 +176,13 @@ class PasswordResetServiceTest {
             String rawToken = "c".repeat(64);
             String tokenHash = sha256(rawToken);
 
-            PasswordResetToken token = PasswordResetToken.of(1L, tokenHash,
+            PasswordResetToken usedToken = PasswordResetToken.of(1L, tokenHash,
                     LocalDateTime.now().plusMinutes(30));
-            token.markUsed(); // 사용 처리
+            usedToken.markUsed();
 
-            given(passwordResetTokenRepository.findByTokenHash(tokenHash)).willReturn(Optional.of(token));
+            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), any(LocalDateTime.class)))
+                    .willReturn(0);
+            given(passwordResetTokenRepository.findByTokenHash(tokenHash)).willReturn(Optional.of(usedToken));
 
             assertThatThrownBy(() -> passwordResetService.confirmReset(rawToken, "NewPass1!"))
                     .isInstanceOf(CustomException.class)
@@ -178,10 +196,12 @@ class PasswordResetServiceTest {
             String rawToken = "d".repeat(64);
             String tokenHash = sha256(rawToken);
 
-            PasswordResetToken token = PasswordResetToken.of(1L, tokenHash,
-                    LocalDateTime.now().minusMinutes(1)); // 이미 만료
+            PasswordResetToken expiredToken = PasswordResetToken.of(1L, tokenHash,
+                    LocalDateTime.now().minusMinutes(1));
 
-            given(passwordResetTokenRepository.findByTokenHash(tokenHash)).willReturn(Optional.of(token));
+            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), any(LocalDateTime.class)))
+                    .willReturn(0);
+            given(passwordResetTokenRepository.findByTokenHash(tokenHash)).willReturn(Optional.of(expiredToken));
 
             assertThatThrownBy(() -> passwordResetService.confirmReset(rawToken, "NewPass1!"))
                     .isInstanceOf(CustomException.class)

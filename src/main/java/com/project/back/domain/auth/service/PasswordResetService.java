@@ -1,23 +1,20 @@
 package com.project.back.domain.auth.service;
 
 import com.project.back.domain.auth.entity.PasswordResetToken;
+import com.project.back.domain.auth.event.PasswordResetEmailEvent;
 import com.project.back.domain.auth.repository.PasswordResetTokenRepository;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
-import jakarta.mail.MessagingException;
-import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -33,16 +30,7 @@ public class PasswordResetService {
     private final UserRepository userRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JavaMailSender mailSender;
-
-    @Value("${mail.from-address}")
-    private String fromAddress;
-
-    @Value("${mail.from-name:QuoteGuard}")
-    private String fromName;
-
-    @Value("${app.frontend-url}")
-    private String frontendUrl;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${app.password-reset-token-expiry-minutes:30}")
     private int tokenExpiryMinutes;
@@ -51,7 +39,11 @@ public class PasswordResetService {
 
     /**
      * 비밀번호 재설정 이메일 요청
-     * 이메일이 존재하지 않아도 동일한 응답을 반환한다. (계정 존재 여부 노출 방지)
+     *
+     * <p>이메일이 존재하지 않아도 동일한 응답을 반환한다. (계정 존재 여부 노출 방지)</p>
+     * <p>이메일 발송은 트랜잭션 커밋 이후 {@code @TransactionalEventListener}로 처리된다.
+     * 발송 실패 시에도 호출자에게 동일 응답(200)을 반환하므로 응답 차이로 계정 존재 여부가
+     * 노출되지 않는다.</p>
      */
     @Transactional
     public void requestReset(String email) {
@@ -68,34 +60,49 @@ public class PasswordResetService {
                     PasswordResetToken.of(user.getId(), tokenHash, expiresAt)
             );
 
-            sendResetEmail(user, rawToken);
+            // 이메일 발송을 AFTER_COMMIT 이벤트로 위임:
+            // - 커밋 전 발송 후 롤백 시 "링크는 있으나 토큰 없음" 불일치 방지
+            // - 발송 실패가 트랜잭션 롤백으로 이어지지 않으므로 계정 열거 방어 유지
+            eventPublisher.publishEvent(
+                    PasswordResetEmailEvent.of(user.getId(), user.getName(), user.getEmail(), rawToken)
+            );
         });
     }
 
     /**
      * 비밀번호 재설정 확인
-     * 토큰 검증 후 새 비밀번호로 변경하고 토큰을 사용 처리한다.
+     *
+     * <p>토큰 검증과 사용 처리를 단일 UPDATE로 원자적으로 수행한다.
+     * 동시 요청에서 한 건만 성공하고 나머지는 오류로 처리된다.</p>
      */
     @Transactional
     public void confirmReset(String rawToken, String newPassword) {
         String tokenHash = hashToken(rawToken);
+        LocalDateTime now = LocalDateTime.now();
 
-        PasswordResetToken token = passwordResetTokenRepository.findByTokenHash(tokenHash)
-                .orElseThrow(() -> new CustomException(ErrorCode.PASSWORD_RESET_TOKEN_INVALID));
+        // 원자적 UPDATE: usedAt IS NULL AND expiresAt > now 조건 만족 시에만 성공
+        int updated = passwordResetTokenRepository.markUsedIfValid(tokenHash, now);
 
-        if (token.isUsed()) {
-            throw new CustomException(ErrorCode.PASSWORD_RESET_TOKEN_ALREADY_USED);
-        }
+        if (updated == 0) {
+            // 0건이면 토큰이 없거나, 이미 사용됐거나, 만료된 것
+            // 세부 원인을 구분해 적절한 오류를 반환한다
+            PasswordResetToken token = passwordResetTokenRepository.findByTokenHash(tokenHash)
+                    .orElseThrow(() -> new CustomException(ErrorCode.PASSWORD_RESET_TOKEN_INVALID));
 
-        if (token.isExpired()) {
+            if (token.isUsed()) {
+                throw new CustomException(ErrorCode.PASSWORD_RESET_TOKEN_ALREADY_USED);
+            }
             throw new CustomException(ErrorCode.PASSWORD_RESET_TOKEN_EXPIRED);
         }
+
+        // UPDATE 성공 후 userId 조회를 위해 토큰을 가져온다
+        PasswordResetToken token = passwordResetTokenRepository.findByTokenHash(tokenHash)
+                .orElseThrow(() -> new CustomException(ErrorCode.PASSWORD_RESET_TOKEN_INVALID));
 
         User user = userRepository.findById(token.getUserId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
         user.changePassword(passwordEncoder.encode(newPassword));
-        token.markUsed();
     }
 
     // --- private helpers ---
@@ -115,53 +122,5 @@ public class PasswordResetService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 not available", e);
         }
-    }
-
-    private void sendResetEmail(User user, String rawToken) {
-        String resetLink = frontendUrl + "/reset-password?token=" + rawToken;
-
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(
-                    message, false, StandardCharsets.UTF_8.name());
-
-            helper.setFrom (fromAddress, fromName);
-            helper.setTo(user.getEmail());
-            helper.setSubject("[QuoteGuard] 비밀번호 재설정 안내");
-            helper.setText(buildEmailBody(user.getName(), resetLink), true);
-
-            mailSender.send(message);
-
-        } catch (MessagingException | RuntimeException e) {
-            log.error("비밀번호 재설정 이메일 발송 실패 - userId={}", user.getId(), e);
-            throw new CustomException(ErrorCode.PASSWORD_RESET_EMAIL_SEND_FAILED);
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private String buildEmailBody(String userName, String resetLink) {
-        return String.format("""
-                <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#1f2937">
-                  <h2 style="font-size:18px;font-weight:600;margin-bottom:8px">비밀번호 재설정 안내</h2>
-                  <p style="font-size:14px;color:#374151;margin-bottom:24px">
-                    안녕하세요, <strong>%s</strong> 님.<br>
-                    아래 버튼을 클릭하여 비밀번호를 재설정하세요.<br>
-                    링크는 <strong>%d분</strong> 후 만료됩니다.
-                  </p>
-                  <a href="%s"
-                     style="display:inline-block;padding:12px 24px;background-color:#2563eb;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:6px">
-                    비밀번호 재설정
-                  </a>
-                  <p style="font-size:12px;color:#9ca3af;margin-top:24px">
-                    버튼이 동작하지 않으면 아래 링크를 복사하여 브라우저에 붙여넣으세요.<br>
-                    <a href="%s" style="color:#6b7280;word-break:break-all">%s</a>
-                  </p>
-                  <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
-                  <p style="font-size:12px;color:#9ca3af">
-                    본인이 요청하지 않은 경우 이 메일을 무시하셔도 됩니다.
-                  </p>
-                </div>
-                """, userName, tokenExpiryMinutes, resetLink, resetLink, resetLink);
     }
 }
