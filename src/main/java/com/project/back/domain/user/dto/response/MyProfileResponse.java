@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 public class MyProfileResponse {
 
     private final Long id;
+    private final String memberNumber;
     private final String email;
     private final String name;
     private final String department;
@@ -25,6 +26,7 @@ public class MyProfileResponse {
     public static MyProfileResponse from(User user) {
         return MyProfileResponse.builder()
                 .id(user.getId())
+                .memberNumber(user.getMemberNumber())
                 .email(user.getEmail())
                 .name(user.getName())
                 .department(user.getDepartment())
