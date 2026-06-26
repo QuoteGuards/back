@@ -3,6 +3,7 @@ package com.project.back.domain.auth.controller;
 import tools.jackson.databind.json.JsonMapper;
 import com.project.back.domain.auth.dto.response.LoginResponse;
 import com.project.back.domain.auth.dto.response.TokenRefreshResponse;
+import com.project.back.domain.auth.ratelimit.PasswordResetRateLimiter;
 import com.project.back.domain.auth.service.AuthService;
 import com.project.back.domain.auth.service.PasswordResetService;
 import com.project.back.domain.user.repository.UserRepository;
@@ -48,6 +49,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private PasswordResetService passwordResetService;
+
+    @MockitoBean
+    private PasswordResetRateLimiter passwordResetRateLimiter;
 
     @MockitoBean
     private UserRepository userRepository;
