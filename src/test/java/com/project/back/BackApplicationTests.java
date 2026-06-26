@@ -14,7 +14,10 @@ import org.springframework.test.context.TestPropertySource;
         "spring.jpa.hibernate.ddl-auto=create-drop",
         "spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.H2Dialect",
         "MAIL_USERNAME=noreply@quoteguard.com",
-        "mail.from-address=noreply@quoteguard.com"
+        "MAIL_PASSWORD=test",
+        "spring.mail.test-connection=false",
+        "mail.from-address=noreply@quoteguard.com",
+        "app.frontend-url=http://localhost:5173"
 })
 class BackApplicationTests {
 

@@ -62,6 +62,12 @@ public enum ErrorCode {
     // Email
     EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "EMAIL_001", "이메일 발송에 실패했습니다."),
 
+    // Password Reset
+    PASSWORD_RESET_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "PWD_RESET_001", "유효하지 않은 비밀번호 재설정 링크입니다."),
+    PASSWORD_RESET_TOKEN_EXPIRED(HttpStatus.BAD_REQUEST, "PWD_RESET_002", "비밀번호 재설정 링크가 만료되었습니다."),
+    PASSWORD_RESET_TOKEN_ALREADY_USED(HttpStatus.BAD_REQUEST, "PWD_RESET_003", "이미 사용된 비밀번호 재설정 링크입니다."),
+    PASSWORD_RESET_EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PWD_RESET_004", "비밀번호 재설정 이메일 발송에 실패했습니다."),
+
     // Approval
     APPROVAL_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "APPROVAL_001", "승인 요청을 찾을 수 없습니다."),
     APPROVAL_ALREADY_PENDING(HttpStatus.CONFLICT, "APPROVAL_002", "이미 승인 대기 중인 요청이 있습니다."),
