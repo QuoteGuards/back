@@ -6,6 +6,7 @@ import com.project.back.domain.quote.dto.request.QuoteUpdateRequest;
 import com.project.back.domain.quote.dto.response.QuoteDetailResponse;
 import com.project.back.domain.quote.dto.response.QuoteInternalAnalysisResponse;
 import com.project.back.domain.quote.dto.response.QuoteListResponse;
+import com.project.back.domain.quote.dto.response.QuoteProductContextResponse;
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.service.QuoteService;
 import com.project.back.domain.user.entity.User;
@@ -93,6 +94,15 @@ public class QuoteController {
                 .map(QuoteListResponse::from)
                 .toList();
         return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    // 견적 작성용 — 제품 원가·할인정책
+    @GetMapping("/product-context/{productId}")
+    public ResponseEntity<ApiResponse<QuoteProductContextResponse>> getProductContextForQuote(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long productId) {
+        QuoteProductContextResponse ctx = quoteService.getProductContextForQuote(productId, userId);
+        return ResponseEntity.ok(ApiResponse.success("견적 작성용 제품 정보 조회 성공", ctx));
     }
 
     // 견적 상세 조회
