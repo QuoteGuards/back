@@ -11,7 +11,6 @@ public record QuoteItemResponse(
         String productCode,
         String spec, //추가
         BigDecimal unitPrice,
-        BigDecimal costPrice,
         BigDecimal quantity,
         BigDecimal discountRate,
         BigDecimal discountAmount,
@@ -30,7 +29,6 @@ public record QuoteItemResponse(
                 item.getProductCode(),
                 item.getSpec(), //추가
                 item.getUnitPrice(),
-                item.getCostPrice(),
                 item.getQuantity(),
                 item.getDiscountRate(),
                 item.getDiscountAmount(),
