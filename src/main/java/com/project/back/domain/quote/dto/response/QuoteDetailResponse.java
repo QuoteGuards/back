@@ -17,6 +17,10 @@ public record QuoteDetailResponse(
         boolean approvalRequired,
         List<ApprovalReasonType> approvalReasons,
 
+        Long discountPolicyId,
+        BigDecimal maxDiscountRate,
+        BigDecimal minProfitRate,
+
         //고객 정보 (스냅샷 기반 조회)
         Long customerId,
         String companyName,
@@ -69,6 +73,8 @@ public record QuoteDetailResponse(
                 .map(QuoteItemResponse::from)
                 .toList();
 
+        var policy = quote.getDiscountPolicy();
+
         return new QuoteDetailResponse(
                 quote.getId(),
                 quote.getQuoteNumber(),
@@ -76,6 +82,9 @@ public record QuoteDetailResponse(
                 quote.getVersionNo(),
                 quote.getApprovalRequired(),
                 reasons,
+                policy != null ? policy.getId() : null,
+                policy != null ? policy.getMaxDiscountRate() : null,
+                policy != null ? policy.getMinProfitRate() : null,
                 quote.getCustomer().getId(),
                 quote.getQuoteCustomer().getCompanyName(), // 추가
                 quote.getQuoteCustomer().getContactName(), // 추가

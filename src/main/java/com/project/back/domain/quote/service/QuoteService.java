@@ -7,6 +7,7 @@ import com.project.back.domain.discount.repository.DiscountPolicyRepository;
 import com.project.back.domain.product.entity.Product;
 import com.project.back.domain.product.repository.ProductRepository;
 import com.project.back.domain.quote.dto.response.QuoteDetailResponse;
+import com.project.back.domain.quote.dto.response.QuoteProductContextResponse;
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.approval.entity.QuoteApprovalReason;
 import com.project.back.domain.quote.entity.QuoteItem;
@@ -17,6 +18,7 @@ import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.training.service.TrainingService;
 import com.project.back.domain.user.entity.User;
+import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.domain.user.service.UserStatsUpdateService;
 import com.project.back.global.enums.ApprovalReasonType;
@@ -35,6 +37,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -64,6 +67,7 @@ public class QuoteService {
                            String deliveryTerm,
                            List<QuoteItemCommand> itemCommands) {
 
+        validateQuoteWriterRole(createdBy);
         validateTrainingCompleted(createdBy.getId());
         Customer customer = getCustomerOrThrow(customerId, createdBy.getId());
         DiscountPolicy policy = resolveDiscountPolicy(discountPolicyId);
@@ -111,6 +115,7 @@ public class QuoteService {
 
     @Transactional
     public Quote submitQuote(Long quoteId, User requester) {
+        validateQuoteWriterRole(requester);
         validateTrainingCompleted(requester.getId());
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
@@ -122,8 +127,7 @@ public class QuoteService {
 
         boolean approvalRequired = !reasons.isEmpty();
 
-        // [수정] 삭제 후 flush를 호출하여 DB에 반영을 강제함
-        approvalReasonRepository.deleteByQuote_Id(quoteId);
+        // 이전 승인/반려 사유 초기화 (orphanRemoval — bulk delete와 중복 호출 금지)
         quote.getApprovalReasons().clear();
 
         if (approvalRequired) {
@@ -150,14 +154,14 @@ public class QuoteService {
                              String deliveryTerm,
                              List<QuoteItemCommand> itemCommands) {
 
+        validateQuoteWriterRole(requester);
         validateTrainingCompleted(requester.getId());
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
         validateEditable(quote);
 
-        // 1. 이전 반려 사유 또는 승인 사유 초기화
-        // 수정이 일어나는 시점에는 이전의 판단 결과는 더 이상 유효하지 않으므로 삭제합니다.
-        approvalReasonRepository.deleteByQuote_Id(quoteId);
+        // 이전 반려/승인 사유 초기화
+        quote.getApprovalReasons().clear();
 
         Customer customer = getCustomerOrThrow(customerId, requester.getId());
 
@@ -210,6 +214,7 @@ public class QuoteService {
 
     @Transactional
     public Quote reuseQuote(Long sourceQuoteId, User requester) {
+        validateQuoteWriterRole(requester);
         validateTrainingCompleted(requester.getId());
         Quote source = getQuoteWithDetailsOrThrow(sourceQuoteId);
         validateOwner(source, requester);
@@ -239,6 +244,7 @@ public class QuoteService {
 
     @Transactional
     public Quote rewriteExpiredQuote(Long expiredQuoteId, User requester) {
+        validateQuoteWriterRole(requester);
         validateTrainingCompleted(requester.getId());
         Quote expired = getQuoteWithDetailsOrThrow(expiredQuoteId);
         validateOwner(expired, requester);
@@ -292,9 +298,41 @@ public class QuoteService {
 
     public QuoteDetailResponse getQuote(String quoteNumber, Long userId) {
         User user = findUser(userId);
-        Quote quote = quoteRepository.findByQuoteNumberAndCreatedBy(quoteNumber, user)
+        Quote quote = quoteRepository.findByQuoteNumberAndCreatedByWithDetails(quoteNumber, user)
                 .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+        quoteRepository.findByIdWithApprovalReasons(quote.getId());
         return QuoteDetailResponse.from(quote);
+    }
+
+    // 견적 작성용 — 제품 원가·적용 할인정책
+    public QuoteProductContextResponse getProductContextForQuote(Long productId, Long userId) {
+        User user = findUser(userId);
+        validateQuoteWriterRole(user);
+        validateTrainingCompleted(userId);
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
+        if (!product.isActive()) {
+            throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
+        }
+
+        DiscountPolicy policy = resolveApplicablePolicy(product);
+        return QuoteProductContextResponse.of(product, policy);
+    }
+
+    private DiscountPolicy resolveApplicablePolicy(Product product) {
+        List<DiscountPolicy> candidates = discountPolicyRepository.findApplicableCandidates(
+                product.getId(),
+                product.getCategory().getId()
+        );
+
+        return candidates.stream()
+                .min(Comparator.comparingInt(p -> switch (p.getTargetType()) {
+                    case PRODUCT -> 1;
+                    case CATEGORY -> 2;
+                    case ALL -> 3;
+                }))
+                .orElse(null);
     }
 
     private Customer getCustomerOrThrow(Long customerId, Long requesterId) {
@@ -322,6 +360,13 @@ public class QuoteService {
     private void validateTrainingCompleted(Long userId) {
         if (!trainingService.isTrainingCompleted(userId)) {
             throw new CustomException(ErrorCode.TRAINING_NOT_COMPLETED);
+        }
+    }
+
+    // 견적 작성·수정 — 영업사원·영업관리자만 (최고관리자 불가)
+    private void validateQuoteWriterRole(User user) {
+        if (user.getRole() == UserRole.SUPER_ADMIN) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
         }
     }
 
