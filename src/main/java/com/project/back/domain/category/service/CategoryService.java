@@ -53,7 +53,8 @@ public class CategoryService {
     public List<CategoryTreeResponse> getActiveCategoryTree() {
         List<Category> active = categoryRepository.findAllActiveWithParent();
 
-        Map<Long, Long> countMap = productRepository.countGroupByCategoryId()
+        // 영업사원은 활성 제품만 보므로 카운트도 활성 제품만 집계
+        Map<Long, Long> countMap = productRepository.countActiveGroupByCategoryId()
                 .stream()
                 .collect(Collectors.toMap(
                         row -> (Long) row[0],
