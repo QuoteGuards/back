@@ -44,6 +44,10 @@ public class ProductService {
     @Transactional
     public ProductResponse create(ProductCreateRequest request) {
         Category category = findCategory(request.getCategoryId());
+        // 비활성 카테고리에는 제품 등록 불가
+        if (!category.isActive()) {
+            throw new CustomException(ErrorCode.PRODUCT_CATEGORY_INACTIVE);
+        }
         validateCode(request.getCode(), null);
 
         Product product = Product.builder()
@@ -68,6 +72,10 @@ public class ProductService {
     public ProductResponse update(Long productId, ProductUpdateRequest request) {
         Product product = findById(productId);
         Category category = findCategory(request.getCategoryId());
+        // 활성 제품을 비활성 카테고리로 옮길 수 없음 (비활성 제품은 비활성 카테고리에 둬도 정합성 OK)
+        if (product.isActive() && !category.isActive()) {
+            throw new CustomException(ErrorCode.PRODUCT_CATEGORY_INACTIVE);
+        }
         validateCode(request.getCode(), productId);
 
         product.update(
@@ -89,7 +97,12 @@ public class ProductService {
     // 제품 활성화
     @Transactional
     public void activate(Long productId) {
-        findById(productId).activate();
+        Product product = findById(productId);
+        // 속한 카테고리가 비활성이면 제품 활성화 불가 (카테고리를 먼저 활성화해야 함)
+        if (!product.getCategory().isActive()) {
+            throw new CustomException(ErrorCode.PRODUCT_CATEGORY_INACTIVE);
+        }
+        product.activate();
     }
 
     // 제품 비활성화
