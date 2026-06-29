@@ -9,6 +9,7 @@ import com.project.back.domain.product.dto.response.ProductSearchResponse;
 import com.project.back.domain.product.entity.Product;
 import com.project.back.domain.product.repository.ProductFavoriteRepository;
 import com.project.back.domain.product.repository.ProductRepository;
+import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final ProductFavoriteRepository productFavoriteRepository;
+    private final QuoteItemRepository quoteItemRepository;
 
     //// 최고 관리자
     // 제품 목록 조회
@@ -116,6 +118,10 @@ public class ProductService {
     @Transactional
     public void delete(Long productId) {
         Product product = findById(productId);
+        // 견적서에 사용된 제품은 삭제 불가 (데이터 정합성 — 비활성화로 대체)
+        if (quoteItemRepository.existsByProductId(productId)) {
+            throw new CustomException(ErrorCode.PRODUCT_IN_USE);
+        }
         // 삭제 전에 즐겨찾기도 모두 삭제
         productFavoriteRepository.deleteAllByProductId(productId);
         productRepository.delete(product);

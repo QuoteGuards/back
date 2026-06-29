@@ -44,6 +44,7 @@ public enum ErrorCode {
     PRODUCT_NOT_FOUND(HttpStatus.NOT_FOUND, "PROD_001", "제품을 찾을 수 없습니다."),
     DUPLICATE_PRODUCT_CODE(HttpStatus.CONFLICT, "PROD_002", "이미 사용 중인 제품 코드입니다."),
     PRODUCT_CATEGORY_INACTIVE(HttpStatus.CONFLICT, "PROD_003", "비활성 카테고리에는 제품을 등록하거나 활성화할 수 없습니다. 카테고리를 먼저 활성화하세요."),
+    PRODUCT_IN_USE(HttpStatus.CONFLICT, "PROD_004", "견적서에 사용된 제품은 삭제할 수 없습니다. 비활성화를 사용하세요."),
 
     // Favorite
     FAVORITE_ALREADY_EXISTS(HttpStatus.CONFLICT, "FAV_001", "이미 즐겨찾기한 제품입니다."),
