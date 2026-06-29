@@ -81,7 +81,7 @@ public interface DiscountPolicyRepository extends JpaRepository<DiscountPolicy,L
     // ALL → category/product 둘 다 null인 활성 ALL 정책, CATEGORY → 같은 category_id, PRODUCT → 같은 product_id
     @Modifying
     @Query("""
-            UPDATE DiscountPolicy p SET p.isActive = false
+            UPDATE DiscountPolicy p SET p.isActive = false, p.updatedAt = CURRENT_TIMESTAMP
             WHERE p.isActive = true
               AND p.id <> :excludeId
               AND p.targetType = :targetType
