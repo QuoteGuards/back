@@ -29,6 +29,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -115,9 +116,10 @@ public class DashboardService {
     }
 
     // 금액 문구용: 천단위 콤마 + 소수점 제거 (예: 5000000.00 → 5,000,000)
+    // Locale 고정(KOREA)으로 런타임 환경과 무관하게 콤마 구분자 보장
     private String wonText(BigDecimal v) {
         if (v == null) return "0";
-        return String.format("%,d", v.setScale(0, RoundingMode.HALF_UP).toBigInteger());
+        return String.format(Locale.KOREA, "%,d", v.setScale(0, RoundingMode.HALF_UP).toBigInteger());
     }
 
     private String createSalesRecommendation(
