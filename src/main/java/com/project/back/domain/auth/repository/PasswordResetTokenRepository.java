@@ -1,6 +1,7 @@
 package com.project.back.domain.auth.repository;
 
 import com.project.back.domain.auth.entity.PasswordResetToken;
+import com.project.back.domain.auth.entity.TokenPurpose;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -14,7 +15,7 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
     Optional<PasswordResetToken> findByTokenHash(String tokenHash);
 
     /**
-     * 사용자의 미사용·미만료 토큰을 즉시 만료 처리한다.
+     * 사용자의 특정 목적 미사용·미만료 토큰을 즉시 만료 처리한다.
      * 새 토큰 발급 전에 호출해 중복 유효 토큰을 방지한다.
      */
     @Modifying
@@ -22,10 +23,22 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
             UPDATE PasswordResetToken t
             SET t.expiresAt = :now
             WHERE t.userId = :userId
+              AND t.purpose = :purpose
               AND t.usedAt IS NULL
               AND t.expiresAt > :now
             """)
-    void expireAllActiveByUserId(@Param("userId") Long userId, @Param("now") LocalDateTime now);
+    void expireAllActiveByUserIdAndPurpose(
+            @Param("userId") Long userId,
+            @Param("purpose") TokenPurpose purpose,
+            @Param("now") LocalDateTime now
+    );
+
+    /**
+     * 기존 호환성 유지 (PASSWORD_RESET 전용)
+     */
+    default void expireAllActiveByUserId(Long userId, LocalDateTime now) {
+        expireAllActiveByUserIdAndPurpose(userId, TokenPurpose.PASSWORD_RESET, now);
+    }
 
     /**
      * 미사용·미만료 토큰을 원자적으로 사용 처리한다.
@@ -44,4 +57,19 @@ public interface PasswordResetTokenRepository extends JpaRepository<PasswordRese
               AND t.expiresAt > :now
             """)
     int markUsedIfValid(@Param("tokenHash") String tokenHash, @Param("now") LocalDateTime now);
+
+    /**
+     * 특정 사용자·목적의 가장 최근 생성 토큰 조회 (재발송 쿨다운 확인용)
+     */
+    @Query("""
+            SELECT t FROM PasswordResetToken t
+            WHERE t.userId = :userId
+              AND t.purpose = :purpose
+            ORDER BY t.createdAt DESC
+            LIMIT 1
+            """)
+    Optional<PasswordResetToken> findLatestByUserIdAndPurpose(
+            @Param("userId") Long userId,
+            @Param("purpose") TokenPurpose purpose
+    );
 }

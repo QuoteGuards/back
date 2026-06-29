@@ -5,6 +5,7 @@ import com.project.back.domain.auth.dto.response.LoginResponse;
 import com.project.back.domain.auth.dto.response.TokenRefreshResponse;
 import com.project.back.domain.auth.ratelimit.PasswordResetRateLimiter;
 import com.project.back.domain.auth.service.AuthService;
+import com.project.back.domain.auth.service.InitialPasswordSetupService;
 import com.project.back.domain.auth.service.PasswordResetService;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.exception.CustomException;
@@ -49,6 +50,9 @@ class AuthControllerTest {
 
     @MockitoBean
     private PasswordResetService passwordResetService;
+
+    @MockitoBean
+    private InitialPasswordSetupService initialPasswordSetupService;
 
     @MockitoBean
     private PasswordResetRateLimiter passwordResetRateLimiter;

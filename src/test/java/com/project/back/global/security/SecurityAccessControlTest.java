@@ -5,6 +5,7 @@ import com.project.back.domain.approval.service.ApprovalService;
 import com.project.back.domain.auth.controller.AuthController;
 import com.project.back.domain.auth.ratelimit.PasswordResetRateLimiter;
 import com.project.back.domain.auth.service.AuthService;
+import com.project.back.domain.auth.service.InitialPasswordSetupService;
 import com.project.back.domain.auth.service.PasswordResetService;
 import com.project.back.domain.user.controller.AdminUserController;
 import com.project.back.domain.user.entity.User;
@@ -62,6 +63,9 @@ class SecurityAccessControlTest {
 
     @MockitoBean
     private PasswordResetService passwordResetService;
+
+    @MockitoBean
+    private InitialPasswordSetupService initialPasswordSetupService;
 
     @MockitoBean
     private UserManagementService userManagementService;

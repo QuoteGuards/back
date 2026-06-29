@@ -1,6 +1,7 @@
 package com.project.back.domain.user.controller;
 
 import tools.jackson.databind.json.JsonMapper;
+import com.project.back.domain.auth.service.InitialPasswordSetupService;
 import com.project.back.domain.user.dto.response.AdminCreateUserResponse;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
@@ -57,6 +58,9 @@ class AdminUserControllerTest {
     private UserManagementService userManagementService;
 
     @MockitoBean
+    private InitialPasswordSetupService initialPasswordSetupService;
+
+    @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
 
     @MockitoBean
@@ -90,7 +94,7 @@ class AdminUserControllerTest {
     class Success {
 
         @Test
-        @DisplayName("SUPER_ADMIN - 계정 생성 성공 시 201 Created + temporaryPassword 반환")
+        @DisplayName("SUPER_ADMIN - 계정 생성 성공 시 201 Created + passwordInitialized=false 반환")
         void createUser_superAdmin_success() throws Exception {
             AdminCreateUserResponse mockResponse = AdminCreateUserResponse.builder()
                     .id(1L)
@@ -101,7 +105,7 @@ class AdminUserControllerTest {
                     .position("대리")
                     .role(UserRole.SALES_STAFF.name())
                     .status(UserStatus.ACTIVE.name())
-                    .temporaryPassword("QG-ABCD1234")
+                    .passwordInitialized(false)
                     .createdAt(LocalDateTime.now())
                     .build();
 
@@ -122,7 +126,7 @@ class AdminUserControllerTest {
                     .andExpect(jsonPath("$.status").value("success"))
                     .andExpect(jsonPath("$.data.memberNumber").value("2026001"))
                     .andExpect(jsonPath("$.data.email").value("2026001@quoteguard.com"))
-                    .andExpect(jsonPath("$.data.temporaryPassword").value("QG-ABCD1234"))
+                    .andExpect(jsonPath("$.data.passwordInitialized").value(false))
                     .andExpect(jsonPath("$.data.status").value("ACTIVE"));
         }
     }
