@@ -165,7 +165,8 @@ public interface DashboardRepository extends JpaRepository<Quote, Long> {
     @Query("""
             SELECT DISTINCT u.department
             FROM Quote q JOIN q.createdBy u
-            WHERE u.department IS NOT NULL
+            WHERE q.isLatest = true
+              AND u.department IS NOT NULL
             ORDER BY u.department
             """)
     List<String> findDistinctDepartments();
