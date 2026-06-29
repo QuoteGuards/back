@@ -77,13 +77,19 @@ public class InitialPasswordSetupService {
         String tokenHash = hashToken(rawToken);
         LocalDateTime now = LocalDateTime.now();
 
-        // 원자적 UPDATE: 미사용·미만료 토큰만 사용 처리
-        int updated = tokenRepository.markUsedIfValid(tokenHash, now);
+        // 원자적 UPDATE: purpose = INITIAL_PASSWORD_SETUP 이고 미사용·미만료인 토큰만 사용 처리
+        // purpose를 WHERE 조건에 포함해 PASSWORD_RESET 토큰이 이 엔드포인트에서 소모되는 것을 방지한다
+        int updated = tokenRepository.markUsedIfValid(
+                tokenHash, TokenPurpose.INITIAL_PASSWORD_SETUP, now);
 
         if (updated == 0) {
             PasswordResetToken token = tokenRepository.findByTokenHash(tokenHash)
                     .orElseThrow(() -> new CustomException(ErrorCode.INIT_PASSWORD_TOKEN_INVALID));
 
+            // purpose 불일치: PASSWORD_RESET 토큰을 초기 설정 엔드포인트에 제출한 경우
+            if (token.getPurpose() != TokenPurpose.INITIAL_PASSWORD_SETUP) {
+                throw new CustomException(ErrorCode.INIT_PASSWORD_TOKEN_PURPOSE_MISMATCH);
+            }
             if (token.isUsed()) {
                 throw new CustomException(ErrorCode.INIT_PASSWORD_TOKEN_ALREADY_USED);
             }
@@ -92,11 +98,6 @@ public class InitialPasswordSetupService {
 
         PasswordResetToken token = tokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new CustomException(ErrorCode.INIT_PASSWORD_TOKEN_INVALID));
-
-        // purpose 검증: INITIAL_PASSWORD_SETUP 토큰만 허용
-        if (token.getPurpose() != TokenPurpose.INITIAL_PASSWORD_SETUP) {
-            throw new CustomException(ErrorCode.INIT_PASSWORD_TOKEN_PURPOSE_MISMATCH);
-        }
 
         User user = userRepository.findById(token.getUserId())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
@@ -124,7 +125,7 @@ public class InitialPasswordSetupService {
         }
 
         // 쿨다운 확인: 최근 토큰 생성 시각이 60초 이내면 거부
-        tokenRepository.findLatestByUserIdAndPurpose(userId, TokenPurpose.INITIAL_PASSWORD_SETUP)
+        tokenRepository.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(userId, TokenPurpose.INITIAL_PASSWORD_SETUP)
                 .ifPresent(latest -> {
                     LocalDateTime cooldownEnd = latest.getCreatedAt().plusSeconds(RESEND_COOLDOWN_SECONDS);
                     if (LocalDateTime.now().isBefore(cooldownEnd)) {

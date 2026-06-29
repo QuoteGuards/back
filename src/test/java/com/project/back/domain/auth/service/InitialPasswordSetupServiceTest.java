@@ -115,7 +115,7 @@ class InitialPasswordSetupServiceTest {
             PasswordResetToken token = buildToken(TokenPurpose.INITIAL_PASSWORD_SETUP, false, false);
             User user = buildUser(false);
 
-            given(tokenRepository.markUsedIfValid(anyString(), any())).willReturn(1);
+            given(tokenRepository.markUsedIfValid(anyString(), any(TokenPurpose.class), any())).willReturn(1);
             given(tokenRepository.findByTokenHash(anyString())).willReturn(Optional.of(token));
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
             given(passwordEncoder.encode("ValidPass1!")).willReturn("encoded_new");
@@ -137,7 +137,7 @@ class InitialPasswordSetupServiceTest {
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(ErrorCode.PASSWORD_CONFIRM_MISMATCH));
 
-            verify(tokenRepository, never()).markUsedIfValid(anyString(), any());
+            verify(tokenRepository, never()).markUsedIfValid(anyString(), any(TokenPurpose.class), any());
         }
 
         @Test
@@ -145,7 +145,7 @@ class InitialPasswordSetupServiceTest {
         void setInitialPassword_alreadyUsedToken() {
             PasswordResetToken usedToken = buildToken(TokenPurpose.INITIAL_PASSWORD_SETUP, true, false);
 
-            given(tokenRepository.markUsedIfValid(anyString(), any())).willReturn(0);
+            given(tokenRepository.markUsedIfValid(anyString(), any(TokenPurpose.class), any())).willReturn(0);
             given(tokenRepository.findByTokenHash(anyString())).willReturn(Optional.of(usedToken));
 
             assertThatThrownBy(() ->
@@ -161,7 +161,7 @@ class InitialPasswordSetupServiceTest {
         void setInitialPassword_expiredToken() {
             PasswordResetToken expiredToken = buildToken(TokenPurpose.INITIAL_PASSWORD_SETUP, false, true);
 
-            given(tokenRepository.markUsedIfValid(anyString(), any())).willReturn(0);
+            given(tokenRepository.markUsedIfValid(anyString(), any(TokenPurpose.class), any())).willReturn(0);
             given(tokenRepository.findByTokenHash(anyString())).willReturn(Optional.of(expiredToken));
 
             assertThatThrownBy(() ->
@@ -175,7 +175,7 @@ class InitialPasswordSetupServiceTest {
         @Test
         @DisplayName("토큰이 없으면 INIT_PASSWORD_TOKEN_INVALID 예외")
         void setInitialPassword_invalidToken() {
-            given(tokenRepository.markUsedIfValid(anyString(), any())).willReturn(0);
+            given(tokenRepository.markUsedIfValid(anyString(), any(TokenPurpose.class), any())).willReturn(0);
             given(tokenRepository.findByTokenHash(anyString())).willReturn(Optional.empty());
 
             assertThatThrownBy(() ->
@@ -191,7 +191,8 @@ class InitialPasswordSetupServiceTest {
         void setInitialPassword_wrongPurpose() {
             PasswordResetToken wrongToken = buildToken(TokenPurpose.PASSWORD_RESET, false, false);
 
-            given(tokenRepository.markUsedIfValid(anyString(), any())).willReturn(1);
+            // purpose=INITIAL_PASSWORD_SETUP을 WHERE 조건에 포함했으므로 PASSWORD_RESET 토큰은 UPDATE 실패 → 0
+            given(tokenRepository.markUsedIfValid(anyString(), any(TokenPurpose.class), any())).willReturn(0);
             given(tokenRepository.findByTokenHash(anyString())).willReturn(Optional.of(wrongToken));
             // purpose 검증 실패로 userRepository.findById 는 호출되지 않으므로 스텁 불필요
 
@@ -209,7 +210,7 @@ class InitialPasswordSetupServiceTest {
             PasswordResetToken token = buildToken(TokenPurpose.INITIAL_PASSWORD_SETUP, false, false);
             User user = buildUser(true); // 이미 설정됨
 
-            given(tokenRepository.markUsedIfValid(anyString(), any())).willReturn(1);
+            given(tokenRepository.markUsedIfValid(anyString(), any(TokenPurpose.class), any())).willReturn(1);
             given(tokenRepository.findByTokenHash(anyString())).willReturn(Optional.of(token));
             given(userRepository.findById(1L)).willReturn(Optional.of(user));
 
@@ -249,7 +250,7 @@ class InitialPasswordSetupServiceTest {
             // 30초 전에 생성된 토큰 → 아직 쿨다운 중
             PasswordResetToken recentToken = buildToken(TokenPurpose.INITIAL_PASSWORD_SETUP, false, false);
             setField(recentToken, "createdAt", LocalDateTime.now().minusSeconds(30));
-            given(tokenRepository.findLatestByUserIdAndPurpose(1L, TokenPurpose.INITIAL_PASSWORD_SETUP))
+            given(tokenRepository.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(1L, TokenPurpose.INITIAL_PASSWORD_SETUP))
                     .willReturn(Optional.of(recentToken));
 
             assertThatThrownBy(() -> service.resendSetupLink(1L))
@@ -267,7 +268,7 @@ class InitialPasswordSetupServiceTest {
             // 2분 전에 생성된 토큰 → 쿨다운 경과
             PasswordResetToken oldToken = buildToken(TokenPurpose.INITIAL_PASSWORD_SETUP, false, false);
             setField(oldToken, "createdAt", LocalDateTime.now().minusMinutes(2));
-            given(tokenRepository.findLatestByUserIdAndPurpose(1L, TokenPurpose.INITIAL_PASSWORD_SETUP))
+            given(tokenRepository.findFirstByUserIdAndPurposeOrderByCreatedAtDesc(1L, TokenPurpose.INITIAL_PASSWORD_SETUP))
                     .willReturn(Optional.of(oldToken));
             given(tokenRepository.save(any(PasswordResetToken.class))).willReturn(oldToken);
 
