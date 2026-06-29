@@ -5,6 +5,7 @@ import com.project.back.global.enums.DiscountTargetType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
@@ -50,4 +51,21 @@ public interface DiscountPolicyRepository extends JpaRepository<DiscountPolicy,L
     List<DiscountPolicy> findApplicableCandidates(
             @Param("productId") Long productId,
             @Param("categoryId") Long categoryId);
+
+    // 대상별 활성 정책 1개 보장: 같은 대상(targetType + 동일 category/product)의 다른 활성 정책 일괄 비활성화
+    // ALL → category/product 둘 다 null인 활성 ALL 정책, CATEGORY → 같은 category_id, PRODUCT → 같은 product_id
+    @Modifying
+    @Query("""
+            UPDATE DiscountPolicy p SET p.isActive = false
+            WHERE p.isActive = true
+              AND p.id <> :excludeId
+              AND p.targetType = :targetType
+              AND ((:categoryId IS NULL AND p.category IS NULL) OR p.category.id = :categoryId)
+              AND ((:productId IS NULL AND p.product IS NULL) OR p.product.id = :productId)
+            """)
+    void deactivateSameTargetActive(
+            @Param("excludeId") Long excludeId,
+            @Param("targetType") DiscountTargetType targetType,
+            @Param("categoryId") Long categoryId,
+            @Param("productId") Long productId);
 }

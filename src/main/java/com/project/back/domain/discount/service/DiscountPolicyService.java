@@ -62,7 +62,9 @@ public class DiscountPolicyService {
                 .createdBy(userId)
                 .build();
 
-        return DiscountPolicyResponse.from(discountPolicyRepository.save(policy));
+        DiscountPolicy saved = discountPolicyRepository.save(policy);
+        enforceSingleActivePerTarget(saved); // 같은 대상 활성 1개 보장 (신규는 기본 활성)
+        return DiscountPolicyResponse.from(saved);
     }
 
     // 수정
@@ -86,11 +88,16 @@ public class DiscountPolicyService {
                 from,
                 request.getEffectiveTo()
         );
+        enforceSingleActivePerTarget(policy); // 활성 상태로 대상/내용 변경 시 같은 대상 활성 1개 보장
         return DiscountPolicyResponse.from(policy);
     }
 
     @Transactional
-    public void activate(Long policyId) { findById(policyId).activate(); }
+    public void activate(Long policyId) {
+        DiscountPolicy policy = findById(policyId);
+        policy.activate();
+        enforceSingleActivePerTarget(policy); // 활성화 시 같은 대상 다른 활성 정책 비활성화
+    }
 
     @Transactional
     public void deactivate(Long policyId) { findById(policyId).deactivate(); }
@@ -103,6 +110,15 @@ public class DiscountPolicyService {
     private DiscountPolicy findById(Long policyId) {
         return discountPolicyRepository.findById(policyId)
                 .orElseThrow(() -> new CustomException(ErrorCode.DISCOUNT_POLICY_NOT_FOUND));
+    }
+
+    // 대상별 활성 정책 1개 보장: 이 정책이 활성이면 같은 대상(targetType+category/product)의 다른 활성 정책을 비활성화
+    private void enforceSingleActivePerTarget(DiscountPolicy policy) {
+        if (!Boolean.TRUE.equals(policy.getIsActive())) return; // 비활성 정책이면 정리 불필요
+        Long categoryId = policy.getCategory() != null ? policy.getCategory().getId() : null;
+        Long productId = policy.getProduct() != null ? policy.getProduct().getId() : null;
+        discountPolicyRepository.deactivateSameTargetActive(
+                policy.getId(), policy.getTargetType(), categoryId, productId);
     }
 
     // targetType=CATEGORY 일 때만 카테고리 적용, 그 외엔 null
