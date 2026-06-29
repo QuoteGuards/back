@@ -1,6 +1,7 @@
 package com.project.back.domain.dashboard.controller;
 
 import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
+import com.project.back.domain.dashboard.dto.response.DepartmentStatResponse;
 import com.project.back.domain.dashboard.dto.response.MonthlyTrendResponse;
 import com.project.back.domain.dashboard.dto.response.PopularProductResponse;
 import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
@@ -31,11 +32,12 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<DashboardSummaryResponse>> getSummary(
             @RequestParam(required = false) String period,  // ONE_MONTH/THREE_MONTHS/SIX_MONTHS/CUSTOM
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String department
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "대시보드 요약 조회 성공",
-                dashboardService.getSummary(period, from, to)
+                dashboardService.getSummary(period, from, to, department)
         ));
     }
 
@@ -44,11 +46,12 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<SalesAnalysisResponse>> getSalesAnalysis(
             @RequestParam(required = false) String period,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String department
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "영업 현황 분석 조회 성공",
-                dashboardService.getSalesAnalysis(period, from, to)
+                dashboardService.getSalesAnalysis(period, from, to, department)
         ));
     }
 
@@ -57,11 +60,12 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<List<MonthlyTrendResponse>>> getMonthlyTrend(
             @RequestParam(required = false) String period,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String department
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "월별 추이 조회 성공",
-                dashboardService.getMonthlyTrend(period, from, to)
+                dashboardService.getMonthlyTrend(period, from, to, department)
         ));
     }
 
@@ -70,11 +74,12 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<List<QuoteStatusCountResponse>>> getQuoteStatusCount(
             @RequestParam(required = false) String period,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String department
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "견적 상태별 건수 조회 성공",
-                dashboardService.getQuoteStatusCount(period, from, to)
+                dashboardService.getQuoteStatusCount(period, from, to, department)
         ));
     }
 
@@ -84,11 +89,12 @@ public class DashboardController {
             @RequestParam(required = false) String period,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String department,
             @RequestParam(defaultValue = "10") int limit
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "인기 제품 순위 조회 성공",
-                dashboardService.getPopularProducts(period, from, to, limit)
+                dashboardService.getPopularProducts(period, from, to, department, limit)
         ));
     }
 
@@ -97,11 +103,34 @@ public class DashboardController {
     public ResponseEntity<ApiResponse<List<SalesStaffResponse>>> getSalesStaff(
             @RequestParam(required = false) String period,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String department
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "영업사원별 통계 조회 성공",
-                dashboardService.getSalesStaff(period, from, to)
+                dashboardService.getSalesStaff(period, from, to, department)
+        ));
+    }
+
+    // 부서 필터 드롭다운 목록
+    @GetMapping("/departments")
+    public ResponseEntity<ApiResponse<List<String>>> getDepartments() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "부서 목록 조회 성공",
+                dashboardService.getDepartments()
+        ));
+    }
+
+    // 부서별 통계: 작성자 department 기준 작성건수 / 승인율 / 반려율 / 총액
+    @GetMapping("/department-stats")
+    public ResponseEntity<ApiResponse<List<DepartmentStatResponse>>> getDepartmentStats(
+            @RequestParam(required = false) String period,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "부서별 통계 조회 성공",
+                dashboardService.getDepartmentStats(period, from, to)
         ));
     }
 }
