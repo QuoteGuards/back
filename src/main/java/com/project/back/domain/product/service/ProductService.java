@@ -9,6 +9,7 @@ import com.project.back.domain.product.dto.response.ProductSearchResponse;
 import com.project.back.domain.product.entity.Product;
 import com.project.back.domain.product.repository.ProductFavoriteRepository;
 import com.project.back.domain.product.repository.ProductRepository;
+import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -27,11 +29,12 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final ProductFavoriteRepository productFavoriteRepository;
+    private final QuoteItemRepository quoteItemRepository;
 
     //// 최고 관리자
     // 제품 목록 조회
-    public Page<ProductResponse> getProductList(Long categoryId, String keyword, Boolean isActive, Pageable pageable) {
-        return productRepository.findAllWithFilters(categoryId, keyword, isActive, pageable)
+    public Page<ProductResponse> getProductList(Long categoryId, String keyword, Boolean isActive, Boolean vatApplicable, Pageable pageable) {
+        return productRepository.findAllWithFilters(categoryId, keyword, isActive, vatApplicable, pageable)
                 .map(ProductResponse::from);
     }
 
@@ -44,6 +47,10 @@ public class ProductService {
     @Transactional
     public ProductResponse create(ProductCreateRequest request) {
         Category category = findCategory(request.getCategoryId());
+        // 비활성 카테고리에는 제품 등록 불가
+        if (!category.isActive()) {
+            throw new CustomException(ErrorCode.PRODUCT_CATEGORY_INACTIVE);
+        }
         validateCode(request.getCode(), null);
 
         Product product = Product.builder()
@@ -68,6 +75,10 @@ public class ProductService {
     public ProductResponse update(Long productId, ProductUpdateRequest request) {
         Product product = findById(productId);
         Category category = findCategory(request.getCategoryId());
+        // 활성 제품을 비활성 카테고리로 옮길 수 없음 (비활성 제품은 비활성 카테고리에 둬도 정합성 OK)
+        if (product.isActive() && !category.isActive()) {
+            throw new CustomException(ErrorCode.PRODUCT_CATEGORY_INACTIVE);
+        }
         validateCode(request.getCode(), productId);
 
         product.update(
@@ -89,7 +100,12 @@ public class ProductService {
     // 제품 활성화
     @Transactional
     public void activate(Long productId) {
-        findById(productId).activate();
+        Product product = findById(productId);
+        // 속한 카테고리가 비활성이면 제품 활성화 불가 (카테고리를 먼저 활성화해야 함)
+        if (!product.getCategory().isActive()) {
+            throw new CustomException(ErrorCode.PRODUCT_CATEGORY_INACTIVE);
+        }
+        product.activate();
     }
 
     // 제품 비활성화
@@ -102,9 +118,29 @@ public class ProductService {
     @Transactional
     public void delete(Long productId) {
         Product product = findById(productId);
+        // 견적서에 사용된 제품은 삭제 불가 (데이터 정합성 — 비활성화로 대체)
+        if (quoteItemRepository.existsByProductId(productId)) {
+            throw new CustomException(ErrorCode.PRODUCT_IN_USE);
+        }
         // 삭제 전에 즐겨찾기도 모두 삭제
         productFavoriteRepository.deleteAllByProductId(productId);
         productRepository.delete(product);
+    }
+
+    //// 일괄 처리 (체크박스 선택 → 한 번에) — 하나라도 실패하면 전체 롤백
+    @Transactional
+    public void bulkActivate(List<Long> ids) {
+        ids.forEach(this::activate);
+    }
+
+    @Transactional
+    public void bulkDeactivate(List<Long> ids) {
+        ids.forEach(this::deactivate);
+    }
+
+    @Transactional
+    public void bulkDelete(List<Long> ids) {
+        ids.forEach(this::delete);
     }
 
     //// 영업사원
@@ -114,7 +150,7 @@ public class ProductService {
 
         Set<Long> favoriteIds = productFavoriteRepository.findProductIdsByUserId(userId);
 
-        return productRepository.findAllWithFilters(categoryId, keyword, true, pageable)
+        return productRepository.findAllWithFilters(categoryId, keyword, true, null, pageable)
                 .map(product -> ProductSearchResponse.of(
                         product,
                         favoriteIds.contains(product.getId())

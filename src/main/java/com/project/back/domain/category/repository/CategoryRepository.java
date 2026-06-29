@@ -24,11 +24,12 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     // 수정 시 본인 제외 slug 중복 검사
     boolean existsBySlugAndIdNot(String slug, Long id);
 
-    // 비활성화 처리 위해 자식 카테고리까지 한 번에 로딩
+    // 비활성화/삭제 처리 위해 자식 카테고리 로딩 (한 단계만 fetch join)
+    // 두 단계 List를 동시에 fetch join하면 MultipleBagFetchException 발생.
+    // 손자 카테고리는 @Transactional 안에서 child.getChildren() 지연 로딩으로 처리.
     @Query("""
         SELECT c FROM Category c
-        LEFT JOIN FETCH c.children ch
-        LEFT JOIN FETCH ch.children
+        LEFT JOIN FETCH c.children
         WHERE c.id = :id
     """)
     Optional<Category> findWithChildrenById(@Param("id") Long id);

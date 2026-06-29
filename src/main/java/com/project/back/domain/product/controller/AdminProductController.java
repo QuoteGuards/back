@@ -1,5 +1,6 @@
 package com.project.back.domain.product.controller;
 
+import com.project.back.domain.product.dto.request.ProductBulkRequest;
 import com.project.back.domain.product.dto.request.ProductCreateRequest;
 import com.project.back.domain.product.dto.request.ProductUpdateRequest;
 import com.project.back.domain.product.dto.response.ProductResponse;
@@ -29,11 +30,12 @@ public class AdminProductController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) Boolean vatApplicable,
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "제품 목록 조회 성공",
-                productService.getProductList(categoryId, keyword, isActive, pageable)
+                productService.getProductList(categoryId, keyword, isActive, vatApplicable, pageable)
         ));
     }
 
@@ -88,5 +90,24 @@ public class AdminProductController {
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long productId) {
         productService.delete(productId);
         return ResponseEntity.ok(ApiResponse.success("제품 삭제 성공", null));
+    }
+
+    // ── 일괄 처리 (체크박스 선택 → 한 번에) ──
+    @PatchMapping("/bulk/activate")
+    public ResponseEntity<ApiResponse<Void>> bulkActivate(@RequestBody @Valid ProductBulkRequest request) {
+        productService.bulkActivate(request.getIds());
+        return ResponseEntity.ok(ApiResponse.success("제품 일괄 활성화 성공", null));
+    }
+
+    @PatchMapping("/bulk/deactivate")
+    public ResponseEntity<ApiResponse<Void>> bulkDeactivate(@RequestBody @Valid ProductBulkRequest request) {
+        productService.bulkDeactivate(request.getIds());
+        return ResponseEntity.ok(ApiResponse.success("제품 일괄 비활성화 성공", null));
+    }
+
+    @DeleteMapping("/bulk")
+    public ResponseEntity<ApiResponse<Void>> bulkDelete(@RequestBody @Valid ProductBulkRequest request) {
+        productService.bulkDelete(request.getIds());
+        return ResponseEntity.ok(ApiResponse.success("제품 일괄 삭제 성공", null));
     }
 }

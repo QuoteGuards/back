@@ -98,6 +98,11 @@ public class CategoryService {
         Category category = categoryRepository.findWithChildrenById(id)
                 .orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
 
+        // 하위 카테고리가 있으면 삭제 불가 (하위부터 먼저 삭제하도록 안내)
+        if (!category.getChildren().isEmpty()) {
+            throw new CustomException(ErrorCode.CATEGORY_HAS_CHILDREN);
+        }
+
         // 연결된 제품이 있으면 삭제 불가
         long productCount = productRepository.countByCategoryId(id);
         // 수정, max_depth는 카테고리 분류 확인할때 사용
@@ -126,15 +131,25 @@ public class CategoryService {
     // 활성화
     @Transactional
     public void activate(Long id) {
-        Category category = findById(id);
-        category.activate();
+        Category category = categoryRepository.findWithChildrenById(id)
+                .orElseThrow(() -> new CustomException(ErrorCode.CATEGORY_NOT_FOUND));
 
-        // 부모 체인 활성화 (최대 depth=3이므로 최대 2번 LAZY 로딩)
+        // 본인 + 하위 카테고리 활성화 (비활성화와 대칭)
+        category.activate();
+        category.getChildren().forEach(child -> {
+            child.activate();
+            child.getChildren().forEach(Category::activate);
+        });
+
+        // 부모 체인 활성화 (활성 자식이 비활성 부모 아래 있을 수 없음)
         Category parent = category.getParent();
         while (parent != null) {
             parent.activate();
             parent = parent.getParent();
         }
+
+        // 하위(자손) 카테고리에 속한 제품도 함께 활성화 (카테고리 on = 제품도 on)
+        productRepository.activateByCategorySubtree(id);
     }
 
     // 비활성화
@@ -148,6 +163,9 @@ public class CategoryService {
             child.deactivate();
             child.getChildren().forEach(Category::deactivate);
         });
+
+        // 하위(자손) 카테고리에 속한 제품도 함께 비활성화 (카테고리 off = 제품도 off)
+        productRepository.deactivateByCategorySubtree(id);
     }
 
 

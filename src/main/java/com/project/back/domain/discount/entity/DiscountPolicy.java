@@ -29,8 +29,8 @@ public class DiscountPolicy {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 정책이름
-    @Column(name = "policy_name", nullable = false, length = 100)
+    // 정책이름 (DB 컬럼은 SQL 스키마대로 name)
+    @Column(name = "name", nullable = false, length = 100)
     private String policyName;
 
     // 정책적용 대상
