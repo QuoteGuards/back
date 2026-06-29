@@ -47,6 +47,22 @@ public class CategoryService {
     }
 
 
+    // 활성 카테고리 전체 트리 (영업사원 제품탐색/상세/즐겨찾기용, 단일 호출)
+    // 드릴다운 N+1 제거: 활성 카테고리를 한 번에 받아 트리로 조립
+    @Transactional(readOnly = true)
+    public List<CategoryTreeResponse> getActiveCategoryTree() {
+        List<Category> active = categoryRepository.findAllActiveWithParent();
+
+        Map<Long, Long> countMap = productRepository.countGroupByCategoryId()
+                .stream()
+                .collect(Collectors.toMap(
+                        row -> (Long) row[0],
+                        row -> (Long) row[1]
+                ));
+
+        return buildTree(active, countMap);
+    }
+
     // 특정 부모 분류의 활성된 자식들 목록(드릴다운)
     @Transactional(readOnly=true)
     public List<CategoryResponse> getActiveChildren(Long parentId){
@@ -215,7 +231,9 @@ public class CategoryService {
             if (c.getParent() == null) {
                 roots.add(dto);
             } else {
-                map.get(c.getParent().getId()).addChild(dto);
+                // 활성만 필터링한 경우 부모가 목록에 없을 수 있어 NPE 방지 (없으면 스킵)
+                CategoryTreeResponse parent = map.get(c.getParent().getId());
+                if (parent != null) parent.addChild(dto);
             }
         }
         return roots;
