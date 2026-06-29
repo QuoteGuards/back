@@ -1,6 +1,7 @@
 package com.project.back.domain.product.dto.request;
 
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 
 import java.util.List;
@@ -9,6 +10,7 @@ import java.util.List;
 @Getter
 public class ProductBulkRequest {
 
+    // 리스트 전체 비어있음(@NotEmpty) + 각 원소 null(@NotNull) 모두 차단
     @NotEmpty
-    private List<Long> ids;
+    private List<@NotNull Long> ids;
 }
