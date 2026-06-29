@@ -43,7 +43,7 @@ public class AdminUserController {
     ) {
         AdminCreateUserResponse result = userManagementService.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.created("사용자 계정이 생성되었습니다. 등록된 이메일로 초기 비밀번호 설정 링크를 발송했습니다.", result));
+                .body(ApiResponse.created("사용자 계정이 생성되었습니다. 등록된 이메일로 초기 비밀번호 설정 링크 발송을 요청했습니다.", result));
     }
 
     /**
@@ -137,6 +137,6 @@ public class AdminUserController {
             @PathVariable Long userId
     ) {
         initialPasswordSetupService.resendSetupLink(userId);
-        return ResponseEntity.ok(ApiResponse.success("초기 비밀번호 설정 링크를 다시 발송했습니다.", null));
+        return ResponseEntity.ok(ApiResponse.success("초기 비밀번호 설정 링크 재발송을 요청했습니다.", null));
     }
 }

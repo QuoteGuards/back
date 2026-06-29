@@ -1,6 +1,7 @@
 package com.project.back.domain.auth.service;
 
 import com.project.back.domain.auth.entity.PasswordResetToken;
+import com.project.back.domain.auth.entity.TokenPurpose;
 import com.project.back.domain.auth.event.PasswordResetEmailEvent;
 import com.project.back.domain.auth.repository.PasswordResetTokenRepository;
 import com.project.back.domain.user.entity.User;
@@ -81,7 +82,7 @@ public class PasswordResetService {
         LocalDateTime now = LocalDateTime.now();
 
         // 원자적 UPDATE: usedAt IS NULL AND expiresAt > now 조건 만족 시에만 성공
-        int updated = passwordResetTokenRepository.markUsedIfValid(tokenHash, now);
+        int updated = passwordResetTokenRepository.markUsedIfValid(tokenHash, TokenPurpose.PASSWORD_RESET, now);
 
         if (updated == 0) {
             // 0건이면 토큰이 없거나, 이미 사용됐거나, 만료된 것

@@ -11,6 +11,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.web.util.HtmlUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
@@ -55,7 +56,7 @@ public class InitialPasswordSetupEmailEventListener {
             helper.setFrom(fromAddress, fromName);
             helper.setTo(event.userEmail());
             helper.setSubject("[QuoteGuard] 초기 비밀번호를 설정해주세요");
-            helper.setText(buildEmailBody(event.userName(), setupLink), true);
+            helper.setText(buildEmailBody(HtmlUtils.htmlEscape(event.userName()), setupLink), true);
 
             mailSender.send(message);
             log.info("초기 비밀번호 설정 이메일 발송 완료 - userId={}", event.userId());
