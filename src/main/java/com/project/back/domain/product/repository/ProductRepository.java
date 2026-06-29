@@ -48,9 +48,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // 카테고리 로직에서 사용함
     long countByCategoryId(Long categoryId);
 
-    // 카테고리 목록 조회 시 각 카테고리의 제품 수 일괄 조회
+    // 카테고리 목록 조회 시 각 카테고리의 제품 수 일괄 조회 (관리자용, 비활성 포함)
     @Query("SELECT p.category.id, COUNT(p) FROM Product p GROUP BY p.category.id")
     List<Object[]> countGroupByCategoryId();
+
+    // 활성 제품만 카테고리별로 집계 (영업사원 제품탐색 트리용 — 활성 제품만 노출)
+    @Query("SELECT p.category.id, COUNT(p) FROM Product p WHERE p.isActive = true GROUP BY p.category.id")
+    List<Object[]> countActiveGroupByCategoryId();
 
     // 카테고리 비활성화 시 해당 카테고리 자손(본인/자식/손자)에 속한 제품을 일괄 비활성화
     // 명시적 LEFT JOIN으로 부모/조부모 없는 카테고리도 누락 없이 매칭

@@ -28,6 +28,11 @@ public interface ProductFavoriteRepository extends JpaRepository<ProductFavorite
     @Query("DELETE FROM ProductFavorite pf WHERE pf.product.id = :productId")
     void deleteAllByProductId(@Param("productId") Long productId);
 
+    // 특정 사용자의 즐겨찾기 전체 삭제 (전체 해제 벌크)
+    @Modifying
+    @Query("DELETE FROM ProductFavorite pf WHERE pf.user.id = :userId")
+    void deleteAllByUserId(@Param("userId") Long userId);
+
     @Query(value = "SELECT pf.product FROM ProductFavorite pf JOIN FETCH pf.product.category WHERE pf.user.id = :userId AND pf.product.isActive = true",
             countQuery = "SELECT COUNT(pf) FROM ProductFavorite pf WHERE pf.user.id = :userId AND pf.product.isActive = true")
     Page<Product> findActiveProductsByUserId(@Param("userId") Long userId, Pageable pageable);

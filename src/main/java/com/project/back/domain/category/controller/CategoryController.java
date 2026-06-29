@@ -1,6 +1,7 @@
 package com.project.back.domain.category.controller;
 
 import com.project.back.domain.category.dto.response.CategoryResponse;
+import com.project.back.domain.category.dto.response.CategoryTreeResponse;
 import com.project.back.domain.category.service.CategoryService;
 import com.project.back.global.common.ApiResponse;
 import lombok.RequiredArgsConstructor;
@@ -28,5 +29,12 @@ public class CategoryController {
             @RequestParam(required=false) Long parentId) {
         return ResponseEntity
                 .ok(ApiResponse.success("카테고리 목록 조회 성공", categoryService.getActiveChildren(parentId)));
+    }
+
+    // 활성 카테고리 전체 트리 조회 (드릴다운 N+1 제거: 한 번에 조회)
+    @GetMapping("/tree")
+    public ResponseEntity<ApiResponse<List<CategoryTreeResponse>>> getActiveCategoryTree() {
+        return ResponseEntity
+                .ok(ApiResponse.success("활성 카테고리 트리 조회 성공", categoryService.getActiveCategoryTree()));
     }
 }
