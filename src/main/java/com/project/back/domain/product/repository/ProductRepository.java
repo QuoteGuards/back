@@ -14,7 +14,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     // 단순 crud
 
-    // 제품 목록 조회(카테고리, 키워드, 활성화 여부 필터+페이징)
+    // 제품 목록 조회(카테고리, 키워드, 활성화 여부, VAT 필터+페이징)
     // 카테고리는 자손 포함 매칭: 선택 카테고리가 제품의 소분류 본인/부모/조부모 중 하나면 포함
     // (카테고리 max depth=3이라 본인·부모·조부모 3단계로 전체 하위 커버)
     @Query("""
@@ -26,11 +26,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                    OR c.parent.parent.id = :categoryId)
               AND (:keyword IS NULL OR p.name LIKE %:keyword% OR p.code LIKE %:keyword%)
               AND (:isActive IS NULL OR p.isActive = :isActive)
+              AND (:vatApplicable IS NULL OR p.vatApplicable = :vatApplicable)
             """)
     Page<Product> findAllWithFilters(
             @Param("categoryId") Long categoryId,
             @Param("keyword") String keyword,
             @Param("isActive") Boolean isActive,
+            @Param("vatApplicable") Boolean vatApplicable,
             Pageable pageable
     );
 

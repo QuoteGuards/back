@@ -30,11 +30,12 @@ public class AdminProductController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) Boolean vatApplicable,
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "제품 목록 조회 성공",
-                productService.getProductList(categoryId, keyword, isActive, pageable)
+                productService.getProductList(categoryId, keyword, isActive, vatApplicable, pageable)
         ));
     }
 

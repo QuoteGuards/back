@@ -31,8 +31,8 @@ public class ProductService {
 
     //// 최고 관리자
     // 제품 목록 조회
-    public Page<ProductResponse> getProductList(Long categoryId, String keyword, Boolean isActive, Pageable pageable) {
-        return productRepository.findAllWithFilters(categoryId, keyword, isActive, pageable)
+    public Page<ProductResponse> getProductList(Long categoryId, String keyword, Boolean isActive, Boolean vatApplicable, Pageable pageable) {
+        return productRepository.findAllWithFilters(categoryId, keyword, isActive, vatApplicable, pageable)
                 .map(ProductResponse::from);
     }
 
@@ -144,7 +144,7 @@ public class ProductService {
 
         Set<Long> favoriteIds = productFavoriteRepository.findProductIdsByUserId(userId);
 
-        return productRepository.findAllWithFilters(categoryId, keyword, true, pageable)
+        return productRepository.findAllWithFilters(categoryId, keyword, true, null, pageable)
                 .map(product -> ProductSearchResponse.of(
                         product,
                         favoriteIds.contains(product.getId())
