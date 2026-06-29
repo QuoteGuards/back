@@ -30,9 +30,19 @@ public interface QuoteRepository extends JpaRepository<Quote, Long>, QuoteReposi
 
     @Query("SELECT DISTINCT q FROM Quote q " +
             "JOIN FETCH q.customer " +
+            "LEFT JOIN FETCH q.discountPolicy " +
             "LEFT JOIN FETCH q.items " +
             "WHERE q.id = :id")
     Optional<Quote> findByIdWithDetails(@Param("id") Long id);
+
+    @Query("SELECT DISTINCT q FROM Quote q " +
+            "JOIN FETCH q.customer " +
+            "LEFT JOIN FETCH q.discountPolicy " +
+            "LEFT JOIN FETCH q.items " +
+            "WHERE q.quoteNumber = :quoteNumber AND q.createdBy = :user")
+    Optional<Quote> findByQuoteNumberAndCreatedByWithDetails(
+            @Param("quoteNumber") String quoteNumber,
+            @Param("user") User user);
 
     @Query("SELECT DISTINCT q FROM Quote q " +
             "LEFT JOIN FETCH q.approvalReasons " +
