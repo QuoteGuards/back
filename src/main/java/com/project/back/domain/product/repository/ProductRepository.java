@@ -15,15 +15,17 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // 단순 crud
 
     // 제품 목록 조회(카테고리, 키워드, 활성화 여부, VAT 필터+페이징)
-    // 카테고리는 자손 포함 매칭: 선택 카테고리가 제품의 소분류 본인/부모/조부모 중 하나면 포함
-    // (카테고리 max depth=3이라 본인·부모·조부모 3단계로 전체 하위 커버)
+    // 카테고리는 자손 포함 매칭: 선택 카테고리가 제품 카테고리의 본인/부모(p1)/조부모(p2) 중 하나면 포함
+    // 부모/조부모가 없는 카테고리(루트·중간)도 누락되지 않도록 명시적 LEFT JOIN 사용 (max depth=3)
     @Query("""
             SELECT p FROM Product p
             JOIN FETCH p.category c
+            LEFT JOIN c.parent p1
+            LEFT JOIN p1.parent p2
             WHERE (:categoryId IS NULL
                    OR c.id = :categoryId
-                   OR c.parent.id = :categoryId
-                   OR c.parent.parent.id = :categoryId)
+                   OR p1.id = :categoryId
+                   OR p2.id = :categoryId)
               AND (:keyword IS NULL OR p.name LIKE %:keyword% OR p.code LIKE %:keyword%)
               AND (:isActive IS NULL OR p.isActive = :isActive)
               AND (:vatApplicable IS NULL OR p.vatApplicable = :vatApplicable)
@@ -51,14 +53,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Object[]> countGroupByCategoryId();
 
     // 카테고리 비활성화 시 해당 카테고리 자손(본인/자식/손자)에 속한 제품을 일괄 비활성화
+    // 명시적 LEFT JOIN으로 부모/조부모 없는 카테고리도 누락 없이 매칭
     @Modifying
     @Query("""
             UPDATE Product p SET p.isActive = false
             WHERE p.category.id IN (
                 SELECT c.id FROM Category c
-                WHERE c.id = :categoryId
-                   OR c.parent.id = :categoryId
-                   OR c.parent.parent.id = :categoryId
+                LEFT JOIN c.parent p1
+                LEFT JOIN p1.parent p2
+                WHERE c.id = :categoryId OR p1.id = :categoryId OR p2.id = :categoryId
             )
             """)
     void deactivateByCategorySubtree(@Param("categoryId") Long categoryId);
@@ -69,9 +72,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             UPDATE Product p SET p.isActive = true
             WHERE p.category.id IN (
                 SELECT c.id FROM Category c
-                WHERE c.id = :categoryId
-                   OR c.parent.id = :categoryId
-                   OR c.parent.parent.id = :categoryId
+                LEFT JOIN c.parent p1
+                LEFT JOIN p1.parent p2
+                WHERE c.id = :categoryId OR p1.id = :categoryId OR p2.id = :categoryId
             )
             """)
     void activateByCategorySubtree(@Param("categoryId") Long categoryId);
