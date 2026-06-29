@@ -232,9 +232,11 @@ public class CategoryService {
             if (c.getParent() == null) {
                 roots.add(dto);
             } else {
-                // 활성만 필터링한 경우 부모가 목록에 없을 수 있어 NPE 방지 (없으면 스킵)
+                // 부모가 목록에 없으면(예: 활성 필터링 시 부모가 비활성 — 불변식 위반 데이터)
+                // 노드를 잃지 않도록 루트로 승격해 노출 (silently drop 방지)
                 CategoryTreeResponse parent = map.get(c.getParent().getId());
                 if (parent != null) parent.addChild(dto);
+                else roots.add(dto);
             }
         }
         return roots;
