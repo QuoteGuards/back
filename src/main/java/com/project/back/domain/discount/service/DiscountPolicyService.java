@@ -29,9 +29,10 @@ public class DiscountPolicyService {
     private final CategoryRepository categoryRepository;
     private final ProductRepository productRepository;
 
-    // 목록 조회 (targetType / isActive 필터 + 페이징)
-    public Page<DiscountPolicyResponse> getList(DiscountTargetType targetType, Boolean isActive, Pageable pageable) {
-        return discountPolicyRepository.findAllWithFilters(targetType, isActive, pageable)
+    // 목록 조회 (targetType / isActive / 정책명 keyword / 특정 categoryId 필터 + 페이징)
+    public Page<DiscountPolicyResponse> getList(DiscountTargetType targetType, Boolean isActive, String keyword, Long categoryId, Pageable pageable) {
+        String kw = (keyword != null && !keyword.isBlank()) ? keyword.trim() : null;
+        return discountPolicyRepository.findAllWithFilters(targetType, isActive, kw, categoryId, pageable)
                 .map(DiscountPolicyResponse::from);
     }
 

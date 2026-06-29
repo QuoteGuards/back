@@ -30,11 +30,13 @@ public class AdminDiscountController {
     public ResponseEntity<ApiResponse<Page<DiscountPolicyResponse>>> getList(
             @RequestParam(required = false) DiscountTargetType targetType,
             @RequestParam(required = false) Boolean isActive,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId,
             @PageableDefault(size = 20, sort = "createdAt") Pageable pageable
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "할인 정책 목록 조회 성공",
-                discountPolicyService.getList(targetType, isActive, pageable)
+                discountPolicyService.getList(targetType, isActive, keyword, categoryId, pageable)
         ));
     }
 
