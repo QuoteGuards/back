@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Set;
 
 @Service
@@ -118,6 +119,22 @@ public class ProductService {
         // 삭제 전에 즐겨찾기도 모두 삭제
         productFavoriteRepository.deleteAllByProductId(productId);
         productRepository.delete(product);
+    }
+
+    //// 일괄 처리 (체크박스 선택 → 한 번에) — 하나라도 실패하면 전체 롤백
+    @Transactional
+    public void bulkActivate(List<Long> ids) {
+        ids.forEach(this::activate);
+    }
+
+    @Transactional
+    public void bulkDeactivate(List<Long> ids) {
+        ids.forEach(this::deactivate);
+    }
+
+    @Transactional
+    public void bulkDelete(List<Long> ids) {
+        ids.forEach(this::delete);
     }
 
     //// 영업사원
