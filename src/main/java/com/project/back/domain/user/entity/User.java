@@ -26,9 +26,23 @@ public class User {
     @Column(nullable = false)
     private String password;
 
+    /**
+     * 사용자가 스스로 비밀번호를 설정했는지 여부.
+     * false: 관리자가 생성했지만 아직 초기 비밀번호 설정 링크를 통해 설정하지 않음 → 로그인 불가
+     * true: 사용자가 비밀번호를 설정 완료 → 로그인 가능
+     */
+    @Column(name = "password_initialized", nullable = false)
+    @Builder.Default
+    private boolean passwordInitialized = false;
+
+    /**
+     * 보안 정책상 비밀번호 변경 필요 여부.
+     * passwordInitialized=true인 상태에서만 의미가 있다.
+     * 현재는 초기 설정 링크 방식으로 변경되어 사용하지 않으나 하위 호환을 위해 유지.
+     */
     @Column(name = "must_change_password", nullable = false)
     @Builder.Default
-    private boolean mustChangePassword = true;
+    private boolean mustChangePassword = false;
 
     @Column(nullable = false, length = 50)
     private String name;
@@ -106,6 +120,18 @@ public class User {
         if (phone != null) this.phone = phone.isBlank() ? null : phone;
     }
 
+    /**
+     * 초기 비밀번호 설정 완료: 사용자가 링크를 통해 비밀번호를 직접 설정한 경우 호출
+     */
+    public void setInitialPassword(String encodedPassword) {
+        this.password = encodedPassword;
+        this.passwordInitialized = true;
+        this.mustChangePassword = false;
+    }
+
+    /**
+     * 비밀번호 변경 (이미 초기화된 사용자 대상)
+     */
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
         this.mustChangePassword = false;

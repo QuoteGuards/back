@@ -1,5 +1,6 @@
 package com.project.back.domain.user.service;
 
+import com.project.back.domain.auth.service.InitialPasswordSetupService;
 import com.project.back.domain.user.dto.request.AdminCreateUserRequest;
 import com.project.back.domain.user.dto.response.AdminCreateUserResponse;
 import com.project.back.domain.user.entity.User;
@@ -27,8 +28,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("관리자 계정 생성 서비스 테스트")
@@ -42,6 +42,9 @@ class AdminUserAccountServiceTest {
 
     @Mock
     private PasswordEncoder passwordEncoder;
+
+    @Mock
+    private InitialPasswordSetupService initialPasswordSetupService;
 
     @BeforeEach
     void setUp() {
@@ -71,7 +74,8 @@ class AdminUserAccountServiceTest {
                 .phone("010-1234-5678")
                 .role(UserRole.SALES_STAFF)
                 .status(UserStatus.ACTIVE)
-                .mustChangePassword(true)
+                .passwordInitialized(false)
+                .mustChangePassword(false)
                 .build();
         setField(user, "id", 1L);
         setField(user, "createdAt", LocalDateTime.now());
@@ -112,6 +116,7 @@ class AdminUserAccountServiceTest {
             given(userRepository.existsByPhone(anyString())).willReturn(false);
             given(passwordEncoder.encode(anyString())).willReturn("encoded");
             stubSavePassthrough();
+            doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
             AdminCreateUserResponse result = userManagementService.createUser(request);
 
@@ -126,12 +131,13 @@ class AdminUserAccountServiceTest {
             AdminCreateUserRequest request = buildRequest(UserRole.SALES_STAFF);
 
             given(userRepository.existsByMemberNumber(anyString()))
-                    .willReturn(true)   // 1차 시도 중복
-                    .willReturn(false); // 2차 시도 성공
+                    .willReturn(true)
+                    .willReturn(false);
             given(userRepository.existsByEmail(anyString())).willReturn(false);
             given(userRepository.existsByPhone(anyString())).willReturn(false);
             given(passwordEncoder.encode(anyString())).willReturn("encoded");
             stubSavePassthrough();
+            doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
             AdminCreateUserResponse result = userManagementService.createUser(request);
 
@@ -163,6 +169,7 @@ class AdminUserAccountServiceTest {
             given(userRepository.existsByPhone(anyString())).willReturn(false);
             given(passwordEncoder.encode(anyString())).willReturn("encoded");
             stubSavePassthrough();
+            doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
             AdminCreateUserResponse result = userManagementService.createUser(request);
 
@@ -171,8 +178,8 @@ class AdminUserAccountServiceTest {
         }
 
         @Test
-        @DisplayName("생성된 계정은 ACTIVE 상태, mustChangePassword=true")
-        void createdUser_isActiveAndMustChangePassword() {
+        @DisplayName("생성된 계정은 ACTIVE 상태, passwordInitialized=false")
+        void createdUser_isActive_andPasswordNotInitialized() {
             AdminCreateUserRequest request = buildRequest(UserRole.SALES_STAFF);
 
             given(userRepository.existsByMemberNumber(anyString())).willReturn(false);
@@ -180,15 +187,17 @@ class AdminUserAccountServiceTest {
             given(userRepository.existsByPhone(anyString())).willReturn(false);
             given(passwordEncoder.encode(anyString())).willReturn("encoded");
             stubSavePassthrough();
+            doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
             AdminCreateUserResponse result = userManagementService.createUser(request);
 
             assertThat(result.getStatus()).isEqualTo("ACTIVE");
+            assertThat(result.isPasswordInitialized()).isFalse();
         }
 
         @Test
-        @DisplayName("임시 비밀번호는 QG- 접두사를 포함한 15자 문자열")
-        void temporaryPassword_hasCorrectFormat() {
+        @DisplayName("임시 비밀번호를 응답에 포함하지 않음")
+        void response_doesNotContainTemporaryPassword() {
             AdminCreateUserRequest request = buildRequest(UserRole.SALES_STAFF);
 
             given(userRepository.existsByMemberNumber(anyString())).willReturn(false);
@@ -196,16 +205,36 @@ class AdminUserAccountServiceTest {
             given(userRepository.existsByPhone(anyString())).willReturn(false);
             given(passwordEncoder.encode(anyString())).willReturn("encoded");
             stubSavePassthrough();
+            doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
             AdminCreateUserResponse result = userManagementService.createUser(request);
 
-            assertThat(result.getTemporaryPassword()).startsWith("QG-");
-            assertThat(result.getTemporaryPassword()).hasSize(15); // "QG-" + 12자
+            // 응답에 temporaryPassword 필드 없음 확인
+            // AdminCreateUserResponse에는 temporaryPassword 필드가 없다
+            assertThat(result).isNotNull();
+            assertThat(result.getMemberNumber()).isNotNull();
         }
 
         @Test
-        @DisplayName("임시 비밀번호는 암호화되어 저장됨 (passwordEncoder.encode 호출)")
-        void temporaryPassword_isEncoded() {
+        @DisplayName("계정 생성 후 초기 비밀번호 설정 이메일 발송 서비스 호출")
+        void createUser_callsSendSetupLink() {
+            AdminCreateUserRequest request = buildRequest(UserRole.SALES_STAFF);
+
+            given(userRepository.existsByMemberNumber(anyString())).willReturn(false);
+            given(userRepository.existsByEmail(anyString())).willReturn(false);
+            given(userRepository.existsByPhone(anyString())).willReturn(false);
+            given(passwordEncoder.encode(anyString())).willReturn("encoded");
+            stubSavePassthrough();
+            doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
+
+            userManagementService.createUser(request);
+
+            verify(initialPasswordSetupService).sendSetupLink(any(User.class));
+        }
+
+        @Test
+        @DisplayName("비밀번호는 BCrypt 인코딩하여 저장 (placeholder, 원문 미노출)")
+        void password_isEncoded() {
             AdminCreateUserRequest request = buildRequest(UserRole.SALES_STAFF);
 
             given(userRepository.existsByMemberNumber(anyString())).willReturn(false);
@@ -213,6 +242,7 @@ class AdminUserAccountServiceTest {
             given(userRepository.existsByPhone(anyString())).willReturn(false);
             given(passwordEncoder.encode(anyString())).willReturn("encoded_pw");
             stubSavePassthrough();
+            doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
             userManagementService.createUser(request);
 
@@ -301,6 +331,7 @@ class AdminUserAccountServiceTest {
             given(userRepository.existsByEmail(anyString())).willReturn(false);
             given(passwordEncoder.encode(anyString())).willReturn("encoded");
             stubSavePassthrough();
+            doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
             userManagementService.createUser(request);
 

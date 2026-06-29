@@ -4,10 +4,12 @@ import com.project.back.domain.auth.dto.request.LoginRequest;
 import com.project.back.domain.auth.dto.request.PasswordResetConfirmRequest;
 import com.project.back.domain.auth.dto.request.PasswordResetRequest;
 import com.project.back.domain.auth.dto.request.RefreshTokenRequest;
+import com.project.back.domain.auth.dto.request.SetInitialPasswordRequest;
 import com.project.back.domain.auth.dto.response.LoginResponse;
 import com.project.back.domain.auth.dto.response.TokenRefreshResponse;
 import com.project.back.domain.auth.ratelimit.PasswordResetRateLimiter;
 import com.project.back.domain.auth.service.AuthService;
+import com.project.back.domain.auth.service.InitialPasswordSetupService;
 import com.project.back.domain.auth.service.PasswordResetService;
 import com.project.back.global.common.ApiResponse;
 import com.project.back.global.exception.CustomException;
@@ -29,11 +31,8 @@ public class AuthController {
     private final AuthService authService;
     private final PasswordResetService passwordResetService;
     private final PasswordResetRateLimiter passwordResetRateLimiter;
+    private final InitialPasswordSetupService initialPasswordSetupService;
 
-    /**
-     * 신뢰할 수 있는 리버스 프록시(nginx, ALB 등) 뒤에 배포된 경우에만 {@code true}로 설정한다.
-     * {@code false}(기본값)이면 X-Forwarded-For/X-Real-IP를 무시하고 RemoteAddr만 사용한다.
-     */
     @Value("${app.trust-proxy-headers:false}")
     private boolean trustProxyHeaders;
 
@@ -63,9 +62,6 @@ public class AuthController {
 
     /**
      * 비밀번호 재설정 링크 요청 (비인증 공개 API)
-     *
-     * <p>이메일 존재 여부와 무관하게 동일한 응답을 반환한다. (계정 열거 방어)</p>
-     * <p>IP+email 기준 60초 쿨다운으로 메일 폭주 및 토큰 churn을 방지한다.</p>
      */
     @PostMapping("/password-reset/request")
     public ResponseEntity<ApiResponse<Void>> requestPasswordReset(
@@ -94,13 +90,20 @@ public class AuthController {
     }
 
     /**
-     * 실제 클라이언트 IP를 추출한다.
+     * 초기 비밀번호 설정 (비인증 공개 API)
      *
-     * <p>{@code app.trust-proxy-headers=true}일 때만 {@code X-Forwarded-For} / {@code X-Real-IP}를 신뢰한다.
-     * 이 설정은 신뢰할 수 있는 리버스 프록시(nginx, ALB 등) 뒤에 배포된 환경에서만 활성화해야 한다.
-     * 그 외 환경에서는 클라이언트가 헤더를 조작하여 Rate Limiter를 우회할 수 있으므로
-     * {@code request.getRemoteAddr()}만 사용한다.</p>
+     * <p>관리자가 계정 생성 후 이메일로 발송된 링크에서 호출된다.
+     * 토큰 purpose가 INITIAL_PASSWORD_SETUP인 경우에만 처리한다.</p>
      */
+    @PostMapping("/set-initial-password")
+    public ResponseEntity<ApiResponse<Void>> setInitialPassword(
+            @Valid @RequestBody SetInitialPasswordRequest request
+    ) {
+        initialPasswordSetupService.setInitialPassword(
+                request.getToken(), request.getNewPassword(), request.getNewPasswordConfirm());
+        return ResponseEntity.ok(ApiResponse.success("비밀번호 설정이 완료되었습니다. 로그인해주세요.", null));
+    }
+
     private String extractClientIp(HttpServletRequest request) {
         if (trustProxyHeaders) {
             String xff = request.getHeader("X-Forwarded-For");

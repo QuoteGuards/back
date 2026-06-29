@@ -19,6 +19,7 @@ public class UserSummaryResponse {
     private final String phone;
     private final String role;
     private final String status;
+    private final boolean passwordInitialized;
     private final boolean mustChangePassword;
     private final LocalDateTime createdAt;
     private final LocalDateTime updatedAt;
@@ -34,6 +35,7 @@ public class UserSummaryResponse {
                 .phone(user.getPhone())
                 .role(user.getRole().name())
                 .status(user.getStatus().name())
+                .passwordInitialized(user.isPasswordInitialized())
                 .mustChangePassword(user.isMustChangePassword())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())

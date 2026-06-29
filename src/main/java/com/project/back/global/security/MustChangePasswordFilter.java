@@ -35,6 +35,7 @@ public class MustChangePasswordFilter extends OncePerRequestFilter {
 
     private static final String CHANGE_PASSWORD_PATH = "/api/users/me/password";
     private static final String LOGOUT_PATH = "/api/auth/logout";
+    private static final String SET_INITIAL_PASSWORD_PATH = "/api/auth/set-initial-password";
 
     private final UserRepository userRepository;
     private final SecurityErrorResponseWriter securityErrorResponseWriter;
@@ -62,6 +63,13 @@ public class MustChangePasswordFilter extends OncePerRequestFilter {
         // 로그아웃 엔드포인트 통과 (초기 비밀번호 변경 전에도 로그아웃 허용)
         if (HttpMethod.POST.matches(request.getMethod())
                 && LOGOUT_PATH.equals(request.getRequestURI())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        // 초기 비밀번호 설정 엔드포인트 통과 (미인증 공개 API)
+        if (HttpMethod.POST.matches(request.getMethod())
+                && SET_INITIAL_PASSWORD_PATH.equals(request.getRequestURI())) {
             filterChain.doFilter(request, response);
             return;
         }

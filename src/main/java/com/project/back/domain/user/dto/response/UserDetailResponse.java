@@ -19,9 +19,9 @@ public class UserDetailResponse {
     private final String phone;
     private final String role;
     private final String status;
+    private final boolean passwordInitialized;
     private final boolean mustChangePassword;
 
-    // 정지 이력
     private final Long suspendedBy;
     private final LocalDateTime suspendedAt;
 
@@ -40,6 +40,7 @@ public class UserDetailResponse {
                 .phone(user.getPhone())
                 .role(user.getRole().name())
                 .status(user.getStatus().name())
+                .passwordInitialized(user.isPasswordInitialized())
                 .mustChangePassword(user.isMustChangePassword())
                 .suspendedBy(user.getSuspendedBy())
                 .suspendedAt(user.getSuspendedAt())

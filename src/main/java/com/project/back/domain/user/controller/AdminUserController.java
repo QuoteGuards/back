@@ -1,5 +1,6 @@
 package com.project.back.domain.user.controller;
 
+import com.project.back.domain.auth.service.InitialPasswordSetupService;
 import com.project.back.domain.user.dto.request.AdminCreateUserRequest;
 import com.project.back.domain.user.dto.request.ChangeUserRoleRequest;
 import com.project.back.domain.user.dto.request.UpdateUserInfoRequest;
@@ -29,11 +30,12 @@ import org.springframework.web.bind.annotation.*;
 public class AdminUserController {
 
     private final UserManagementService userManagementService;
+    private final InitialPasswordSetupService initialPasswordSetupService;
 
     /**
      * 관리자가 신규 사원 계정을 직접 생성
      * - 회원번호로 이메일 자동 생성 ({memberNumber}@domain)
-     * - 임시 비밀번호는 응답에 1회만 포함 (이후 확인 불가)
+     * - 임시 비밀번호 없음: 등록된 이메일로 초기 비밀번호 설정 링크 발송
      */
     @PostMapping
     public ResponseEntity<ApiResponse<AdminCreateUserResponse>> createUser(
@@ -41,7 +43,7 @@ public class AdminUserController {
     ) {
         AdminCreateUserResponse result = userManagementService.createUser(request);
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.created("사용자 계정이 생성되었습니다.", result));
+                .body(ApiResponse.created("사용자 계정이 생성되었습니다. 등록된 이메일로 초기 비밀번호 설정 링크를 발송했습니다.", result));
     }
 
     /**
@@ -114,7 +116,7 @@ public class AdminUserController {
     }
 
     /**
-     * 사용자 삭제 (소프트 삭제: DELETED 상태로 변경)
+     * 사용자 삭제 (소프트 삭제)
      */
     @DeleteMapping("/{userId}")
     public ResponseEntity<ApiResponse<Void>> deleteUser(
@@ -123,5 +125,18 @@ public class AdminUserController {
     ) {
         userManagementService.deleteUser(requesterId, userId);
         return ResponseEntity.ok(ApiResponse.success("사용자가 삭제되었습니다.", null));
+    }
+
+    /**
+     * 초기 비밀번호 설정 링크 재발송
+     * - 비밀번호 설정이 완료되지 않은 사용자에게만 발송 가능
+     * - 60초 쿨다운 적용
+     */
+    @PostMapping("/{userId}/initial-password/resend")
+    public ResponseEntity<ApiResponse<Void>> resendInitialPasswordSetupLink(
+            @PathVariable Long userId
+    ) {
+        initialPasswordSetupService.resendSetupLink(userId);
+        return ResponseEntity.ok(ApiResponse.success("초기 비밀번호 설정 링크를 다시 발송했습니다.", null));
     }
 }

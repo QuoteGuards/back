@@ -60,7 +60,8 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/password-reset/request",
-                                "/api/auth/password-reset/confirm"
+                                "/api/auth/password-reset/confirm",
+                                "/api/auth/set-initial-password"
                         ).permitAll()
 
                         // 사용자 통계 조회 (본인)

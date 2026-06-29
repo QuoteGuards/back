@@ -33,39 +33,41 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RefreshTokenRepository refreshTokenRepository;
 
-    // 로그인 (이메일 + 비밀번호)
-    // 이메일은 관리자가 계정 생성 시 {memberNumber}@domain 형식으로 자동 생성된다.
     @Transactional
     public LoginResponse login(LoginRequest request) {
         // 1. 이메일로 유저 찾기
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
-        // 2. 비밀번호 검증
+        // 2. 비밀번호 미설정 사용자 차단 (초기 설정 링크 미사용 상태)
+        if (!user.isPasswordInitialized()) {
+            throw new CustomException(ErrorCode.PASSWORD_NOT_INITIALIZED);
+        }
+
+        // 3. 비밀번호 검증
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new CustomException(ErrorCode.INVALID_PASSWORD);
         }
 
-        // 3. 유저 상태 검사
+        // 4. 유저 상태 검사
         validateUserStatus(user.getStatus());
 
-        // 4. 마지막 로그인 일시 기록
+        // 5. 마지막 로그인 일시 기록
         user.updateLastLoginAt();
 
-        // 5. JWT 액세스 토큰 발행
+        // 6. JWT 액세스 토큰 발행
         String accessToken = jwtTokenProvider.createAccessToken(
                 user.getId(),
                 user.getEmail(),
                 user.getRole().name()
         );
 
-        // 6. 리프레시 토큰 발행 (기존 토큰 교체)
+        // 7. 리프레시 토큰 발행 (기존 토큰 교체)
         String rawRefreshToken = issueRefreshToken(user.getId());
 
         return LoginResponse.of(accessToken, rawRefreshToken, user.isMustChangePassword());
     }
 
-    // 액세스 토큰 재발급
     @Transactional
     public TokenRefreshResponse refresh(RefreshTokenRequest request) {
         String hashedToken = hashToken(request.getRefreshToken());
@@ -91,14 +93,11 @@ public class AuthService {
         return TokenRefreshResponse.of(newAccessToken);
     }
 
-    // 로그아웃: 리프레시 토큰 삭제
     @Transactional
     public void logout(Long userId) {
         refreshTokenRepository.deleteByUserId(userId);
     }
 
-    // 리프레시 토큰 생성 및 DB 저장 (기존 토큰 교체)
-    // DB에는 SHA-256 해시값만 저장하고, 원문은 클라이언트에게만 반환한다.
     private String issueRefreshToken(Long userId) {
         refreshTokenRepository.deleteByUserId(userId);
 
@@ -111,7 +110,6 @@ public class AuthService {
         return rawToken;
     }
 
-    // 리프레시 토큰 SHA-256 해시
     private String hashToken(String rawToken) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")
