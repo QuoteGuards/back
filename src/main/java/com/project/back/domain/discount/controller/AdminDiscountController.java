@@ -32,7 +32,7 @@ public class AdminDiscountController {
             @RequestParam(required = false) Boolean isActive,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) Long categoryId,
-            @PageableDefault(size = 20, sort = "createdAt") Pageable pageable
+            @PageableDefault(size = 20) Pageable pageable // 정렬은 쿼리에서 (ALL 우선 + 최신순)
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "할인 정책 목록 조회 성공",

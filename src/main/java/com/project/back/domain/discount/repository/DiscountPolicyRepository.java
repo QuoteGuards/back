@@ -33,6 +33,7 @@ public interface DiscountPolicyRepository extends JpaRepository<DiscountPolicy,L
               AND (:categoryId IS NULL
                    OR pc.id = :categoryId OR pc1.id = :categoryId OR pc2.id = :categoryId
                    OR ppc.id = :categoryId OR ppc1.id = :categoryId OR ppc2.id = :categoryId)
+            ORDER BY CASE WHEN p.targetType = 'ALL' THEN 0 ELSE 1 END, p.createdAt DESC
             """,
             countQuery = """
                     SELECT COUNT(p) FROM DiscountPolicy p
