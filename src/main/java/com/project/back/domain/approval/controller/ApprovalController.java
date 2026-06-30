@@ -30,7 +30,7 @@ public class ApprovalController {
 
     // ── 1. 승인 요청 ──
     // POST /api/quotes/{quoteId}/approval-requests
-    @PreAuthorize("hasRole('SALES_STAFF')")
+    @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER')")
     @PostMapping("/quotes/{quoteId}/approval-requests")
     public ResponseEntity<ApprovalRequestResponse> requestApproval(
             @PathVariable Long quoteId,
@@ -63,15 +63,42 @@ public class ApprovalController {
         return ResponseEntity.ok(approvalService.getMonthlyStats());
     }
 
-    // ── 4. 승인 대기 목록 조회 (관리자용) ──
+    // ── 4. 승인 대기 목록 조회 (SUPER_ADMIN - 전체) ──
     // GET /api/admin/approval-requests
-    @PreAuthorize("hasAnyRole('SALES_MANAGER', 'SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
     @GetMapping("/admin/approval-requests")
     public ResponseEntity<List<ApprovalRequestResponse>> getPendingList() {
         List<ApprovalRequestResponse> result = approvalService.getPendingList()
                 .stream()
                 .map(ApprovalRequestResponse::from)
                 .toList();
+        return ResponseEntity.ok(result);
+    }
+
+    // ── 4-1. 승인 대기 목록 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
+    // GET /api/manager/approval-requests
+    @PreAuthorize("hasRole('SALES_MANAGER')")
+    @GetMapping("/manager/approval-requests")
+    public ResponseEntity<List<ApprovalRequestResponse>> getPendingListForManager(
+            @AuthenticationPrincipal Long userId
+    ) {
+        List<ApprovalRequestResponse> result = approvalService.getPendingListForManager(userId)
+                .stream()
+                .map(ApprovalRequestResponse::from)
+                .toList();
+        return ResponseEntity.ok(result);
+    }
+
+    // ── 4-2. 승인 상세 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
+    // GET /api/manager/approval-requests/{approvalRequestId}
+    @PreAuthorize("hasRole('SALES_MANAGER')")
+    @GetMapping("/manager/approval-requests/{approvalRequestId}")
+    public ResponseEntity<ApprovalRequestDetailResponse> getApprovalDetailForManager(
+            @PathVariable Long approvalRequestId,
+            @AuthenticationPrincipal Long userId
+    ) {
+        ApprovalRequestDetailResponse result =
+                approvalService.getApprovalDetailForManager(approvalRequestId, userId);
         return ResponseEntity.ok(result);
     }
 

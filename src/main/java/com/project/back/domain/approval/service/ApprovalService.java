@@ -10,6 +10,7 @@ import com.project.back.domain.approval.repository.QuoteApprovalReasonRepository
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.user.entity.User;
+import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.domain.user.service.UserStatsUpdateService;
 import com.project.back.global.enums.ApprovalReasonType;
@@ -92,6 +93,12 @@ public class ApprovalService {
         User approver = userRepository.findById(approverId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
+        // 자가 승인 차단
+        validateSelfApproval(approver, approvalRequest);
+
+        // SALES_MANAGER는 자신의 부서 영업사원 견적만 승인 가능 (관리자→관리자는 부서 무관)
+        validateDepartmentIfManager(approver, approvalRequest);
+
         // PENDING 상태만 승인 가능
         validatePendingStatus(approvalRequest);
 
@@ -136,6 +143,12 @@ public class ApprovalService {
         ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
         User approver = userRepository.findById(approverId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        // 자가 승인 차단
+        validateSelfApproval(approver, approvalRequest);
+
+        // SALES_MANAGER는 자신의 부서 영업사원 견적만 반려 가능 (관리자→관리자는 부서 무관)
+        validateDepartmentIfManager(approver, approvalRequest);
 
         // PENDING 상태만 반려 가능
         validatePendingStatus(approvalRequest);
@@ -235,10 +248,25 @@ public class ApprovalService {
         return new ApprovalMonthlyStatsResponse(approved, rejected);
     }
 
-    // ── 7. 승인 대기 목록 조회 (관리자용) ──
+    // ── 7. 승인 대기 목록 조회 (SUPER_ADMIN - 전체) ──
     public List<ApprovalRequest> getPendingList() {
         return approvalRequestRepository.findByStatusOrderByRequestedAtAsc(
                 ApprovalRequest.ApprovalStatus.PENDING
+        );
+    }
+
+    // ── 7-1. 승인 대기 목록 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
+    public List<ApprovalRequest> getPendingListForManager(Long managerId) {
+        User manager = userRepository.findById(managerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        String department = manager.getDepartment();
+        if (department == null || department.isBlank()) {
+            return List.of();
+        }
+
+        return approvalRequestRepository.findByStatusAndRequesterDepartment(
+                ApprovalRequest.ApprovalStatus.PENDING, department
         );
     }
 
@@ -264,9 +292,56 @@ public class ApprovalService {
             throw new CustomException(ErrorCode.APPROVAL_NOT_PENDING);
         }
     }
+
+    private void validateSelfApproval(User approver, ApprovalRequest approvalRequest) {
+        if (approver.getId().equals(approvalRequest.getRequester().getId())) {
+            throw new CustomException(ErrorCode.APPROVAL_SELF_DENIED);
+        }
+    }
+
+    private void validateDepartmentIfManager(User approver, ApprovalRequest approvalRequest) {
+        if (approver.getRole() != UserRole.SALES_MANAGER) {
+            return; // SUPER_ADMIN 등은 부서 제한 없음
+        }
+        // 요청자가 영업관리자면 부서 무관하게 다른 영업관리자가 처리 가능
+        if (approvalRequest.getRequester().getRole() == UserRole.SALES_MANAGER) {
+            return;
+        }
+        // 요청자가 영업사원이면 같은 부서 영업관리자만 처리 가능
+        String approverDept = approver.getDepartment();
+        String requesterDept = approvalRequest.getRequester().getDepartment();
+        if (approverDept == null || !approverDept.equals(requesterDept)) {
+            throw new CustomException(ErrorCode.APPROVAL_DEPT_MISMATCH);
+        }
+    }
     public ApprovalRequestDetailResponse getApprovalDetail(Long approvalRequestId) {
 
         ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
+
+        List<QuoteApprovalReason> reasons =
+                quoteApprovalReasonRepository.findByQuote_Id(approvalRequest.getQuote().getId());
+
+        List<QuoteApprovalHistory> histories =
+                quoteApprovalHistoryRepository
+                        .findByApprovalRequestIdOrderByActedAtAsc(approvalRequestId);
+
+        return ApprovalRequestDetailResponse.from(approvalRequest, reasons, histories);
+    }
+
+    // ── 승인 상세 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
+    public ApprovalRequestDetailResponse getApprovalDetailForManager(Long approvalRequestId, Long managerId) {
+
+        ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
+
+        User manager = userRepository.findById(managerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+
+        String managerDept = manager.getDepartment();
+        String requesterDept = approvalRequest.getRequester().getDepartment();
+
+        if (managerDept == null || !managerDept.equals(requesterDept)) {
+            throw new CustomException(ErrorCode.APPROVAL_DEPT_MISMATCH);
+        }
 
         List<QuoteApprovalReason> reasons =
                 quoteApprovalReasonRepository.findByQuote_Id(approvalRequest.getQuote().getId());

@@ -79,6 +79,8 @@ public enum ErrorCode {
     APPROVAL_NOT_REJECTED(HttpStatus.BAD_REQUEST, "APPROVAL_004", "반려된 견적만 재요청할 수 있습니다."),
     APPROVAL_ACCESS_DENIED(HttpStatus.FORBIDDEN, "APPROVAL_005", "본인이 요청한 승인 건만 재요청할 수 있습니다."),
     REJECT_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "APPROVAL_006", "반려 사유는 필수입니다."),
+    APPROVAL_DEPT_MISMATCH(HttpStatus.FORBIDDEN, "APPROVAL_007", "담당 부서의 승인 요청만 조회할 수 있습니다."),
+    APPROVAL_SELF_DENIED(HttpStatus.FORBIDDEN, "APPROVAL_008", "자신이 요청한 견적은 직접 승인/반려할 수 없습니다."),
 
     // Customer
     CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "CUSTOMER_001", "존재하지 않는 고객입니다."),

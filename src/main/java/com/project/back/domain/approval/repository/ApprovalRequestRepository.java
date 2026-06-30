@@ -54,4 +54,18 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             LocalDateTime from,
             LocalDateTime to
     );
+
+    // 특정 부서 소속 영업사원의 승인 대기 목록 조회 (SALES_MANAGER 담당 범위)
+    @Query("""
+        SELECT ar FROM ApprovalRequest ar
+        JOIN FETCH ar.requester r
+        LEFT JOIN FETCH ar.approver
+        WHERE ar.status = :status
+        AND r.department = :department
+        ORDER BY ar.requestedAt ASC
+        """)
+    List<ApprovalRequest> findByStatusAndRequesterDepartment(
+            @Param("status") ApprovalRequest.ApprovalStatus status,
+            @Param("department") String department
+    );
 }
