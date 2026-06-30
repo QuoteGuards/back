@@ -90,6 +90,10 @@ public class ApprovalRequest {
         this.requestMemo = memo;
     }
 
+    public void updateAiRiskSummary(String summary) {
+        this.aiRiskSummary = summary;
+    }
+
     @PrePersist
     public void prePersist() {
         this.requestedAt = LocalDateTime.now();
