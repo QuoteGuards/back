@@ -20,6 +20,10 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         String location = Paths.get(dir).toAbsolutePath().normalize().toUri().toString();
+        // addResourceLocations 는 디렉토리 기준 해석을 위해 끝이 "/" 여야 함
+        if (!location.endsWith("/")) {
+            location += "/";
+        }
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(location);
     }
