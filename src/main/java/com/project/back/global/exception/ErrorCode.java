@@ -105,6 +105,12 @@ public enum ErrorCode {
     // User Stats
     USER_STATS_NOT_FOUND(HttpStatus.NOT_FOUND, "STATS_001", "해당 사용자의 통계 데이터가 없습니다."),
 
+    // File
+    FILE_EMPTY(HttpStatus.BAD_REQUEST, "FILE_001", "업로드할 파일이 없습니다."),
+    FILE_TOO_LARGE(HttpStatus.BAD_REQUEST, "FILE_002", "파일 크기가 너무 큽니다. (최대 5MB)"),
+    FILE_INVALID_TYPE(HttpStatus.BAD_REQUEST, "FILE_003", "이미지 파일만 업로드할 수 있습니다."),
+    FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_004", "파일 업로드에 실패했습니다."),
+
     // Common
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "입력값이 유효하지 않습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_999", "서버 내부 오류가 발생했습니다.");
