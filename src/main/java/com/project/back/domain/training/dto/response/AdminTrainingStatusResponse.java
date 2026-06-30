@@ -23,24 +23,6 @@ public record AdminTrainingStatusResponse(
         boolean fullyCompleted,
         LocalDateTime completedAt
 ) {
-    public static AdminTrainingStatusResponse from(UserTrainingProgress progress) {
-        return new AdminTrainingStatusResponse(
-                progress.getUser().getId(),
-                progress.getUser().getMemberNumber(),
-                progress.getUser().getName(),
-                progress.getUser().getEmail(),
-                progress.getUser().getDepartment(),
-                progress.getTrainingContent().getTitle(),
-                progress.getStatus(),
-                progress.getProgressRate(),
-                progress.getWatchedSeconds(),
-                progress.getLastWatchedSeconds(),
-                false,
-                progress.getStatus() == TrainingStatus.COMPLETED,
-                progress.getCompletedAt()
-        );
-    }
-
     public static AdminTrainingStatusResponse from(
             User user,
             TrainingContent content,

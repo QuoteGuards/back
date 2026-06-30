@@ -19,6 +19,7 @@ import com.project.back.global.exception.ErrorCode;
 import com.project.back.global.storage.VideoFileStorage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -26,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -152,8 +154,8 @@ public class TrainingService {
 
     @Transactional
     public String uploadQuoteWritingVideo(MultipartFile file) {
-        String url = videoFileStorage.store(file, "trainings");
         TrainingContent content = getQuoteWritingContent();
+        String url = videoFileStorage.store(file, "trainings");
         content.updateVideoUrl(url);
         return url;
     }
@@ -171,9 +173,14 @@ public class TrainingService {
 
         TrainingContent content = getQuoteWritingContent();
 
-        List<User> salesUsers = userRepository
-                .findAllWithFilters(UserRole.SALES_STAFF, UserStatus.ACTIVE, null, PageRequest.of(0, 1000))
-                .getContent();
+        List<User> salesUsers = new ArrayList<>();
+        int page = 0;
+        Page<User> salesUserPage;
+        do {
+            salesUserPage = userRepository
+                    .findAllWithFilters(UserRole.SALES_STAFF, UserStatus.ACTIVE, null, PageRequest.of(page++, 1000));
+            salesUsers.addAll(salesUserPage.getContent());
+        } while (salesUserPage.hasNext());
 
         if (requester.getRole() == UserRole.SALES_MANAGER) {
             String managerDepartment = requester.getDepartment();
