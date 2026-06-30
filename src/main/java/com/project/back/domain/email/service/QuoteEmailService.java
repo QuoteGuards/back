@@ -6,6 +6,7 @@ import com.project.back.domain.email.dto.QuoteEmailRequest;
 import com.project.back.domain.email.entity.EmailSendStatus;
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.repository.QuoteRepository;
+import com.project.back.domain.quote.service.QuoteService;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.exception.CustomException;
@@ -28,11 +29,11 @@ import java.nio.charset.StandardCharsets;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 public class QuoteEmailService {
 
     private final JavaMailSender mailSender;
     private final QuoteRepository quoteRepository;
+    private final QuoteService quoteService;
     private final UserRepository userRepository;
     private final QuoteDocumentService documentService;
     private final EmailHistoryService emailHistoryService;
@@ -43,6 +44,7 @@ public class QuoteEmailService {
     @Value("${mail.from-name:QuoteGuard}")
     private String fromName;
 
+    @Transactional
     public void sendQuoteEmail(
             String quoteNumber,
             Long userId,
@@ -54,6 +56,8 @@ public class QuoteEmailService {
 
         Quote quote = quoteRepository.findByQuoteNumberAndCreatedBy(quoteNumber, user)
                 .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+
+        quoteService.validateQuoteSendable(quote);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -85,6 +89,7 @@ public class QuoteEmailService {
 
         // 발송 성공 후 이력 저장 - 이력 저장 실패가 발송 결과를 FAILED로 뒤집지 않도록 try 밖에서 처리
         emailHistoryService.record(user, quote, request, EmailSendStatus.SENT, null);
+        quoteService.markQuoteAsSent(quote);
     }
 
     // 로그에 수신자 이메일을 평문 노출하지 않도록 로컬 파트 앞 2자만 남기고 마스킹

@@ -57,6 +57,19 @@ class AuthServiceTest {
     class Login {
 
         @Test
+        @DisplayName("비밀번호 미설정 사용자 로그인 → PASSWORD_NOT_INITIALIZED 예외")
+        void login_passwordNotInitialized_blocked() {
+            LoginRequest request = mockLoginRequest("2026001@quoteguard.com", "Pass@1234");
+            given(userRepository.findByEmail("2026001@quoteguard.com"))
+                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, false, false)));
+
+            assertThatThrownBy(() -> authService.login(request))
+                    .isInstanceOf(CustomException.class)
+                    .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
+                            .isEqualTo(ErrorCode.PASSWORD_NOT_INITIALIZED));
+        }
+
+        @Test
         @DisplayName("ACTIVE - success, mustChangePassword=false")
         void login_active_success() {
             LoginRequest request = mockLoginRequest("2026001@quoteguard.com", "Pass@1234");
@@ -229,6 +242,10 @@ class AuthServiceTest {
     }
 
     private User buildUser(UserStatus status, boolean mustChangePassword) {
+        return buildUser(status, mustChangePassword, true);
+    }
+
+    private User buildUser(UserStatus status, boolean mustChangePassword, boolean passwordInitialized) {
         return User.builder()
                 .id(1L)
                 .memberNumber("2026001")
@@ -238,6 +255,7 @@ class AuthServiceTest {
                 .role(UserRole.SALES_STAFF)
                 .status(status)
                 .mustChangePassword(mustChangePassword)
+                .passwordInitialized(passwordInitialized)
                 .build();
     }
 

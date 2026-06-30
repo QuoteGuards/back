@@ -1,6 +1,7 @@
 package com.project.back.domain.auth.service;
 
 import com.project.back.domain.auth.entity.PasswordResetToken;
+import com.project.back.domain.auth.entity.TokenPurpose;
 import com.project.back.domain.auth.event.PasswordResetEmailEvent;
 import com.project.back.domain.auth.repository.PasswordResetTokenRepository;
 import com.project.back.domain.user.entity.User;
@@ -140,7 +141,7 @@ class PasswordResetServiceTest {
             User user = buildUser();
 
             // markUsedIfValid: 1 반환 → 원자적 UPDATE 성공
-            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), any(LocalDateTime.class)))
+            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), eq(TokenPurpose.PASSWORD_RESET), any(LocalDateTime.class)))
                     .willReturn(1);
             // UPDATE 성공 후 userId 조회용 findByTokenHash
             given(passwordResetTokenRepository.findByTokenHash(tokenHash)).willReturn(Optional.of(token));
@@ -159,7 +160,7 @@ class PasswordResetServiceTest {
             String tokenHash = sha256(rawToken);
 
             // markUsedIfValid: 0 반환 → 조건 불충족
-            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), any(LocalDateTime.class)))
+            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), eq(TokenPurpose.PASSWORD_RESET), any(LocalDateTime.class)))
                     .willReturn(0);
             // 세부 원인 파악을 위해 findByTokenHash 호출 → 토큰 없음
             given(passwordResetTokenRepository.findByTokenHash(tokenHash)).willReturn(Optional.empty());
@@ -180,7 +181,7 @@ class PasswordResetServiceTest {
                     LocalDateTime.now().plusMinutes(30));
             usedToken.markUsed();
 
-            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), any(LocalDateTime.class)))
+            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), eq(TokenPurpose.PASSWORD_RESET), any(LocalDateTime.class)))
                     .willReturn(0);
             given(passwordResetTokenRepository.findByTokenHash(tokenHash)).willReturn(Optional.of(usedToken));
 
@@ -199,7 +200,7 @@ class PasswordResetServiceTest {
             PasswordResetToken expiredToken = PasswordResetToken.of(1L, tokenHash,
                     LocalDateTime.now().minusMinutes(1));
 
-            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), any(LocalDateTime.class)))
+            given(passwordResetTokenRepository.markUsedIfValid(eq(tokenHash), eq(TokenPurpose.PASSWORD_RESET), any(LocalDateTime.class)))
                     .willReturn(0);
             given(passwordResetTokenRepository.findByTokenHash(tokenHash)).willReturn(Optional.of(expiredToken));
 

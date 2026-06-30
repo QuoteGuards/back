@@ -6,6 +6,7 @@ import com.project.back.domain.discount.entity.DiscountPolicy;
 import com.project.back.domain.discount.repository.DiscountPolicyRepository;
 import com.project.back.domain.product.entity.Product;
 import com.project.back.domain.product.repository.ProductRepository;
+import com.project.back.domain.quote.dto.response.AdminQuoteListResponse;
 import com.project.back.domain.quote.dto.response.QuoteDetailResponse;
 import com.project.back.domain.quote.dto.response.QuoteProductContextResponse;
 import com.project.back.domain.quote.entity.Quote;
@@ -39,6 +40,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -69,6 +73,7 @@ public class QuoteService {
 
         validateQuoteWriterRole(createdBy);
         validateTrainingCompleted(createdBy.getId());
+        validateQuoteDates(issuedDate, validUntil);
         Customer customer = getCustomerOrThrow(customerId, createdBy.getId());
         DiscountPolicy policy = resolveDiscountPolicy(discountPolicyId);
 
@@ -106,7 +111,7 @@ public class QuoteService {
 
         quoteRepository.save(quote);
 
-        List<QuoteItem> items = buildItems(quote, itemCommands, policy);
+        List<QuoteItem> items = buildItems(quote, itemCommands, policy, null);
         quoteItemRepository.saveAll(items);
         calculationService.calculate(quote, items);
 
@@ -120,6 +125,7 @@ public class QuoteService {
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
         validateEditable(quote);
+        validateQuoteDates(quote.getIssuedDate(), quote.getValidUntil());
 
         List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quoteId);
         List<ApprovalReasonType> reasons = approvalCheckService.check(
@@ -156,6 +162,7 @@ public class QuoteService {
 
         validateQuoteWriterRole(requester);
         validateTrainingCompleted(requester.getId());
+        validateQuoteDates(issuedDate, validUntil);
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
         validateEditable(quote);
@@ -175,7 +182,11 @@ public class QuoteService {
 
         quote.updateInfo(customer, snapshot, internalMemo, issuedDate, validUntil, deliveryTerm);
 
-        List<QuoteItem> newItems = buildItems(quote, itemCommands, quote.getDiscountPolicy());
+        Map<Long, QuoteItem> existingByProductId = quote.getItems().stream()
+                .filter(item -> item.getProductId() != null)
+                .collect(Collectors.toMap(QuoteItem::getProductId, Function.identity(), (a, b) -> a));
+
+        List<QuoteItem> newItems = buildItems(quote, itemCommands, quote.getDiscountPolicy(), existingByProductId);
 
         // 엔티티 내부에서 클리어하고 새로 추가
         quote.replaceItems(newItems);
@@ -193,9 +204,50 @@ public class QuoteService {
         return quoteRepository.searchMyQuotes(userId, status, customerName, quoteNumber, from, to);
     }
 
+    // 전체 견적 목록(SUPER_ADMIN 전용)
+    public List<AdminQuoteListResponse> searchAdminQuotes(User requester,
+                                                          QuoteStatus status,
+                                                          String customerName,
+                                                          String quoteNumber,
+                                                          String writerName,
+                                                          LocalDateTime from,
+                                                          LocalDateTime to) {
+        if (requester.getRole() != UserRole.SUPER_ADMIN) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+
+        return quoteRepository.searchAdminQuotes(
+                        status, customerName, quoteNumber, writerName, from, to)
+                .stream()
+                .map(AdminQuoteListResponse::from)
+                .toList();
+    }
+
+    // 담당 영업사원 견적(SALES_MANAGER, 동일 department)
+    public List<AdminQuoteListResponse> searchManagerQuotes(User requester,
+                                                            QuoteStatus status,
+                                                            String customerName,
+                                                            String quoteNumber,
+                                                            String writerName,
+                                                            LocalDateTime from,
+                                                            LocalDateTime to) {
+        if (requester.getRole() != UserRole.SALES_MANAGER) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+        if (requester.getDepartment() == null || requester.getDepartment().isBlank()) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+
+        return quoteRepository.searchManagerQuotes(
+                        requester.getDepartment(), status, customerName, quoteNumber, writerName, from, to)
+                .stream()
+                .map(AdminQuoteListResponse::from)
+                .toList();
+    }
+
     public Quote getQuoteDetail(Long quoteId, User requester) {
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
-        validateOwner(quote, requester);
+        validateQuoteReadAccess(quote, requester);
         return quote;
     }
 
@@ -203,7 +255,7 @@ public class QuoteService {
 
     public InternalAnalysisResult getInternalAnalysis(Long quoteId, User requester) {
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
-        validateOwner(quote, requester);
+        validateQuoteReadAccess(quote, requester);
 
         List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quoteId);
         List<ApprovalReasonType> reasons = approvalCheckService.check(
@@ -226,7 +278,7 @@ public class QuoteService {
                 .quoteNumber(generateQuoteNumber())
                 .internalMemo(source.getInternalMemo())
                 .issuedDate(LocalDate.now())
-                .validUntil(source.getValidUntil())
+                .validUntil(LocalDate.now().plusMonths(1))
                 .deliveryTerm(source.getDeliveryTerm())
                 .status(QuoteStatus.DRAFT)
                 .quoteCustomer(source.getQuoteCustomer())
@@ -234,10 +286,10 @@ public class QuoteService {
                 .build();
 
         quoteRepository.save(newQuote);
-        List<QuoteItem> copiedItems = copyItems(newQuote,
-                quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(sourceQuoteId));
-        quoteItemRepository.saveAll(copiedItems);
-        calculationService.calculate(newQuote, copiedItems);
+        List<QuoteItem> sourceItems = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(sourceQuoteId);
+        List<QuoteItem> rebuiltItems = rebuildItemsWithCurrentPrice(newQuote, sourceItems);
+        quoteItemRepository.saveAll(rebuiltItems);
+        calculationService.calculate(newQuote, rebuiltItems);
 
         return newQuote;
     }
@@ -304,6 +356,36 @@ public class QuoteService {
         return QuoteDetailResponse.from(quote);
     }
 
+    /**
+     * 고객 발송(이메일) 가능 여부 검증.
+     * 승인 완료·승인 불필요·발송 완료(재발송)만 허용하며, EXPIRED 및 유효기간 경과 견적은 차단한다.
+     */
+    public void validateQuoteSendable(Quote quote) {
+        LocalDate today = LocalDate.now();
+        if (quote.getStatus() == QuoteStatus.EXPIRED) {
+            throw new CustomException(ErrorCode.QUOTE_EXPIRED_NOT_SENDABLE);
+        }
+        if (quote.getIssuedDate() != null && today.isBefore(quote.getIssuedDate())) {
+            throw new CustomException(ErrorCode.QUOTE_NOT_YET_ISSUED);
+        }
+        if (quote.getValidUntil() != null && quote.getValidUntil().isBefore(today)) {
+            throw new CustomException(ErrorCode.QUOTE_VALIDITY_EXPIRED);
+        }
+        if (quote.getStatus() != QuoteStatus.APPROVED
+                && quote.getStatus() != QuoteStatus.APPROVAL_NOT_REQUIRED
+                && quote.getStatus() != QuoteStatus.SENT) {
+            throw new CustomException(ErrorCode.QUOTE_NOT_SENDABLE);
+        }
+    }
+
+    @Transactional
+    public void markQuoteAsSent(Quote quote) {
+        if (quote.getStatus() != QuoteStatus.SENT) {
+            quote.markAsSent();
+            userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
+        }
+    }
+
     // 견적 작성용 — 제품 원가·적용 할인정책
     public QuoteProductContextResponse getProductContextForQuote(Long productId, Long userId) {
         User user = findUser(userId);
@@ -352,6 +434,30 @@ public class QuoteService {
             throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
     }
 
+    // 소유자, SUPER_ADMIN(전체), SALES_MANAGER(동일 부서 영업사원)
+    private void validateQuoteReadAccess(Quote quote, User requester) {
+        if (quote.getCreatedBy().getId().equals(requester.getId())) {
+            return;
+        }
+        if (requester.getRole() == UserRole.SUPER_ADMIN) {
+            return;
+        }
+        if (requester.getRole() == UserRole.SALES_MANAGER) {
+            User writer = quote.getCreatedBy();
+            if (writer.getRole() != UserRole.SALES_STAFF) {
+                throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
+            }
+            String dept = requester.getDepartment();
+            if (dept == null || dept.isBlank()
+                    || writer.getDepartment() == null
+                    || !dept.equals(writer.getDepartment())) {
+                throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
+            }
+            return;
+        }
+        throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
+    }
+
     private void validateEditable(Quote quote) {
         if (quote.getStatus() != QuoteStatus.DRAFT && quote.getStatus() != QuoteStatus.REVISING)
             throw new CustomException(ErrorCode.QUOTE_NOT_EDITABLE);
@@ -360,6 +466,18 @@ public class QuoteService {
     private void validateTrainingCompleted(Long userId) {
         if (!trainingService.isTrainingCompleted(userId)) {
             throw new CustomException(ErrorCode.TRAINING_NOT_COMPLETED);
+        }
+    }
+
+    private void validateQuoteDates(LocalDate issuedDate, LocalDate validUntil) {
+        if (validUntil == null) {
+            throw new CustomException(ErrorCode.QUOTE_VALID_UNTIL_REQUIRED);
+        }
+        if (issuedDate != null && validUntil.isBefore(issuedDate)) {
+            throw new CustomException(ErrorCode.QUOTE_VALID_UNTIL_INVALID);
+        }
+        if (validUntil.isBefore(LocalDate.now())) {
+            throw new CustomException(ErrorCode.QUOTE_VALID_UNTIL_INVALID);
         }
     }
 
@@ -389,7 +507,10 @@ public class QuoteService {
                 .orElseThrow(() -> new CustomException(ErrorCode.DISCOUNT_POLICY_NOT_FOUND));
     }
 
-    private List<QuoteItem> buildItems(Quote quote, List<QuoteItemCommand> commands, DiscountPolicy policy) {
+    private List<QuoteItem> buildItems(Quote quote,
+                                       List<QuoteItemCommand> commands,
+                                       DiscountPolicy policy,
+                                       Map<Long, QuoteItem> existingByProductId) {
         int[] order = {0};
         return commands.stream()
                 .map(cmd -> {
@@ -397,7 +518,11 @@ public class QuoteService {
                             .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
                     if (!product.isActive()) throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
 
-                    validateDiscountReasonAgainstPolicy(policy, cmd.discountRate(), cmd.discountReason(), cmd.quantity(), product);
+                    ItemPriceSnapshot prices = resolveItemPrices(product, existingByProductId);
+
+                    validateDiscountReasonAgainstPolicy(
+                            policy, cmd.discountRate(), cmd.discountReason(), cmd.quantity(),
+                            prices.unitPrice(), prices.costPrice());
 
                     QuoteItem item = QuoteItem.builder()
                             .quote(quote)
@@ -405,8 +530,8 @@ public class QuoteService {
                             .productName(product.getName())
                             .productCode(product.getCode())
                             .spec(product.getSpec())
-                            .unitPrice(product.getUnitPrice())
-                            .costPrice(product.getCostPrice())
+                            .unitPrice(prices.unitPrice())
+                            .costPrice(prices.costPrice())
                             .quantity(cmd.quantity())
                             .discountRate(cmd.discountRate() != null ? cmd.discountRate() : BigDecimal.ZERO)
                             .discountReason(cmd.discountReason())
@@ -420,6 +545,19 @@ public class QuoteService {
                 .toList();
     }
 
+    /** 신규 초안은 제품 마스터 가격, 수정·재작성은 기존 품목 스냅샷(신규 품목만 마스터) */
+    private ItemPriceSnapshot resolveItemPrices(Product product, Map<Long, QuoteItem> existingByProductId) {
+        if (existingByProductId != null) {
+            QuoteItem existing = existingByProductId.get(product.getId());
+            if (existing != null) {
+                return new ItemPriceSnapshot(existing.getUnitPrice(), existing.getCostPrice());
+            }
+        }
+        return new ItemPriceSnapshot(product.getUnitPrice(), product.getCostPrice());
+    }
+
+    private record ItemPriceSnapshot(BigDecimal unitPrice, BigDecimal costPrice) {}
+
      //할인율이 정책의 최대 할인율을 초과하거나,할인 적용 후 예상 이익률이 정책의 최소 이익률보다 낮으면 할인 사유를 필수로 요구한다.
      // 정책이 없는 경우(discountPolicyId가 null)에는 검증을 생략한다.
      // 기존 메서드를 수정하여 인자를 받도록 변경
@@ -427,7 +565,8 @@ public class QuoteService {
                                                       BigDecimal discountRate,
                                                       String discountReason,
                                                       BigDecimal quantity,
-                                                      Product product) {
+                                                      BigDecimal unitPrice,
+                                                      BigDecimal costPrice) {
          if (policy == null) return;
 
          BigDecimal rate = discountRate != null ? discountRate : BigDecimal.ZERO;
@@ -436,12 +575,12 @@ public class QuoteService {
          boolean exceedsMaxDiscount = policy.getMaxDiscountRate() != null
                  && rate.compareTo(policy.getMaxDiscountRate()) > 0;
 
-         BigDecimal base = product.getUnitPrice().multiply(quantity);
+         BigDecimal base = unitPrice.multiply(quantity);
          BigDecimal discountAmount = rate.compareTo(BigDecimal.ZERO) > 0
                  ? base.multiply(rate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP)
                  : BigDecimal.ZERO;
          BigDecimal lineSupply = base.subtract(discountAmount);
-         BigDecimal lineCost = product.getCostPrice().multiply(quantity);
+         BigDecimal lineCost = costPrice.multiply(quantity);
          BigDecimal profit = lineSupply.subtract(lineCost);
          BigDecimal profitRate = lineSupply.compareTo(BigDecimal.ZERO) == 0
                  ? BigDecimal.ZERO
@@ -458,8 +597,7 @@ public class QuoteService {
      }
 
 
-     //만료 견적 재작성(rewriteExpiredQuote) 시 사용.
-     //(견적 정합성: 만료 기간 이후 재작성은 금액이 바뀔 수 있어야 함 ->reuseQuote의 copyItems와 다르게 동작
+     // reuseQuote·rewriteExpiredQuote 시 사용 — 품목 구성은 유지하고 단가·원가는 현재 제품 마스터 기준
      private List<QuoteItem> rebuildItemsWithCurrentPrice(Quote newQuote, List<QuoteItem> sourceItems) {
          int[] order = {0};
          return sourceItems.stream()
@@ -478,12 +616,15 @@ public class QuoteService {
 
                      //재작성 시에도 정책 검증 실시
                      if (currentProduct != null) {
+                         BigDecimal unitPrice = currentProduct.getUnitPrice();
+                         BigDecimal costPrice = currentProduct.getCostPrice();
                          validateDiscountReasonAgainstPolicy(
                                  newQuote.getDiscountPolicy(),
                                  src.getDiscountRate(),
                                  src.getDiscountReason(),
                                  src.getQuantity(),
-                                 currentProduct
+                                 unitPrice,
+                                 costPrice
                          );
                      }
 
@@ -518,31 +659,6 @@ public class QuoteService {
         if (quote.getProfitRate().compareTo(policy.getMinProfitRate()) < 0) {
             // 필요시 로직 처리
         }
-    }
-
-    private List<QuoteItem> copyItems(Quote newQuote, List<QuoteItem> sourceItems) {
-        int[] order = {0};
-        return sourceItems.stream()
-                .map(src -> {
-                    QuoteItem item = QuoteItem.builder()
-                            .quote(newQuote)
-                            .productId(src.getProductId())
-                            .productName(src.getProductName())
-                            .productCode(src.getProductCode())
-                            .spec(src.getSpec())
-                            .unitPrice(src.getUnitPrice())
-                            .costPrice(src.getCostPrice())
-                            .quantity(src.getQuantity())
-                            .discountRate(src.getDiscountRate())
-                            .discountReason(src.getDiscountReason())
-                            .vatApplicable(src.getVatApplicable())
-                            .sortOrder(order[0]++)
-                            .build();
-
-                    newQuote.addItem(item);
-                    return item;
-                })
-                .toList();
     }
 
     public record QuoteItemCommand(

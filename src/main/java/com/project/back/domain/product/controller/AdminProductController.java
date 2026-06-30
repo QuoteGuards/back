@@ -6,14 +6,19 @@ import com.project.back.domain.product.dto.request.ProductUpdateRequest;
 import com.project.back.domain.product.dto.response.ProductResponse;
 import com.project.back.domain.product.service.ProductService;
 import com.project.back.global.common.ApiResponse;
+import com.project.back.global.storage.FileStorage;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Map;
 
 // 관리자용
 @RestController
@@ -23,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminProductController {
 
     private final ProductService productService;
+    private final FileStorage fileStorage;
 
     // 제품 조회
     @GetMapping
@@ -46,6 +52,15 @@ public class AdminProductController {
                 "제품 상세 조회 성공",
                 productService.getProduct(productId)
         ));
+    }
+
+    // 제품 이미지 업로드 → 저장 후 공개 URL 반환 (프론트가 imageUrl 필드에 사용)
+    @PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Map<String, String>>> uploadImage(
+            @RequestParam("file") MultipartFile file
+    ) {
+        String url = fileStorage.store(file, "products");
+        return ResponseEntity.ok(ApiResponse.success("이미지 업로드 성공", Map.of("url", url)));
     }
 
     // 제품 등록

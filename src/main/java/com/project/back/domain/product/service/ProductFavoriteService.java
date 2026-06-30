@@ -48,6 +48,12 @@ public class ProductFavoriteService {
         productFavoriteRepository.delete(favorite);
     }
 
+    // 즐겨찾기 전체 해제 (벌크) — 해당 사용자의 즐겨찾기를 쿼리 1번으로 일괄 삭제
+    @Transactional
+    public void removeAllFavorites(Long userId) {
+        productFavoriteRepository.deleteAllByUserId(userId);
+    }
+
     @Transactional(readOnly = true)
     public Page<ProductSearchResponse> getFavorites(Long userId, Pageable pageable) {
         return productFavoriteRepository.findActiveProductsByUserId(userId, pageable)

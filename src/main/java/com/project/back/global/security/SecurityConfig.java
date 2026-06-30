@@ -60,8 +60,12 @@ public class SecurityConfig {
                                 "/api/auth/login",
                                 "/api/auth/refresh",
                                 "/api/auth/password-reset/request",
-                                "/api/auth/password-reset/confirm"
+                                "/api/auth/password-reset/confirm",
+                                "/api/auth/set-initial-password"
                         ).permitAll()
+
+                        // 업로드된 이미지는 인증 없이 접근 (img src 용)
+                        .requestMatchers("/uploads/**").permitAll()
 
                         // 사용자 통계 조회 (본인)
                         .requestMatchers(HttpMethod.GET, "/api/users/me/stats").authenticated()
@@ -81,6 +85,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/quotes/*/approval-reasons").authenticated()
 
                         // 관리자 전용
+                        .requestMatchers(HttpMethod.GET, "/api/admin/quotes").hasRole("SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/manager/quotes").hasRole("SALES_MANAGER")
                         .requestMatchers("/api/admin/approval-requests/**").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/admin/quotes/*/approve").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/admin/quotes/*/reject").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")

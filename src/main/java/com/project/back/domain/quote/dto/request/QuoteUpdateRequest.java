@@ -18,6 +18,7 @@ public record QuoteUpdateRequest(
         @NotNull(message = "발행일은 필수입니다.")
         LocalDate issuedDate,    // 추가
 
+        @NotNull(message = "견적 유효기간(만료일)은 필수입니다.")
         LocalDate validUntil,
 
         @NotBlank(message = "납기 조건은 필수입니다.")
