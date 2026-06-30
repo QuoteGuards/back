@@ -4,6 +4,7 @@ import com.project.back.domain.approval.dto.request.ApprovalDecisionDto;
 import com.project.back.domain.approval.dto.request.ApprovalRequestDto;
 import com.project.back.domain.approval.dto.request.ReRequestDto;
 import com.project.back.domain.approval.dto.request.UpdateMemoDto;
+import com.project.back.domain.approval.dto.response.AiRiskSummaryResponse;
 import com.project.back.domain.approval.dto.response.ApprovalHistoryResponse;
 import com.project.back.domain.approval.dto.response.ApprovalMonthlyStatsResponse;
 import com.project.back.domain.approval.dto.response.ApprovalReasonResponse;
@@ -11,6 +12,7 @@ import com.project.back.domain.approval.dto.response.ApprovalRequestDetailRespon
 import com.project.back.domain.approval.dto.response.ApprovalRequestResponse;
 import com.project.back.domain.approval.entity.ApprovalRequest;
 
+import com.project.back.domain.approval.service.AiRiskSummaryService;
 import com.project.back.domain.approval.service.ApprovalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +29,7 @@ import java.util.List;
 public class ApprovalController {
 
     private final ApprovalService approvalService;
+    private final AiRiskSummaryService aiRiskSummaryService;
 
     // ── 1. 승인 요청 ──
     // POST /api/quotes/{quoteId}/approval-requests
@@ -175,6 +178,29 @@ public class ApprovalController {
                 .stream()
                 .map(ApprovalHistoryResponse::from)
                 .toList();
+        return ResponseEntity.ok(result);
+    }
+
+    // ── AI 리스크 요약 조회 (SUPER_ADMIN - 전체) ──
+    // GET /api/admin/approval-requests/{approvalRequestId}/ai-summary
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @GetMapping("/admin/approval-requests/{approvalRequestId}/ai-summary")
+    public ResponseEntity<AiRiskSummaryResponse> getAiSummary(
+            @PathVariable Long approvalRequestId
+    ) {
+        AiRiskSummaryResponse result = aiRiskSummaryService.getSummary(approvalRequestId);
+        return ResponseEntity.ok(result);
+    }
+
+    // ── AI 리스크 요약 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
+    // GET /api/manager/approval-requests/{approvalRequestId}/ai-summary
+    @PreAuthorize("hasRole('SALES_MANAGER')")
+    @GetMapping("/manager/approval-requests/{approvalRequestId}/ai-summary")
+    public ResponseEntity<AiRiskSummaryResponse> getAiSummaryForManager(
+            @PathVariable Long approvalRequestId,
+            @AuthenticationPrincipal Long userId
+    ) {
+        AiRiskSummaryResponse result = aiRiskSummaryService.getSummaryForManager(approvalRequestId, userId);
         return ResponseEntity.ok(result);
     }
 

@@ -1,6 +1,7 @@
 package com.project.back.global.security;
 
 import com.project.back.domain.approval.controller.ApprovalController;
+import com.project.back.domain.approval.service.AiRiskSummaryService;
 import com.project.back.domain.approval.service.ApprovalService;
 import com.project.back.domain.auth.controller.AuthController;
 import com.project.back.domain.auth.ratelimit.PasswordResetRateLimiter;
@@ -68,6 +69,9 @@ class SecurityAccessControlTest {
 
     @MockitoBean
     private ApprovalService approvalService;
+
+    @MockitoBean
+    private AiRiskSummaryService aiRiskSummaryService;
 
     @MockitoBean
     private PasswordResetRateLimiter passwordResetRateLimiter;
