@@ -25,7 +25,7 @@ DROP TABLE IF EXISTS product_favorites;
 DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS user_stats;
-DROP TABLE IF EXISTS login_histories;
+DROP TABLE IF EXISTS refresh_tokens;
 DROP TABLE IF EXISTS password_reset_tokens;
 DROP TABLE IF EXISTS user_account_histories;
 DROP TABLE IF EXISTS user_training_progress;
@@ -82,7 +82,7 @@ CREATE TABLE password_reset_tokens (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '비밀번호 재설정 토큰 식별자',
 
     user_id BIGINT NOT NULL COMMENT '비밀번호 재설정을 요청한 사용자 ID',
-    token_hash VARCHAR(255) NOT NULL COMMENT '원본 토큰을 해시 처리한 값. 원본 토큰은 DB에 저장하지 않음',
+    token_hash VARCHAR(64) NOT NULL COMMENT '원본 토큰의 SHA-256 해시값(64자). 원본 토큰은 DB에 저장하지 않음',
     purpose ENUM('PASSWORD_RESET', 'INITIAL_PASSWORD_SETUP') NOT NULL DEFAULT 'PASSWORD_RESET' COMMENT '토큰 목적: PASSWORD_RESET=비밀번호 찾기, INITIAL_PASSWORD_SETUP=관리자 생성 계정의 초기 비밀번호 설정',
 
     expires_at DATETIME NOT NULL COMMENT '토큰 만료 일시',
@@ -94,6 +94,23 @@ CREATE TABLE password_reset_tokens (
         REFERENCES users(id)
         ON DELETE CASCADE
 ) COMMENT = '이메일 기반 비밀번호 재설정 및 초기 비밀번호 설정 요청 토큰을 저장하는 테이블';
+
+
+CREATE TABLE refresh_tokens (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'Refresh Token 식별자',
+
+    user_id BIGINT NOT NULL COMMENT '토큰 소유 사용자 ID',
+    token VARCHAR(512) NOT NULL COMMENT 'Refresh Token 값 (JWT 또는 랜덤 토큰). 중복 불가',
+
+    expiry_date DATETIME NOT NULL COMMENT '토큰 만료 일시',
+
+    CONSTRAINT uk_refresh_tokens_token UNIQUE (token),
+
+    CONSTRAINT fk_refresh_tokens_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+) COMMENT = 'JWT Refresh Token을 저장하는 테이블. 토큰 갱신 및 로그아웃 처리에 사용';
 
 
 CREATE TABLE training_contents (
@@ -173,30 +190,13 @@ CREATE TABLE user_account_histories (
 ) COMMENT = '관리자 계정 생성, 정지, 권한 변경, 비밀번호 초기화 등 사용자 관리 이력을 저장하는 테이블';
 
 
-CREATE TABLE login_histories (
-    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '로그인 이력 식별자',
-
-    user_id BIGINT NULL COMMENT '로그인한 사용자 ID (존재하지 않는 회원번호로 실패한 경우 NULL 가능)',
-    login_id VARCHAR(50) NOT NULL COMMENT '로그인 시도에 사용된 회원번호',
-
-    success BOOLEAN NOT NULL COMMENT '로그인 성공 여부. TRUE=성공, FALSE=실패',
-    failure_reason ENUM('USER_NOT_FOUND', 'INVALID_PASSWORD', 'PASSWORD_NOT_INITIALIZED', 'SUSPENDED_USER', 'DELETED_USER') NULL COMMENT '로그인 실패 사유. 성공 시 NULL',
-
-    ip_address VARCHAR(45) NULL COMMENT '로그인 시도 IP 주소 (IPv6까지 고려하여 45자 사용)',
-    user_agent VARCHAR(500) NULL COMMENT '브라우저 및 기기 정보 (긴 User-Agent 문자열을 고려해 500자 사용)',
-
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '로그인 시도 일시',
-
-    CONSTRAINT fk_login_histories_user
-        FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE SET NULL
-) COMMENT = '회원번호 기반 로그인 성공/실패 기록과 최근 로그인 정보를 저장하는 테이블';
 
 
 CREATE TABLE user_stats (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '사용자 통계 식별자',
     user_id BIGINT NOT NULL COMMENT '통계 대상 사용자 ID',
+
+    version BIGINT NOT NULL DEFAULT 0 COMMENT 'JPA 낙관적 락 버전. 동시 통계 갱신 시 충돌 감지에 사용',
 
     total_quotes INT NOT NULL DEFAULT 0 COMMENT '사용자가 작성한 전체 견적 수',
     approved_quotes INT NOT NULL DEFAULT 0 COMMENT '승인 완료된 견적 수',
@@ -383,19 +383,19 @@ CREATE TABLE quotes (
         'CANCELLED'
     ) NOT NULL DEFAULT 'DRAFT' COMMENT '견적 상태: 임시저장, 작성완료, 승인불필요, 승인대기, 승인완료, 반려, 수정중, 발송완료, 만료, 취소',
 
-    company_name VARCHAR(200) NULL COMMENT '발행 시점 자사명',
-    company_business_number VARCHAR(30) NULL COMMENT '발행 시점 자사 사업자번호',
-    company_email VARCHAR(255) NULL COMMENT '발행 시점 자사 이메일',
-    company_phone VARCHAR(20) NULL COMMENT '발행 시점 자사 연락처',
-    company_address TEXT NULL COMMENT '발행 시점 자사 주소지',
-    customer_company_name VARCHAR(200) NULL COMMENT '발행 시점 거래처명',
-    customer_contact_name VARCHAR(100) NULL COMMENT '발행 시점 고객 담당자명',
-    customer_email VARCHAR(255) NULL COMMENT '발행 시점 고객 이메일',
-    customer_phone VARCHAR(20) NULL COMMENT '발행 시점 고객 연락처',
-    customer_address TEXT NULL COMMENT '발행 시점 고객 주소지',
-    
+    company_name VARCHAR(100) NULL COMMENT '발행 시점 자사명',
+    company_business_number VARCHAR(20) NULL COMMENT '발행 시점 자사 사업자번호',
+    company_email VARCHAR(100) NULL COMMENT '발행 시점 자사 이메일',
+    company_phone VARCHAR(30) NULL COMMENT '발행 시점 자사 연락처',
+    company_address VARCHAR(255) NULL COMMENT '발행 시점 자사 주소지',
+    customer_company_name VARCHAR(100) NULL COMMENT '발행 시점 거래처명',
+    customer_contact_name VARCHAR(50) NULL COMMENT '발행 시점 고객 담당자명',
+    customer_email VARCHAR(100) NULL COMMENT '발행 시점 고객 이메일',
+    customer_phone VARCHAR(30) NULL COMMENT '발행 시점 고객 연락처',
+    customer_address VARCHAR(255) NULL COMMENT '발행 시점 고객 주소지',
+
     issued_date DATE NULL COMMENT '견적 발행일',
-    delivery_term VARCHAR(255) NULL COMMENT '납기 및 인도 조건',
+    delivery_term VARCHAR(100) NULL COMMENT '납기 및 인도 조건',
 
     subtotal DECIMAL(18, 2) NOT NULL DEFAULT 0.00 COMMENT '할인 및 VAT 적용 전 상품 금액 합계',
     discount_amount DECIMAL(18, 2) NOT NULL DEFAULT 0.00 COMMENT '견적 전체 할인 금액 합계',
@@ -467,6 +467,8 @@ CREATE TABLE quote_items (
 
     line_supply_amount DECIMAL(18, 2) NOT NULL DEFAULT 0.00 COMMENT '항목별 VAT 제외 공급가액',
     line_total DECIMAL(18, 2) NOT NULL COMMENT '항목 최종 금액. 수량, 단가, 할인, VAT를 반영한 금액',
+
+    discount_reason VARCHAR(255) NULL COMMENT '할인 적용 사유 (선택 입력)',
 
     sort_order INT NOT NULL DEFAULT 0 COMMENT '견적서 내 항목 표시 순서',
 
@@ -706,6 +708,11 @@ CREATE TABLE ai_generation_logs (
 -- 조회 성능 개선용 인덱스
 -- ================================================================================================================================
 
+-- refresh_tokens 테이블 인덱스
+-- 토큰 값으로 유효성 확인 시 사용한다.
+CREATE INDEX idx_refresh_tokens_user ON refresh_tokens (user_id);
+
+
 -- users 테이블 인덱스
 -- 회원번호 기반 로그인과 사용자 검색 시 사용한다.
 CREATE INDEX idx_users_member_number ON users (member_number);
@@ -737,12 +744,6 @@ CREATE INDEX idx_user_account_histories_user ON user_account_histories (user_id)
 CREATE INDEX idx_user_account_histories_admin ON user_account_histories (admin_id);
 
 
--- login_histories 테이블 인덱스
--- login_histories 테이블의 user_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_login_histories_user ON login_histories (user_id);
-
--- 로그인 실패 이력 분석 시 회원번호 기준으로 로그인 시도 기록을 빠르게 조회한다.
-CREATE INDEX idx_login_histories_login_id ON login_histories (login_id);
 
 
 -- password_reset_tokens 테이블 인덱스

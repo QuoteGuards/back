@@ -66,11 +66,20 @@ public class User {
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
 
+    @Column(name = "created_by")
+    private Long createdBy;
+
     @Column(name = "suspended_by")
     private Long suspendedBy;
 
     @Column(name = "suspended_at")
     private LocalDateTime suspendedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "password_changed_at")
+    private LocalDateTime passwordChangedAt;
 
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
@@ -106,6 +115,7 @@ public class User {
 
     public void delete() {
         this.status = UserStatus.DELETED;
+        this.deletedAt = LocalDateTime.now();
     }
 
     public void updateInfo(String name, String phone, String department, String position) {
@@ -127,6 +137,7 @@ public class User {
         this.password = encodedPassword;
         this.passwordInitialized = true;
         this.mustChangePassword = false;
+        this.passwordChangedAt = LocalDateTime.now();
     }
 
     /**
@@ -135,6 +146,7 @@ public class User {
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
         this.mustChangePassword = false;
+        this.passwordChangedAt = LocalDateTime.now();
     }
 
     public void changeRole(UserRole newRole) {

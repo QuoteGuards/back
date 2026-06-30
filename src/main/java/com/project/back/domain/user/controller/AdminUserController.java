@@ -39,9 +39,10 @@ public class AdminUserController {
      */
     @PostMapping
     public ResponseEntity<ApiResponse<AdminCreateUserResponse>> createUser(
+            @AuthenticationPrincipal Long requesterId,
             @Valid @RequestBody AdminCreateUserRequest request
     ) {
-        AdminCreateUserResponse result = userManagementService.createUser(request);
+        AdminCreateUserResponse result = userManagementService.createUser(request, requesterId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created("사용자 계정이 생성되었습니다. 등록된 이메일로 초기 비밀번호 설정 링크 발송을 요청했습니다.", result));
     }
