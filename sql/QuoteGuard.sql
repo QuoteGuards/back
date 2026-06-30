@@ -105,6 +105,7 @@ CREATE TABLE refresh_tokens (
     expiry_date DATETIME NOT NULL COMMENT '토큰 만료 일시',
 
     CONSTRAINT uk_refresh_tokens_token UNIQUE (token),
+    CONSTRAINT uk_refresh_tokens_user UNIQUE (user_id),
 
     CONSTRAINT fk_refresh_tokens_user
         FOREIGN KEY (user_id)
@@ -387,12 +388,12 @@ CREATE TABLE quotes (
     company_business_number VARCHAR(20) NULL COMMENT '발행 시점 자사 사업자번호',
     company_email VARCHAR(100) NULL COMMENT '발행 시점 자사 이메일',
     company_phone VARCHAR(30) NULL COMMENT '발행 시점 자사 연락처',
-    company_address VARCHAR(255) NULL COMMENT '발행 시점 자사 주소지',
+    company_address TEXT NULL COMMENT '발행 시점 자사 주소지',
     customer_company_name VARCHAR(100) NULL COMMENT '발행 시점 거래처명',
     customer_contact_name VARCHAR(50) NULL COMMENT '발행 시점 고객 담당자명',
     customer_email VARCHAR(100) NULL COMMENT '발행 시점 고객 이메일',
     customer_phone VARCHAR(30) NULL COMMENT '발행 시점 고객 연락처',
-    customer_address VARCHAR(255) NULL COMMENT '발행 시점 고객 주소지',
+    customer_address TEXT NULL COMMENT '발행 시점 고객 주소지',
 
     issued_date DATE NULL COMMENT '견적 발행일',
     delivery_term VARCHAR(100) NULL COMMENT '납기 및 인도 조건',
@@ -707,11 +708,6 @@ CREATE TABLE ai_generation_logs (
 -- ================================================================================================================================
 -- 조회 성능 개선용 인덱스
 -- ================================================================================================================================
-
--- refresh_tokens 테이블 인덱스
--- 토큰 값으로 유효성 확인 시 사용한다.
-CREATE INDEX idx_refresh_tokens_user ON refresh_tokens (user_id);
-
 
 -- users 테이블 인덱스
 -- 회원번호 기반 로그인과 사용자 검색 시 사용한다.

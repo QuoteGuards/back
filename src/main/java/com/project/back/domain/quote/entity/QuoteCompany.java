@@ -14,7 +14,7 @@ public class QuoteCompany {
     @Column(name = "company_name", length = 100)
     private String name;
 
-    @Column(name = "company_address", length = 255)
+    @Column(name = "company_address", columnDefinition = "TEXT")
     private String address;
 
     @Column(name = "company_phone", length = 30)
