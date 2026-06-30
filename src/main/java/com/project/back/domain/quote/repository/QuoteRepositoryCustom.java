@@ -17,6 +17,23 @@ public interface QuoteRepositoryCustom {
                                LocalDateTime from,
                                LocalDateTime to);
 
+    // 전체 견적 목록(SUPER_ADMIN 전용)
+    List<Quote> searchAdminQuotes(QuoteStatus status,
+                                  String customerName,
+                                  String quoteNumber,
+                                  String writerName,
+                                  LocalDateTime from,
+                                  LocalDateTime to);
+
+    // 담당 영업사원 견적 SALES_MANAGER, 동일 department의 SALES_STAFF 견적
+    List<Quote> searchManagerQuotes(String managerDepartment,
+                                    QuoteStatus status,
+                                    String customerName,
+                                    String quoteNumber,
+                                    String writerName,
+                                    LocalDateTime from,
+                                    LocalDateTime to);
+
     /**
      * 특정 사용자의 견적 통계를 DB에서 한 번의 집계 쿼리로 조회한다.
      * isLatest=true 이고 DRAFT·CANCELLED 제외한 최신 버전 견적만 대상으로 한다.

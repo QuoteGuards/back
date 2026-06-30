@@ -6,6 +6,7 @@ import com.project.back.domain.discount.entity.DiscountPolicy;
 import com.project.back.domain.discount.repository.DiscountPolicyRepository;
 import com.project.back.domain.product.entity.Product;
 import com.project.back.domain.product.repository.ProductRepository;
+import com.project.back.domain.quote.dto.response.AdminQuoteListResponse;
 import com.project.back.domain.quote.dto.response.QuoteDetailResponse;
 import com.project.back.domain.quote.dto.response.QuoteProductContextResponse;
 import com.project.back.domain.quote.entity.Quote;
@@ -193,9 +194,50 @@ public class QuoteService {
         return quoteRepository.searchMyQuotes(userId, status, customerName, quoteNumber, from, to);
     }
 
+    // 전체 견적 목록(SUPER_ADMIN 전용)
+    public List<AdminQuoteListResponse> searchAdminQuotes(User requester,
+                                                          QuoteStatus status,
+                                                          String customerName,
+                                                          String quoteNumber,
+                                                          String writerName,
+                                                          LocalDateTime from,
+                                                          LocalDateTime to) {
+        if (requester.getRole() != UserRole.SUPER_ADMIN) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+
+        return quoteRepository.searchAdminQuotes(
+                        status, customerName, quoteNumber, writerName, from, to)
+                .stream()
+                .map(AdminQuoteListResponse::from)
+                .toList();
+    }
+
+    // 담당 영업사원 견적(SALES_MANAGER, 동일 department)
+    public List<AdminQuoteListResponse> searchManagerQuotes(User requester,
+                                                            QuoteStatus status,
+                                                            String customerName,
+                                                            String quoteNumber,
+                                                            String writerName,
+                                                            LocalDateTime from,
+                                                            LocalDateTime to) {
+        if (requester.getRole() != UserRole.SALES_MANAGER) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+        if (requester.getDepartment() == null || requester.getDepartment().isBlank()) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+
+        return quoteRepository.searchManagerQuotes(
+                        requester.getDepartment(), status, customerName, quoteNumber, writerName, from, to)
+                .stream()
+                .map(AdminQuoteListResponse::from)
+                .toList();
+    }
+
     public Quote getQuoteDetail(Long quoteId, User requester) {
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
-        validateOwner(quote, requester);
+        validateQuoteReadAccess(quote, requester);
         return quote;
     }
 
@@ -203,7 +245,7 @@ public class QuoteService {
 
     public InternalAnalysisResult getInternalAnalysis(Long quoteId, User requester) {
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
-        validateOwner(quote, requester);
+        validateQuoteReadAccess(quote, requester);
 
         List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quoteId);
         List<ApprovalReasonType> reasons = approvalCheckService.check(
@@ -350,6 +392,30 @@ public class QuoteService {
     private void validateOwner(Quote quote, User requester) {
         if (!quote.getCreatedBy().getId().equals(requester.getId()))
             throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
+    }
+
+    // 소유자, SUPER_ADMIN(전체), SALES_MANAGER(동일 부서 영업사원)
+    private void validateQuoteReadAccess(Quote quote, User requester) {
+        if (quote.getCreatedBy().getId().equals(requester.getId())) {
+            return;
+        }
+        if (requester.getRole() == UserRole.SUPER_ADMIN) {
+            return;
+        }
+        if (requester.getRole() == UserRole.SALES_MANAGER) {
+            User writer = quote.getCreatedBy();
+            if (writer.getRole() != UserRole.SALES_STAFF) {
+                throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
+            }
+            String dept = requester.getDepartment();
+            if (dept == null || dept.isBlank()
+                    || writer.getDepartment() == null
+                    || !dept.equals(writer.getDepartment())) {
+                throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
+            }
+            return;
+        }
+        throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
     }
 
     private void validateEditable(Quote quote) {

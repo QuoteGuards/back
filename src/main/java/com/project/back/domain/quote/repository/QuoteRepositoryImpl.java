@@ -6,6 +6,7 @@ import com.querydsl.core.types.dsl.CaseBuilder;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import com.project.back.domain.user.dto.UserStatsProjection;
+import com.project.back.domain.user.entity.UserRole;
 import com.project.back.global.enums.QuoteStatus;
 import com.project.back.domain.quote.entity.Quote;
 import lombok.RequiredArgsConstructor;
@@ -62,6 +63,54 @@ public class QuoteRepositoryImpl implements QuoteRepositoryCustom {
                         containsQuoteNumber(quoteNumber),
                         betweenCreatedAt(from, to),
                         quote.isLatest.isTrue()
+                )
+                .orderBy(quote.createdAt.desc())
+                .fetch();
+    }
+
+    @Override
+    public List<Quote> searchAdminQuotes(QuoteStatus status,
+                                         String customerName,
+                                         String quoteNumber,
+                                         String writerName,
+                                         LocalDateTime from,
+                                         LocalDateTime to) {
+        return queryFactory
+                .selectFrom(quote)
+                .join(quote.customer, customer).fetchJoin()
+                .join(quote.createdBy).fetchJoin()
+                .where(
+                        quote.isLatest.isTrue(),
+                        eqStatus(status),
+                        containsCustomerName(customerName),
+                        containsQuoteNumber(quoteNumber),
+                        containsWriterName(writerName),
+                        betweenCreatedAt(from, to)
+                )
+                .orderBy(quote.createdAt.desc())
+                .fetch();
+    }
+
+    @Override
+    public List<Quote> searchManagerQuotes(String managerDepartment,
+                                           QuoteStatus status,
+                                           String customerName,
+                                           String quoteNumber,
+                                           String writerName,
+                                           LocalDateTime from,
+                                           LocalDateTime to) {
+        return queryFactory
+                .selectFrom(quote)
+                .join(quote.customer, customer).fetchJoin()
+                .join(quote.createdBy).fetchJoin()
+                .where(
+                        quote.isLatest.isTrue(),
+                        inManagerDepartmentScope(managerDepartment),
+                        eqStatus(status),
+                        containsCustomerName(customerName),
+                        containsQuoteNumber(quoteNumber),
+                        containsWriterName(writerName),
+                        betweenCreatedAt(from, to)
                 )
                 .orderBy(quote.createdAt.desc())
                 .fetch();
@@ -228,5 +277,20 @@ public class QuoteRepositoryImpl implements QuoteRepositoryCustom {
         if (from != null) return quote.createdAt.goe(from);
         if (to != null) return quote.createdAt.loe(to);
         return null;
+    }
+
+    private BooleanExpression containsWriterName(String writerName) {
+        return (writerName != null && !writerName.isBlank())
+                ? quote.createdBy.name.containsIgnoreCase(writerName)
+                : null;
+    }
+
+    // 동일 부서 영업사원(SALES_STAFF) 견적만
+    private BooleanExpression inManagerDepartmentScope(String managerDepartment) {
+        BooleanExpression staffQuotes = quote.createdBy.role.eq(UserRole.SALES_STAFF);
+        if (managerDepartment != null && !managerDepartment.isBlank()) {
+            return staffQuotes.and(quote.createdBy.department.eq(managerDepartment));
+        }
+        return staffQuotes;
     }
 }
