@@ -6,6 +6,8 @@ import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.common.ApiResponse;
 import com.project.back.global.enums.QuoteStatus;
+import com.project.back.global.exception.CustomException;
+import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -44,6 +46,6 @@ public class AdminQuoteController {
 
     private User getUser(Long userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
     }
 }

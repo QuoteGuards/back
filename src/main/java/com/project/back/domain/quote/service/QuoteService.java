@@ -40,6 +40,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -108,7 +111,7 @@ public class QuoteService {
 
         quoteRepository.save(quote);
 
-        List<QuoteItem> items = buildItems(quote, itemCommands, policy);
+        List<QuoteItem> items = buildItems(quote, itemCommands, policy, null);
         quoteItemRepository.saveAll(items);
         calculationService.calculate(quote, items);
 
@@ -179,7 +182,11 @@ public class QuoteService {
 
         quote.updateInfo(customer, snapshot, internalMemo, issuedDate, validUntil, deliveryTerm);
 
-        List<QuoteItem> newItems = buildItems(quote, itemCommands, quote.getDiscountPolicy());
+        Map<Long, QuoteItem> existingByProductId = quote.getItems().stream()
+                .filter(item -> item.getProductId() != null)
+                .collect(Collectors.toMap(QuoteItem::getProductId, Function.identity(), (a, b) -> a));
+
+        List<QuoteItem> newItems = buildItems(quote, itemCommands, quote.getDiscountPolicy(), existingByProductId);
 
         // 엔티티 내부에서 클리어하고 새로 추가
         quote.replaceItems(newItems);
@@ -354,10 +361,14 @@ public class QuoteService {
      * 승인 완료·승인 불필요·발송 완료(재발송)만 허용하며, EXPIRED 및 유효기간 경과 견적은 차단한다.
      */
     public void validateQuoteSendable(Quote quote) {
+        LocalDate today = LocalDate.now();
         if (quote.getStatus() == QuoteStatus.EXPIRED) {
             throw new CustomException(ErrorCode.QUOTE_EXPIRED_NOT_SENDABLE);
         }
-        if (quote.getValidUntil() != null && quote.getValidUntil().isBefore(LocalDate.now())) {
+        if (quote.getIssuedDate() != null && today.isBefore(quote.getIssuedDate())) {
+            throw new CustomException(ErrorCode.QUOTE_NOT_YET_ISSUED);
+        }
+        if (quote.getValidUntil() != null && quote.getValidUntil().isBefore(today)) {
             throw new CustomException(ErrorCode.QUOTE_VALIDITY_EXPIRED);
         }
         if (quote.getStatus() != QuoteStatus.APPROVED
@@ -371,6 +382,7 @@ public class QuoteService {
     public void markQuoteAsSent(Quote quote) {
         if (quote.getStatus() != QuoteStatus.SENT) {
             quote.markAsSent();
+            userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
         }
     }
 
@@ -495,7 +507,10 @@ public class QuoteService {
                 .orElseThrow(() -> new CustomException(ErrorCode.DISCOUNT_POLICY_NOT_FOUND));
     }
 
-    private List<QuoteItem> buildItems(Quote quote, List<QuoteItemCommand> commands, DiscountPolicy policy) {
+    private List<QuoteItem> buildItems(Quote quote,
+                                       List<QuoteItemCommand> commands,
+                                       DiscountPolicy policy,
+                                       Map<Long, QuoteItem> existingByProductId) {
         int[] order = {0};
         return commands.stream()
                 .map(cmd -> {
@@ -503,9 +518,11 @@ public class QuoteService {
                             .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
                     if (!product.isActive()) throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
 
+                    ItemPriceSnapshot prices = resolveItemPrices(product, existingByProductId);
+
                     validateDiscountReasonAgainstPolicy(
                             policy, cmd.discountRate(), cmd.discountReason(), cmd.quantity(),
-                            cmd.unitPrice(), cmd.costPrice());
+                            prices.unitPrice(), prices.costPrice());
 
                     QuoteItem item = QuoteItem.builder()
                             .quote(quote)
@@ -513,8 +530,8 @@ public class QuoteService {
                             .productName(product.getName())
                             .productCode(product.getCode())
                             .spec(product.getSpec())
-                            .unitPrice(cmd.unitPrice())
-                            .costPrice(cmd.costPrice())
+                            .unitPrice(prices.unitPrice())
+                            .costPrice(prices.costPrice())
                             .quantity(cmd.quantity())
                             .discountRate(cmd.discountRate() != null ? cmd.discountRate() : BigDecimal.ZERO)
                             .discountReason(cmd.discountReason())
@@ -527,6 +544,19 @@ public class QuoteService {
                 })
                 .toList();
     }
+
+    /** 신규 초안은 제품 마스터 가격, 수정·재작성은 기존 품목 스냅샷(신규 품목만 마스터) */
+    private ItemPriceSnapshot resolveItemPrices(Product product, Map<Long, QuoteItem> existingByProductId) {
+        if (existingByProductId != null) {
+            QuoteItem existing = existingByProductId.get(product.getId());
+            if (existing != null) {
+                return new ItemPriceSnapshot(existing.getUnitPrice(), existing.getCostPrice());
+            }
+        }
+        return new ItemPriceSnapshot(product.getUnitPrice(), product.getCostPrice());
+    }
+
+    private record ItemPriceSnapshot(BigDecimal unitPrice, BigDecimal costPrice) {}
 
      //할인율이 정책의 최대 할인율을 초과하거나,할인 적용 후 예상 이익률이 정책의 최소 이익률보다 낮으면 할인 사유를 필수로 요구한다.
      // 정책이 없는 경우(discountPolicyId가 null)에는 검증을 생략한다.
