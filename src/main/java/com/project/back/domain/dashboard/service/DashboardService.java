@@ -4,6 +4,7 @@ import com.project.back.domain.dashboard.dto.DepartmentStatRow;
 import com.project.back.domain.dashboard.dto.MonthlyTrendRow;
 import com.project.back.domain.dashboard.dto.PeriodRange;
 import com.project.back.domain.dashboard.dto.PopularProductRow;
+import com.project.back.domain.dashboard.dto.ProductViewRankRow;
 import com.project.back.domain.dashboard.dto.SalesStaffRow;
 import com.project.back.domain.dashboard.dto.StatusCountRow;
 import com.project.back.domain.dashboard.dto.SummaryRow;
@@ -11,6 +12,7 @@ import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
 import com.project.back.domain.dashboard.dto.response.DepartmentStatResponse;
 import com.project.back.domain.dashboard.dto.response.MonthlyTrendResponse;
 import com.project.back.domain.dashboard.dto.response.PopularProductResponse;
+import com.project.back.domain.dashboard.dto.response.ProductViewRankResponse;
 import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
 import com.project.back.domain.dashboard.dto.response.SalesStaffResponse;
 import com.project.back.domain.dashboard.repository.DashboardRepository;
@@ -209,6 +211,19 @@ public class DashboardService {
                         range.from(), range.to(), nb(department), PageRequest.of(0, safeLimit))
                 .stream()
                 .map(this::toPopularResponse)
+                .toList();
+    }
+
+    // 조회수 기반 인기 제품 순위 (TOP N, 누적 — 기간/부서 필터 무관)
+    public List<ProductViewRankResponse> getTopProductsByViews(int limit) {
+        int safeLimit = Math.min(Math.max(limit, 1), 100);
+        return dashboardRepository.aggregateTopByViews(PageRequest.of(0, safeLimit))
+                .stream()
+                .map(r -> ProductViewRankResponse.builder()
+                        .productId(r.productId())
+                        .productName(r.productName())
+                        .viewCount(r.viewCount() != null ? r.viewCount() : 0L)
+                        .build())
                 .toList();
     }
 
