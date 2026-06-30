@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 
 /**
  * 관리자가 신규 계정을 생성했을 때 반환하는 응답 DTO.
- * temporaryPassword는 최초 1회 전달용이며, DB에는 암호화 후 저장되고 로그에 출력하지 않는다.
+ * 임시 비밀번호는 포함하지 않는다. 사용자에게 이메일로 초기 비밀번호 설정 링크를 발송한다.
  */
 @Getter
 @Builder
@@ -23,13 +23,10 @@ public class AdminCreateUserResponse {
     private final String phone;
     private final String role;
     private final String status;
-
-    /** 관리자에게 최초 1회만 전달. 화면에서 안내 후 폐기. */
-    private final String temporaryPassword;
-
+    private final boolean passwordInitialized;
     private final LocalDateTime createdAt;
 
-    public static AdminCreateUserResponse from(User user, String temporaryPassword) {
+    public static AdminCreateUserResponse from(User user) {
         return AdminCreateUserResponse.builder()
                 .id(user.getId())
                 .memberNumber(user.getMemberNumber())
@@ -40,7 +37,7 @@ public class AdminCreateUserResponse {
                 .phone(user.getPhone())
                 .role(user.getRole().name())
                 .status(user.getStatus().name())
-                .temporaryPassword(temporaryPassword)
+                .passwordInitialized(user.isPasswordInitialized())
                 .createdAt(user.getCreatedAt())
                 .build();
     }

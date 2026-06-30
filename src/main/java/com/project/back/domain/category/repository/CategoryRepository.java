@@ -42,6 +42,11 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     // 활성화된 중분류, 소분류(하위카테고리들) 조회
     List<Category> findAllByParentIdAndIsActiveTrueOrderBySortOrder(Long parentId);
 
+    // 활성 카테고리 전체를 한 번에 조회 (영업사원 트리용)
+    // 노드마다 드릴다운 호출하던 N+1을 제거하고 Service에서 트리로 조립
+    @Query("SELECT c FROM Category c LEFT JOIN FETCH c.parent WHERE c.isActive = true ORDER BY c.depth, c.sortOrder")
+    List<Category> findAllActiveWithParent();
+
 
     ///  이 외 필요시 아래에 추가하기
 

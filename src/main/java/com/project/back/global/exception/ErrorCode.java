@@ -72,6 +72,15 @@ public enum ErrorCode {
     PASSWORD_RESET_EMAIL_SEND_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "PWD_RESET_004", "비밀번호 재설정 이메일 발송에 실패했습니다."),
     PASSWORD_RESET_TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "PWD_RESET_005", "잠시 후 다시 시도해주세요. (1분 대기)"),
 
+    // Initial Password Setup
+    PASSWORD_NOT_INITIALIZED(HttpStatus.FORBIDDEN, "INIT_PWD_001", "초기 비밀번호 설정이 필요합니다. 이메일로 발송된 설정 링크를 확인해주세요."),
+    INIT_PASSWORD_TOKEN_INVALID(HttpStatus.BAD_REQUEST, "INIT_PWD_002", "유효하지 않은 비밀번호 설정 링크입니다."),
+    INIT_PASSWORD_TOKEN_EXPIRED(HttpStatus.BAD_REQUEST, "INIT_PWD_003", "비밀번호 설정 링크가 만료되었습니다. 관리자에게 재발송을 요청해주세요."),
+    INIT_PASSWORD_TOKEN_ALREADY_USED(HttpStatus.BAD_REQUEST, "INIT_PWD_004", "이미 사용된 비밀번호 설정 링크입니다."),
+    INIT_PASSWORD_TOKEN_PURPOSE_MISMATCH(HttpStatus.BAD_REQUEST, "INIT_PWD_005", "올바르지 않은 링크 유형입니다."),
+    INIT_PASSWORD_ALREADY_SET(HttpStatus.BAD_REQUEST, "INIT_PWD_006", "이미 비밀번호가 설정된 계정입니다."),
+    INIT_PASSWORD_RESEND_TOO_SOON(HttpStatus.TOO_MANY_REQUESTS, "INIT_PWD_007", "잠시 후 다시 시도해주세요. (1분 대기)"),
+
     // Approval
     APPROVAL_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "APPROVAL_001", "승인 요청을 찾을 수 없습니다."),
     APPROVAL_ALREADY_PENDING(HttpStatus.CONFLICT, "APPROVAL_002", "이미 승인 대기 중인 요청이 있습니다."),
