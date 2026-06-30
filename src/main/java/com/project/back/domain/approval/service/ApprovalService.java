@@ -14,6 +14,7 @@ import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.domain.user.service.UserStatsUpdateService;
 import com.project.back.global.enums.ApprovalReasonType;
+import com.project.back.global.enums.QuoteStatus;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,11 @@ public class ApprovalService {
         // 승인 요청 생성
         Quote quote = quoteRepository.findById(quoteId)
                 .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+
+        // APPROVAL_PENDING 상태(제출 완료 + 승인 필요)인 견적만 승인 요청 가능
+        if (quote.getStatus() != QuoteStatus.APPROVAL_PENDING) {
+            throw new CustomException(ErrorCode.APPROVAL_QUOTE_NOT_SUBMITTED);
+        }
 
         ApprovalRequest approvalRequest = ApprovalRequest.builder()
                 .quote(quote)
