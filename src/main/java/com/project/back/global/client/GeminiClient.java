@@ -35,7 +35,12 @@ public class GeminiClient {
                     .retrieve()
                     .body(GeminiResponse.class);
 
-            if (response == null || response.candidates() == null || response.candidates().isEmpty()) {
+            if (response == null
+                    || response.candidates() == null
+                    || response.candidates().isEmpty()
+                    || response.candidates().get(0).content() == null
+                    || response.candidates().get(0).content().parts() == null
+                    || response.candidates().get(0).content().parts().isEmpty()) {
                 throw new CustomException(ErrorCode.AI_SUMMARY_GENERATION_FAILED);
             }
 
