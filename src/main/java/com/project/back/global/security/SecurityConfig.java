@@ -64,6 +64,9 @@ public class SecurityConfig {
                                 "/api/auth/set-initial-password"
                         ).permitAll()
 
+                        // 업로드된 이미지는 인증 없이 접근 (img src 용)
+                        .requestMatchers("/uploads/**").permitAll()
+
                         // 사용자 통계 조회 (본인)
                         .requestMatchers(HttpMethod.GET, "/api/users/me/stats").authenticated()
 
