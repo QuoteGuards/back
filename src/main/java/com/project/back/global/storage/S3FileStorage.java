@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -52,7 +53,8 @@ public class S3FileStorage implements FileStorage {
                             .build(),
                     RequestBody.fromInputStream(file.getInputStream(), file.getSize())
             );
-        } catch (IOException e) {
+        } catch (IOException | SdkException e) {
+            // IOException(스트림) + S3Exception/SdkClientException(SdkException 하위) 모두 동일 처리
             log.error("S3 업로드 실패 (key={})", key, e);
             throw new CustomException(ErrorCode.FILE_UPLOAD_FAILED);
         }
