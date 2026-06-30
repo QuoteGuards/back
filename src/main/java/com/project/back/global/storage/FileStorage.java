@@ -24,6 +24,10 @@ public interface FileStorage {
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new CustomException(ErrorCode.FILE_INVALID_TYPE);
         }
+        // 허용 확장자(jpg/jpeg/png/gif/webp/bmp)가 아니면 거부 — 저장 시 확장자 누락/우회 방지
+        if (extensionOf(file.getOriginalFilename()).isEmpty()) {
+            throw new CustomException(ErrorCode.FILE_INVALID_TYPE);
+        }
     }
 
     // 원본 파일명에서 확장자 추출 (없으면 빈 문자열)
