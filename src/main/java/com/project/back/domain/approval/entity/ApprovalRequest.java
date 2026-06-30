@@ -45,6 +45,9 @@ public class ApprovalRequest {
     private String rejectReason;
 
     @Column(columnDefinition = "TEXT")
+    private String approveMemo;
+
+    @Column(columnDefinition = "TEXT")
     private String aiRiskSummary;
 
     @Column(nullable = false)
@@ -63,6 +66,7 @@ public class ApprovalRequest {
     // ── 상태 변경 메서드 ──
     public void approve(User approver, String memo) {
         this.approver = approver;
+        this.approveMemo = memo;
         this.status = ApprovalStatus.APPROVED;
         this.processedAt = LocalDateTime.now();
     }
@@ -88,6 +92,10 @@ public class ApprovalRequest {
 
     public void updateMemo(String memo) {
         this.requestMemo = memo;
+    }
+
+    public void updateAiRiskSummary(String summary) {
+        this.aiRiskSummary = summary;
     }
 
     @PrePersist
