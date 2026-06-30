@@ -46,7 +46,7 @@ public class GeminiClient {
 
             return response.extractText();
 
-        } catch (RestClientException e) {
+        } catch (RuntimeException e) {
             log.error("Gemini API 호출 실패: {}", e.getMessage());
             throw new CustomException(ErrorCode.AI_SUMMARY_GENERATION_FAILED);
         }
