@@ -38,9 +38,12 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
-            @Valid @RequestBody LoginRequest request
+            @Valid @RequestBody LoginRequest request,
+            HttpServletRequest httpRequest
     ) {
-        LoginResponse response = authService.login(request);
+        String ipAddress = extractClientIp(httpRequest);
+        String userAgent = httpRequest.getHeader("User-Agent");
+        LoginResponse response = authService.login(request, ipAddress, userAgent);
         return ResponseEntity.ok(ApiResponse.success("로그인에 성공했습니다.", response));
     }
 

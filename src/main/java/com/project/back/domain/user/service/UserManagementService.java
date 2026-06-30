@@ -48,7 +48,7 @@ public class UserManagementService {
      * </ul>
      */
     @Transactional
-    public AdminCreateUserResponse createUser(AdminCreateUserRequest request) {
+    public AdminCreateUserResponse createUser(AdminCreateUserRequest request, Long createdBy) {
         // 1. 회원번호 자동 생성
         String memberNumber = generateMemberNumber();
 
@@ -86,6 +86,7 @@ public class UserManagementService {
                 .status(UserStatus.ACTIVE)
                 .passwordInitialized(false)
                 .mustChangePassword(false)
+                .createdBy(createdBy)
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -106,7 +107,14 @@ public class UserManagementService {
     // 사용자 상세 조회
     @Transactional(readOnly = true)
     public UserDetailResponse getUserDetail(Long userId) {
-        return UserDetailResponse.from(findUserById(userId));
+        User user = findUserById(userId);
+        String createdByName = null;
+        if (user.getCreatedBy() != null) {
+            createdByName = userRepository.findById(user.getCreatedBy())
+                    .map(User::getName)
+                    .orElse(null);
+        }
+        return UserDetailResponse.from(user, createdByName);
     }
 
     // 사용자 정보 수정
