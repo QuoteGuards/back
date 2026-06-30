@@ -4,6 +4,7 @@ import com.project.back.domain.dashboard.dto.response.DashboardSummaryResponse;
 import com.project.back.domain.dashboard.dto.response.DepartmentStatResponse;
 import com.project.back.domain.dashboard.dto.response.MonthlyTrendResponse;
 import com.project.back.domain.dashboard.dto.response.PopularProductResponse;
+import com.project.back.domain.dashboard.dto.response.ProductViewRankResponse;
 import com.project.back.domain.dashboard.dto.response.QuoteStatusCountResponse;
 import com.project.back.domain.dashboard.dto.response.SalesStaffResponse;
 import com.project.back.domain.dashboard.service.DashboardService;
@@ -109,6 +110,17 @@ public class DashboardController {
         return ResponseEntity.ok(ApiResponse.success(
                 "영업사원별 통계 조회 성공",
                 dashboardService.getSalesStaff(period, from, to, department)
+        ));
+    }
+
+    // 조회수 기반 인기 제품 순위 (TOP N, 누적 — 기간/부서 무관)
+    @GetMapping("/popular-products-by-views")
+    public ResponseEntity<ApiResponse<List<ProductViewRankResponse>>> getPopularByViews(
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "조회수 인기 제품 순위 조회 성공",
+                dashboardService.getTopProductsByViews(limit)
         ));
     }
 
