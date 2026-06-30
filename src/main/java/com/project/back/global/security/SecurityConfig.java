@@ -71,10 +71,10 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/admin/users/**").hasRole("SUPER_ADMIN")
 
-                        // 승인 요청 (영업사원만)
-                        .requestMatchers(HttpMethod.POST, "/api/quotes/*/approval-requests").hasRole("SALES_STAFF")
+                        // 승인 요청 (영업사원 + 영업관리자)
+                        .requestMatchers(HttpMethod.POST, "/api/quotes/*/approval-requests").hasAnyRole("SALES_STAFF", "SALES_MANAGER")
                         .requestMatchers(HttpMethod.PATCH, "/api/quotes/*/approval-requests/*/memo").hasRole("SALES_STAFF")
-                        .requestMatchers(HttpMethod.POST, "/api/quotes/*/resubmit").hasRole("SALES_STAFF")
+                        .requestMatchers(HttpMethod.POST, "/api/quotes/*/resubmit").hasAnyRole("SALES_STAFF", "SALES_MANAGER")
 
                         // 승인 이력/사유 조회 (인증된 사용자 전체)
                         .requestMatchers(HttpMethod.GET, "/api/quotes/*/approval-histories").authenticated()

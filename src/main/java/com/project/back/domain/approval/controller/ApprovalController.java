@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -46,14 +47,23 @@ public class ApprovalController {
         return ResponseEntity.ok(ApprovalRequestResponse.from(result));
     }
 
-    // 2. 승인 요청 상세 조회 추가
-    @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
+    // 2. 승인 요청 상세 조회
+    // SUPER_ADMIN: 전체 조회, SALES_STAFF: 본인 요청건만
+    // SALES_MANAGER는 /api/manager/approval-requests/{id} 전용 엔드포인트 사용
+    @PreAuthorize("hasAnyRole('SALES_STAFF', 'SUPER_ADMIN')")
     @GetMapping("/approval-requests/{approvalRequestId}")
     public ResponseEntity<ApprovalRequestDetailResponse> getApprovalDetail(
-            @PathVariable Long approvalRequestId
+            @PathVariable Long approvalRequestId,
+            @AuthenticationPrincipal Long userId,
+            Authentication authentication
     ) {
-        ApprovalRequestDetailResponse result =
-                approvalService.getApprovalDetail(approvalRequestId);
+        boolean isSuperAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
+
+        ApprovalRequestDetailResponse result = isSuperAdmin
+                ? approvalService.getApprovalDetail(approvalRequestId)
+                : approvalService.getApprovalDetailForStaff(approvalRequestId, userId);
+
         return ResponseEntity.ok(result);
     }
 
@@ -139,7 +149,7 @@ public class ApprovalController {
 
     // ── 6. 재요청 ──
     // POST /api/quotes/{quoteId}/resubmit
-    @PreAuthorize("hasRole('SALES_STAFF')")
+    @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER')")
     @PostMapping("/quotes/{quoteId}/resubmit")
     public ResponseEntity<ApprovalRequestResponse> reRequest(
             @PathVariable Long quoteId,

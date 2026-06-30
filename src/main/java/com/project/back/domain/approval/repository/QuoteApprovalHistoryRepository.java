@@ -10,9 +10,15 @@ import java.util.Optional;
 
 public interface QuoteApprovalHistoryRepository extends JpaRepository<QuoteApprovalHistory, Long> {
 
-    // 특정 승인 요청의 이력 목록 조회 (시간순)
+    // 특정 승인 요청의 이력 목록 조회 (시간순) - actor FETCH JOIN으로 N+1 방지
+    @Query("""
+            SELECT h FROM QuoteApprovalHistory h
+            JOIN FETCH h.actor
+            WHERE h.approvalRequest.id = :approvalRequestId
+            ORDER BY h.actedAt ASC
+            """)
     List<QuoteApprovalHistory> findByApprovalRequestIdOrderByActedAtAsc(
-            Long approvalRequestId
+            @Param("approvalRequestId") Long approvalRequestId
     );
 
     // 특정 견적의 전체 승인 이력 조회

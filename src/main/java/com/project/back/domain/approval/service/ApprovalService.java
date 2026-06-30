@@ -328,6 +328,25 @@ public class ApprovalService {
         return ApprovalRequestDetailResponse.from(approvalRequest, reasons, histories);
     }
 
+    // ── 승인 상세 조회 (SALES_STAFF - 본인 요청건만) ──
+    public ApprovalRequestDetailResponse getApprovalDetailForStaff(Long approvalRequestId, Long requesterId) {
+
+        ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
+
+        if (!approvalRequest.getRequester().getId().equals(requesterId)) {
+            throw new CustomException(ErrorCode.APPROVAL_ACCESS_DENIED);
+        }
+
+        List<QuoteApprovalReason> reasons =
+                quoteApprovalReasonRepository.findByQuote_Id(approvalRequest.getQuote().getId());
+
+        List<QuoteApprovalHistory> histories =
+                quoteApprovalHistoryRepository
+                        .findByApprovalRequestIdOrderByActedAtAsc(approvalRequestId);
+
+        return ApprovalRequestDetailResponse.from(approvalRequest, reasons, histories);
+    }
+
     // ── 승인 상세 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
     public ApprovalRequestDetailResponse getApprovalDetailForManager(Long approvalRequestId, Long managerId) {
 

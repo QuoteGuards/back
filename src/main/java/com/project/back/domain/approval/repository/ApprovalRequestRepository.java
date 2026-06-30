@@ -23,6 +23,7 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
     // 승인 대기 목록 조회 (요청일 오름차순)
     @Query("""
         SELECT ar FROM ApprovalRequest ar
+        JOIN FETCH ar.quote
         JOIN FETCH ar.requester
         LEFT JOIN FETCH ar.approver
         WHERE ar.status = :status
@@ -43,6 +44,7 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
 
     @Query("""
         SELECT ar FROM ApprovalRequest ar
+        JOIN FETCH ar.quote
         JOIN FETCH ar.requester
         LEFT JOIN FETCH ar.approver
         WHERE ar.id = :id
@@ -58,6 +60,7 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
     // 특정 부서 소속 영업사원의 승인 대기 목록 조회 (SALES_MANAGER 담당 범위)
     @Query("""
         SELECT ar FROM ApprovalRequest ar
+        JOIN FETCH ar.quote
         JOIN FETCH ar.requester r
         LEFT JOIN FETCH ar.approver
         WHERE ar.status = :status
