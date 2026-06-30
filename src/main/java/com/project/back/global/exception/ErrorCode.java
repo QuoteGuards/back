@@ -56,6 +56,12 @@ public enum ErrorCode {
     QUOTE_NOT_EXPIRED(HttpStatus.BAD_REQUEST, "QUOTE_003", "만료된 견적만 재작성할 수 있습니다."),
     QUOTE_ACCESS_DENIED(HttpStatus.FORBIDDEN, "QUOTE_004", "본인이 작성한 견적만 접근할 수 있습니다."),
     DISCOUNT_REASON_REQUIRED(HttpStatus.BAD_REQUEST, "QUOTE_005", "할인율 변경 시 사유를 반드시 입력해야 합니다."),
+    QUOTE_NOT_SENDABLE(HttpStatus.BAD_REQUEST, "QUOTE_006", "승인 완료 또는 승인 불필요 상태의 견적만 발송할 수 있습니다."),
+    QUOTE_VALIDITY_EXPIRED(HttpStatus.BAD_REQUEST, "QUOTE_007", "견적 유효기간이 만료되어 발송할 수 없습니다. 만료 견적 재작성 및 재승인 후 발송해주세요."),
+    QUOTE_EXPIRED_NOT_SENDABLE(HttpStatus.BAD_REQUEST, "QUOTE_008", "만료된 견적은 고객 발송할 수 없습니다. 만료 견적 재작성 후 승인을 다시 받아주세요."),
+    QUOTE_VALID_UNTIL_REQUIRED(HttpStatus.BAD_REQUEST, "QUOTE_009", "견적 유효기간(만료일)을 입력해주세요."),
+    QUOTE_VALID_UNTIL_INVALID(HttpStatus.BAD_REQUEST, "QUOTE_010", "견적 유효기간은 발행일 이후이며 오늘 이후 날짜여야 합니다."),
+    QUOTE_NOT_YET_ISSUED(HttpStatus.BAD_REQUEST, "QUOTE_011", "견적 발행일 이전에는 발송할 수 없습니다."),
 
     // Discount Policy
     DISCOUNT_POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, "DISCOUNT_001", "할인 정책을 찾을 수 없습니다."),

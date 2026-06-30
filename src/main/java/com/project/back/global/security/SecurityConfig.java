@@ -85,6 +85,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/quotes/*/approval-reasons").authenticated()
 
                         // 관리자 전용
+                        .requestMatchers(HttpMethod.GET, "/api/admin/quotes").hasRole("SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/manager/quotes").hasRole("SALES_MANAGER")
                         .requestMatchers("/api/admin/approval-requests/**").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/admin/quotes/*/approve").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
                         .requestMatchers("/api/admin/quotes/*/reject").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
