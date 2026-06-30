@@ -30,7 +30,7 @@ public class GuideController {
 
     //견적 작성 가이드 확인 완료 처리
     @PostMapping("/quote-writing/confirm")
-    @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SALES_STAFF')")
     public ResponseEntity<ApiResponse<Void>> confirmGuide(
             @AuthenticationPrincipal Long userId) {
 
