@@ -119,7 +119,6 @@ public class AuthService {
         refreshTokenRepository.save(RefreshToken.of(userId, hashedToken, expiryDate));
         return rawToken;
     }
-
     private String hashToken(String rawToken) {
         try {
             byte[] hash = MessageDigest.getInstance("SHA-256")
@@ -140,6 +139,14 @@ public class AuthService {
                 log.warn("Login failed: loginId={}, reason=DELETED_USER, ip={}", loginId, ipAddress);
                 throw new CustomException(ErrorCode.USER_DELETED);
             }
+            case ACTIVE -> { /* 정상 유저 */ }
+        }
+    }
+
+    private void validateUserStatus(UserStatus status) {
+        switch (status) {
+            case SUSPENDED -> throw new CustomException(ErrorCode.USER_SUSPENDED);
+            case DELETED -> throw new CustomException(ErrorCode.USER_DELETED);
             case ACTIVE -> { /* 정상 유저 */ }
         }
     }

@@ -25,6 +25,7 @@ public class UserDetailResponse {
     // 계정 생성자 정보
     private final Long createdBy;
     private final String createdByName;
+    private final String createdByMemberNumber;
 
     // 정지 정보
     private final Long suspendedBy;
@@ -41,10 +42,10 @@ public class UserDetailResponse {
     private final LocalDateTime updatedAt;
 
     public static UserDetailResponse from(User user) {
-        return from(user, null);
+        return from(user, null, null);
     }
 
-    public static UserDetailResponse from(User user, String createdByName) {
+    public static UserDetailResponse from(User user, String createdByName, String createdByMemberNumber) {
         return UserDetailResponse.builder()
                 .id(user.getId())
                 .memberNumber(user.getMemberNumber())
@@ -59,6 +60,7 @@ public class UserDetailResponse {
                 .mustChangePassword(user.isMustChangePassword())
                 .createdBy(user.getCreatedBy())
                 .createdByName(createdByName)
+                .createdByMemberNumber(createdByMemberNumber)
                 .suspendedBy(user.getSuspendedBy())
                 .suspendedAt(user.getSuspendedAt())
                 .deletedAt(user.getDeletedAt())
