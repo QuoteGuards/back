@@ -108,14 +108,7 @@ public class UserManagementService {
     @Transactional(readOnly = true)
     public UserDetailResponse getUserDetail(Long userId) {
         User user = findUserById(userId);
-        String createdByName = null;
-        String createdByMemberNumber = null;
-        if (user.getCreatedBy() != null) {
-            var creator = userRepository.findById(user.getCreatedBy());
-            createdByName = creator.map(User::getName).orElse(null);
-            createdByMemberNumber = creator.map(User::getMemberNumber).orElse(null);
-        }
-        return UserDetailResponse.from(user, createdByName, createdByMemberNumber);
+        return buildUserDetailResponse(user);
     }
 
     // 사용자 정보 수정
@@ -124,7 +117,7 @@ public class UserManagementService {
         User user = findUserById(userId);
         user.updateInfo(request.getName(), request.getPhone(), request.getDepartment(), request.getPosition());
         User saved = userRepository.saveAndFlush(user);
-        return UserDetailResponse.from(saved);
+        return buildUserDetailResponse(saved);
     }
 
     // 사용자 권한 변경
@@ -136,7 +129,7 @@ public class UserManagementService {
         User user = findUserById(userId);
         user.changeRole(request.getRole());
         User saved = userRepository.saveAndFlush(user);
-        return UserDetailResponse.from(saved);
+        return buildUserDetailResponse(saved);
     }
 
     // 사용자 비활성화
@@ -151,7 +144,7 @@ public class UserManagementService {
         }
         user.suspend(requesterId);
         User saved = userRepository.saveAndFlush(user);
-        return UserDetailResponse.from(saved);
+        return buildUserDetailResponse(saved);
     }
 
     // 사용자 재활성화
@@ -163,7 +156,23 @@ public class UserManagementService {
         }
         user.reactivate();
         User saved = userRepository.saveAndFlush(user);
-        return UserDetailResponse.from(saved);
+        return buildUserDetailResponse(saved);
+    }
+
+    /**
+     * 계정 생성자 메타데이터(createdByName, createdByMemberNumber)를 보강하여
+     * UserDetailResponse를 조립한다. UserDetailResponse를 반환하는 모든 경로에서
+     * 동일한 보강 로직을 사용하도록 공통 헬퍼로 분리했다.
+     */
+    private UserDetailResponse buildUserDetailResponse(User user) {
+        String createdByName = null;
+        String createdByMemberNumber = null;
+        if (user.getCreatedBy() != null) {
+            var creator = userRepository.findById(user.getCreatedBy());
+            createdByName = creator.map(User::getName).orElse(null);
+            createdByMemberNumber = creator.map(User::getMemberNumber).orElse(null);
+        }
+        return UserDetailResponse.from(user, createdByName, createdByMemberNumber);
     }
 
     // 사용자 삭제 (소프트 삭제)

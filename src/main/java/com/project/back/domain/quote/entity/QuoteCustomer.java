@@ -23,6 +23,6 @@ public class QuoteCustomer {
     @Column(name = "customer_phone", length = 30)
     private String phone;
 
-    @Column(name = "customer_address", length = 255)
+    @Column(name = "customer_address", columnDefinition = "TEXT")
     private String address;
 }

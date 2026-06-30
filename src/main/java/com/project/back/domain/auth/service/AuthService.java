@@ -42,19 +42,19 @@ public class AuthService {
         // 1. 이메일로 유저 찾기
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> {
-                    log.warn("Login failed: loginId={}, reason=USER_NOT_FOUND, ip={}", request.getEmail(), ipAddress);
+                    log.warn("Login failed: loginId={}, reason=USER_NOT_FOUND, ip={}", maskEmail(request.getEmail()), ipAddress);
                     return new CustomException(ErrorCode.USER_NOT_FOUND);
                 });
 
         // 2. 비밀번호 미설정 사용자 차단
         if (!user.isPasswordInitialized()) {
-            log.warn("Login failed: loginId={}, reason=PASSWORD_NOT_INITIALIZED, ip={}", request.getEmail(), ipAddress);
+            log.warn("Login failed: loginId={}, reason=PASSWORD_NOT_INITIALIZED, ip={}", maskEmail(request.getEmail()), ipAddress);
             throw new CustomException(ErrorCode.PASSWORD_NOT_INITIALIZED);
         }
 
         // 3. 비밀번호 검증
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            log.warn("Login failed: loginId={}, reason=INVALID_PASSWORD, ip={}", request.getEmail(), ipAddress);
+            log.warn("Login failed: loginId={}, reason=INVALID_PASSWORD, ip={}", maskEmail(request.getEmail()), ipAddress);
             throw new CustomException(ErrorCode.INVALID_PASSWORD);
         }
 
@@ -74,7 +74,7 @@ public class AuthService {
         // 7. 리프레시 토큰 발행 (기존 토큰 교체)
         String rawRefreshToken = issueRefreshToken(user.getId());
 
-        log.info("Login success: loginId={}, userId={}, ip={}", request.getEmail(), user.getId(), ipAddress);
+        log.info("Login success: loginId={}, userId={}, ip={}", maskEmail(request.getEmail()), user.getId(), ipAddress);
         return LoginResponse.of(accessToken, rawRefreshToken, user.isMustChangePassword());
     }
 
@@ -132,15 +132,27 @@ public class AuthService {
     private void validateUserStatus(User user, String loginId, String ipAddress) {
         switch (user.getStatus()) {
             case SUSPENDED -> {
-                log.warn("Login failed: loginId={}, reason=SUSPENDED_USER, ip={}", loginId, ipAddress);
+                log.warn("Login failed: loginId={}, reason=SUSPENDED_USER, ip={}", maskEmail(loginId), ipAddress);
                 throw new CustomException(ErrorCode.USER_SUSPENDED);
             }
             case DELETED -> {
-                log.warn("Login failed: loginId={}, reason=DELETED_USER, ip={}", loginId, ipAddress);
+                log.warn("Login failed: loginId={}, reason=DELETED_USER, ip={}", maskEmail(loginId), ipAddress);
                 throw new CustomException(ErrorCode.USER_DELETED);
             }
             case ACTIVE -> { /* 정상 유저 */ }
         }
+    }
+
+    // 로그에 로그인 ID(이메일)를 평문 노출하지 않도록 로컬 파트 앞 2자만 남기고 마스킹
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return "***";
+        }
+        int at = email.indexOf('@');
+        String local = email.substring(0, at);
+        String domain = email.substring(at);
+        String visible = local.length() <= 2 ? local : local.substring(0, 2);
+        return visible + "***" + domain;
     }
 
     private void validateUserStatus(UserStatus status) {
