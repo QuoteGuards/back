@@ -24,6 +24,7 @@ public class ApprovalRequestResponse {
     private String status;
     private String requestMemo;
     private String rejectReason;
+    private String approveMemo;
 
     private int requestCount;
 
@@ -42,6 +43,7 @@ public class ApprovalRequestResponse {
                 .status(entity.getStatus().name())
                 .requestMemo(entity.getRequestMemo())
                 .rejectReason(entity.getRejectReason())
+                .approveMemo(entity.getApproveMemo())
                 .requestCount(entity.getRequestCount())
                 .requestedAt(entity.getRequestedAt())
                 .processedAt(entity.getProcessedAt())

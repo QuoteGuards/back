@@ -3,6 +3,7 @@ package com.project.back.domain.dashboard.repository;
 import com.project.back.domain.dashboard.dto.DepartmentStatRow;
 import com.project.back.domain.dashboard.dto.MonthlyTrendRow;
 import com.project.back.domain.dashboard.dto.PopularProductRow;
+import com.project.back.domain.dashboard.dto.ProductViewRankRow;
 import com.project.back.domain.dashboard.dto.SalesStaffRow;
 import com.project.back.domain.dashboard.dto.StatusCountRow;
 import com.project.back.domain.dashboard.dto.SummaryRow;
@@ -170,4 +171,14 @@ public interface DashboardRepository extends JpaRepository<Quote, Long> {
             ORDER BY u.department
             """)
     List<String> findDistinctDepartments();
+
+    // 조회수 기반 인기 제품 순위 (활성 제품, view_count 누적 — 기간/부서 필터 무관)
+    @Query("""
+            SELECT new com.project.back.domain.dashboard.dto.ProductViewRankRow(
+                p.id, p.name, p.viewCount)
+            FROM Product p
+            WHERE p.isActive = true
+            ORDER BY p.viewCount DESC
+            """)
+    List<ProductViewRankRow> aggregateTopByViews(Pageable pageable);
 }
