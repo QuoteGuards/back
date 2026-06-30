@@ -109,12 +109,13 @@ public class UserManagementService {
     public UserDetailResponse getUserDetail(Long userId) {
         User user = findUserById(userId);
         String createdByName = null;
+        String createdByMemberNumber = null;
         if (user.getCreatedBy() != null) {
-            createdByName = userRepository.findById(user.getCreatedBy())
-                    .map(User::getName)
-                    .orElse(null);
+            var creator = userRepository.findById(user.getCreatedBy());
+            createdByName = creator.map(User::getName).orElse(null);
+            createdByMemberNumber = creator.map(User::getMemberNumber).orElse(null);
         }
-        return UserDetailResponse.from(user, createdByName);
+        return UserDetailResponse.from(user, createdByName, createdByMemberNumber);
     }
 
     // 사용자 정보 수정
@@ -194,8 +195,9 @@ public class UserManagementService {
     }
 
     /**
-     * 사용 불가 비밀번호 placeholder: 외부에 절대 노출하지 않으며 로그인에 사용할 수 없다.
-     * BCrypt 해시 후 저장하므로 원문 복원 불가.
+     * 사용 불가 비밀번호 placeholder를 생성한다.
+     * 외부에 절대 노출하지 않으며 로그인에 사용할 수 없다.
+     * BCrypt 해시 후 저장하므로 원문 복원은 불가능하다.
      */
     private String generateUnusablePlaceholder() {
         byte[] bytes = new byte[32];
