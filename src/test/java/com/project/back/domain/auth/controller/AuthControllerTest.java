@@ -63,7 +63,7 @@ class AuthControllerTest {
     @DisplayName("POST /api/auth/login - 200 OK (success)")
     @WithMockUser
     void login_success() throws Exception {
-        given(authService.login(any()))
+        given(authService.login(any(), any(), any()))
                 .willReturn(LoginResponse.of("mock.jwt.token", "mock.refresh.token"));
 
         mockMvc.perform(post("/api/auth/login")
@@ -99,7 +99,7 @@ class AuthControllerTest {
     @DisplayName("POST /api/auth/login - 403 Forbidden (SUSPENDED user)")
     @WithMockUser
     void login_suspendedUser() throws Exception {
-        given(authService.login(any())).willThrow(new CustomException(ErrorCode.USER_SUSPENDED));
+        given(authService.login(any(), any(), any())).willThrow(new CustomException(ErrorCode.USER_SUSPENDED));
 
         mockMvc.perform(post("/api/auth/login")
                         .with(csrf())

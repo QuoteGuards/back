@@ -34,7 +34,7 @@ public class QuoteReminderEmailService {
     @Value("${mail.from-address}")
     private String fromAddress;
 
-    @Value("${mail.from-name}")
+    @Value("${mail.from-name:QuoteGuard}")
     private String fromName;
 
     @Transactional

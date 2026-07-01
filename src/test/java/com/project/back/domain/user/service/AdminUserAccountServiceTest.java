@@ -117,7 +117,7 @@ class AdminUserAccountServiceTest {
             stubSavePassthrough();
             doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
-            AdminCreateUserResponse result = userManagementService.createUser(request);
+            AdminCreateUserResponse result = userManagementService.createUser(request, 1L);
 
             assertThat(result.getMemberNumber()).hasSize(7);
             assertThat(result.getMemberNumber()).startsWith(yyPrefix);
@@ -138,7 +138,7 @@ class AdminUserAccountServiceTest {
             stubSavePassthrough();
             doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
-            AdminCreateUserResponse result = userManagementService.createUser(request);
+            AdminCreateUserResponse result = userManagementService.createUser(request, 1L);
 
             assertThat(result.getMemberNumber()).hasSize(7);
         }
@@ -150,7 +150,7 @@ class AdminUserAccountServiceTest {
 
             given(userRepository.existsByMemberNumber(anyString())).willReturn(true);
 
-            assertThatThrownBy(() -> userManagementService.createUser(request))
+            assertThatThrownBy(() -> userManagementService.createUser(request, 1L))
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(ErrorCode.MEMBER_NUMBER_GENERATION_FAILED));
@@ -170,7 +170,7 @@ class AdminUserAccountServiceTest {
             stubSavePassthrough();
             doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
-            AdminCreateUserResponse result = userManagementService.createUser(request);
+            AdminCreateUserResponse result = userManagementService.createUser(request, 1L);
 
             assertThat(result.getEmail()).endsWith("@quoteguard.com");
             assertThat(result.getEmail()).startsWith(result.getMemberNumber());
@@ -188,7 +188,7 @@ class AdminUserAccountServiceTest {
             stubSavePassthrough();
             doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
-            AdminCreateUserResponse result = userManagementService.createUser(request);
+            AdminCreateUserResponse result = userManagementService.createUser(request, 1L);
 
             assertThat(result.getStatus()).isEqualTo("ACTIVE");
             assertThat(result.isPasswordInitialized()).isFalse();
@@ -206,7 +206,7 @@ class AdminUserAccountServiceTest {
             stubSavePassthrough();
             doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
-            AdminCreateUserResponse result = userManagementService.createUser(request);
+            AdminCreateUserResponse result = userManagementService.createUser(request, 1L);
 
             // 응답에 temporaryPassword 필드 없음 확인
             // AdminCreateUserResponse에는 temporaryPassword 필드가 없다
@@ -226,7 +226,7 @@ class AdminUserAccountServiceTest {
             stubSavePassthrough();
             doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
-            userManagementService.createUser(request);
+            userManagementService.createUser(request, 1L);
 
             verify(initialPasswordSetupService).sendSetupLink(any(User.class));
         }
@@ -243,7 +243,7 @@ class AdminUserAccountServiceTest {
             stubSavePassthrough();
             doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
-            userManagementService.createUser(request);
+            userManagementService.createUser(request, 1L);
 
             verify(passwordEncoder).encode(anyString());
         }
@@ -263,7 +263,7 @@ class AdminUserAccountServiceTest {
             given(userRepository.existsByMemberNumber(anyString())).willReturn(false);
             given(userRepository.existsByEmail(anyString())).willReturn(false);
 
-            assertThatThrownBy(() -> userManagementService.createUser(request))
+            assertThatThrownBy(() -> userManagementService.createUser(request, 1L))
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(ErrorCode.ACCESS_DENIED));
@@ -286,7 +286,7 @@ class AdminUserAccountServiceTest {
             given(userRepository.existsByMemberNumber(anyString())).willReturn(false);
             given(userRepository.existsByEmail(anyString())).willReturn(true);
 
-            assertThatThrownBy(() -> userManagementService.createUser(request))
+            assertThatThrownBy(() -> userManagementService.createUser(request, 1L))
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(ErrorCode.DUPLICATE_EMAIL));
@@ -310,7 +310,7 @@ class AdminUserAccountServiceTest {
             given(userRepository.existsByEmail(anyString())).willReturn(false);
             given(userRepository.existsByPhone("010-1234-5678")).willReturn(true);
 
-            assertThatThrownBy(() -> userManagementService.createUser(request))
+            assertThatThrownBy(() -> userManagementService.createUser(request, 1L))
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(ErrorCode.DUPLICATE_PHONE));
@@ -332,7 +332,7 @@ class AdminUserAccountServiceTest {
             stubSavePassthrough();
             doNothing().when(initialPasswordSetupService).sendSetupLink(any(User.class));
 
-            userManagementService.createUser(request);
+            userManagementService.createUser(request, 1L);
 
             verify(userRepository, never()).existsByPhone(anyString());
         }
