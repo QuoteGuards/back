@@ -35,7 +35,7 @@ CREATE TABLE users (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '사용자 식별자',
 
     member_number VARCHAR(20) NOT NULL COMMENT '시스템 자동 생성 로그인용 회원번호. 중복 불가',
-    email VARCHAR(100) NOT NULL COMMENT '사용자 실제 수신 이메일. 비밀번호 재설정 링크 발송에 사용하며 로그인 ID로는 사용하지 않음',
+    email VARCHAR(100) NOT NULL COMMENT '시스템 자동 생성 로그인용 이메일({member_number}@{account.email-domain} 형식). 실제 인증(로그인 조회) 및 초기 비밀번호 설정·재설정 링크 발송에 사용',
     password VARCHAR(255) NOT NULL COMMENT 'BCrypt 등으로 암호화된 비밀번호 해시값',
     password_initialized BOOLEAN NOT NULL DEFAULT FALSE COMMENT '사용자가 초기 비밀번호 설정 링크 또는 재설정 절차를 통해 실제 비밀번호를 설정했는지 여부',
     password_changed_at DATETIME NULL COMMENT '마지막 비밀번호 변경 일시',
@@ -96,11 +96,11 @@ CREATE TABLE refresh_tokens (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'Refresh Token 식별자',
 
     user_id BIGINT NOT NULL COMMENT '토큰 소유 사용자 ID',
-    token VARCHAR(512) NOT NULL COMMENT 'Refresh Token 값 (JWT 또는 랜덤 토큰). 중복 불가',
+    token_hash VARCHAR(64) NOT NULL COMMENT '원본 Refresh Token을 SHA-256으로 해시 처리한 값(64자). 원본 토큰은 DB에 저장하지 않음',
 
     expiry_date DATETIME NOT NULL COMMENT '토큰 만료 일시',
 
-    CONSTRAINT uk_refresh_tokens_token UNIQUE (token),
+    CONSTRAINT uk_refresh_tokens_token_hash UNIQUE (token_hash),
     CONSTRAINT uk_refresh_tokens_user UNIQUE (user_id),
 
     CONSTRAINT fk_refresh_tokens_user

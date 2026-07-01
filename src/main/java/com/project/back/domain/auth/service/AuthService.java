@@ -81,7 +81,7 @@ public class AuthService {
     @Transactional
     public TokenRefreshResponse refresh(RefreshTokenRequest request) {
         String hashedToken = hashToken(request.getRefreshToken());
-        RefreshToken stored = refreshTokenRepository.findByToken(hashedToken)
+        RefreshToken stored = refreshTokenRepository.findByTokenHash(hashedToken)
                 .orElseThrow(() -> new CustomException(ErrorCode.REFRESH_TOKEN_NOT_FOUND));
 
         if (stored.isExpired()) {

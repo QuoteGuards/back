@@ -153,7 +153,7 @@ class AuthServiceTest {
             RefreshTokenRequest request = new RefreshTokenRequest();
             setField(request, "refreshToken", raw);
 
-            given(refreshTokenRepository.findByToken(sha256(raw)))
+            given(refreshTokenRepository.findByTokenHash(sha256(raw)))
                     .willReturn(Optional.of(stored));
             given(userRepository.findById(1L))
                     .willReturn(Optional.of(buildUser(UserStatus.ACTIVE)));
@@ -172,7 +172,7 @@ class AuthServiceTest {
             String raw = "unknown-token";
             RefreshTokenRequest request = new RefreshTokenRequest();
             setField(request, "refreshToken", raw);
-            given(refreshTokenRepository.findByToken(sha256(raw))).willReturn(Optional.empty());
+            given(refreshTokenRepository.findByTokenHash(sha256(raw))).willReturn(Optional.empty());
 
             assertThatThrownBy(() -> authService.refresh(request))
                     .isInstanceOf(CustomException.class)
@@ -188,7 +188,7 @@ class AuthServiceTest {
 
             RefreshTokenRequest request = new RefreshTokenRequest();
             setField(request, "refreshToken", raw);
-            given(refreshTokenRepository.findByToken(sha256(raw)))
+            given(refreshTokenRepository.findByTokenHash(sha256(raw)))
                     .willReturn(Optional.of(expired));
 
             assertThatThrownBy(() -> authService.refresh(request))
