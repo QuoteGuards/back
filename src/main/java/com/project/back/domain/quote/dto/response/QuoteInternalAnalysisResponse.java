@@ -1,5 +1,6 @@
 package com.project.back.domain.quote.dto.response;
 
+import com.project.back.domain.approval.entity.QuoteApprovalReason;
 import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.domain.quote.entity.Quote;
 
@@ -30,7 +31,7 @@ public record QuoteInternalAnalysisResponse(
 ) {
     public static QuoteInternalAnalysisResponse from(Quote quote) {
         List<ApprovalReasonType> reasons = quote.getApprovalReasons().stream()
-                .map(r -> ApprovalReasonType.valueOf(r.getReasonType().name()))
+                .map(QuoteApprovalReason::getReasonType)
                 .toList();
 
         List<QuoteItemInternalResponse> itemDetails = quote.getItems().stream()

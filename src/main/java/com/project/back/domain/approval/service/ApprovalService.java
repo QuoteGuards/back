@@ -409,21 +409,12 @@ public class ApprovalService {
         List<QuoteApprovalReason> reasons = reasonTypes.stream()
                 .map(type -> QuoteApprovalReason.of(
                         quote,
-                        convertReasonType(type),
+                        type,
                         buildReasonMessage(type)
                 ))
                 .toList();
 
         quoteApprovalReasonRepository.saveAll(reasons);
-    }
-
-    // global enum → approval enum 변환
-    private QuoteApprovalReason.ReasonType convertReasonType(ApprovalReasonType type) {
-        return switch (type) {
-            case DISCOUNT_EXCEEDED -> QuoteApprovalReason.ReasonType.DISCOUNT_EXCEEDED;
-            case LOW_PROFIT -> QuoteApprovalReason.ReasonType.LOW_PROFIT;
-            case HIGH_AMOUNT -> QuoteApprovalReason.ReasonType.HIGH_AMOUNT;
-        };
     }
 
     private String buildReasonMessage(ApprovalReasonType type) {
