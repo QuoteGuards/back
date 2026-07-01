@@ -60,6 +60,7 @@ public class QuoteService {
     private final UserStatsUpdateService userStatsUpdateService;
     private final DiscountPolicyRepository discountPolicyRepository;
     private final ProductRepository productRepository;
+    private final com.project.back.notification.service.NotificationService notificationService;
 
     @Transactional
     public Quote saveDraft(User createdBy,
@@ -346,6 +347,26 @@ public class QuoteService {
         quoteRepository.findExpiredQuotes(
                         Arrays.asList(QuoteStatus.APPROVAL_NOT_REQUIRED, QuoteStatus.APPROVED))
                 .forEach(Quote::expire);
+    }
+
+    // 매일 자정, 3일 후 만료 예정인 견적의 작성자에게 만료 임박 알림을 발송한다.
+    @Scheduled(cron = "0 5 0 * * *")
+    @Transactional(readOnly = true)
+    public void notifyExpiringQuotes() {
+        LocalDate target = LocalDate.now().plusDays(3);
+        List<Quote> quotes = quoteRepository.findExpiringOn(
+                target,
+                Arrays.asList(QuoteStatus.APPROVAL_NOT_REQUIRED, QuoteStatus.APPROVED, QuoteStatus.SENT));
+
+        for (Quote quote : quotes) {
+            notificationService.create(
+                    quote.getCreatedBy().getId(),
+                    com.project.back.notification.entity.NotificationType.QUOTE_EXPIRING,
+                    "견적 만료 임박",
+                    "견적 " + quote.getQuoteNumber() + " 이(가) 3일 후 만료됩니다.",
+                    com.project.back.notification.entity.NotificationRelatedType.QUOTE,
+                    quote.getId());
+        }
     }
 
     public QuoteDetailResponse getQuote(String quoteNumber, Long userId) {
