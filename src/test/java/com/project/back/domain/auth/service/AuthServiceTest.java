@@ -63,7 +63,7 @@ class AuthServiceTest {
             given(userRepository.findByEmail("2026001@quoteguard.com"))
                     .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, false, false)));
 
-            assertThatThrownBy(() -> authService.login(request))
+            assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "TestAgent"))
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(ErrorCode.PASSWORD_NOT_INITIALIZED));
@@ -82,7 +82,7 @@ class AuthServiceTest {
             given(refreshTokenRepository.save(any(RefreshToken.class)))
                     .willAnswer(inv -> inv.getArgument(0));
 
-            LoginResponse response = authService.login(request);
+            LoginResponse response = authService.login(request, "127.0.0.1", "TestAgent");
 
             assertThat(response.getAccessToken()).isEqualTo("mock.jwt.token");
             assertThat(response.getRefreshToken()).isNotBlank();
@@ -103,7 +103,7 @@ class AuthServiceTest {
             given(refreshTokenRepository.save(any(RefreshToken.class)))
                     .willAnswer(inv -> inv.getArgument(0));
 
-            LoginResponse response = authService.login(request);
+            LoginResponse response = authService.login(request, "127.0.0.1", "TestAgent");
 
             assertThat(response.isMustChangePassword()).isTrue();
         }
@@ -114,7 +114,7 @@ class AuthServiceTest {
             LoginRequest request = mockLoginRequest("none@quoteguard.com", "Pass@1234");
             given(userRepository.findByEmail("none@quoteguard.com")).willReturn(Optional.empty());
 
-            assertThatThrownBy(() -> authService.login(request))
+            assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "TestAgent"))
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(ErrorCode.USER_NOT_FOUND));
@@ -128,7 +128,7 @@ class AuthServiceTest {
                     .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, false)));
             given(passwordEncoder.matches("wrongPass", "encodedPassword")).willReturn(false);
 
-            assertThatThrownBy(() -> authService.login(request))
+            assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "TestAgent"))
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(ErrorCode.INVALID_PASSWORD));
@@ -152,7 +152,7 @@ class AuthServiceTest {
                     .willReturn(Optional.of(buildUser(status, false)));
             given(passwordEncoder.matches("Pass@1234", "encodedPassword")).willReturn(true);
 
-            assertThatThrownBy(() -> authService.login(request))
+            assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "TestAgent"))
                     .isInstanceOf(CustomException.class)
                     .satisfies(e -> assertThat(((CustomException) e).getErrorCode())
                             .isEqualTo(expectedCode));

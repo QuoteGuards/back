@@ -109,7 +109,7 @@ class AdminUserControllerTest {
                     .createdAt(LocalDateTime.now())
                     .build();
 
-            given(userManagementService.createUser(any())).willReturn(mockResponse);
+            given(userManagementService.createUser(any(), any())).willReturn(mockResponse);
 
             mockMvc.perform(post("/api/admin/users")
                             .with(asUser(1L, "SUPER_ADMIN"))
@@ -216,7 +216,7 @@ class AdminUserControllerTest {
         @Test
         @DisplayName("이메일 중복(자동 생성 충돌) 시 409 Conflict")
         void createUser_duplicateEmail_conflict() throws Exception {
-            given(userManagementService.createUser(any()))
+            given(userManagementService.createUser(any(), any()))
                     .willThrow(new CustomException(ErrorCode.DUPLICATE_EMAIL));
 
             mockMvc.perform(post("/api/admin/users")
