@@ -95,6 +95,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
             return bearerToken.substring(BEARER_PREFIX.length());
         }
+        // SSE 구독은 장기 JWT를 URL에 노출하지 않고 별도의 단기 SSE 토큰으로 인증한다.
+        // (NotificationController.subscribe + SseTokenService 참조)
         return null;
     }
 }

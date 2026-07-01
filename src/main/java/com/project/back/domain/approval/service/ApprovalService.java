@@ -11,12 +11,16 @@ import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
+import com.project.back.domain.user.entity.UserStatus;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.domain.user.service.UserStatsUpdateService;
 import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.global.enums.QuoteStatus;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
+import com.project.back.notification.entity.NotificationRelatedType;
+import com.project.back.notification.entity.NotificationType;
+import com.project.back.notification.event.NotificationCreateEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +42,7 @@ public class ApprovalService {
     private final UserRepository userRepository;
     private final QuoteRepository quoteRepository;
     private final UserStatsUpdateService userStatsUpdateService;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     // ── 1. 승인 요청 ──
     @Transactional
@@ -88,7 +93,42 @@ public class ApprovalService {
                 requestMemo
         );
 
+        // 승인 권한자에게 알림 발송
+        notifyApprovers(requester, quote, approvalRequest.getId());
+
         return approvalRequest;
+    }
+
+    /**
+     * 승인 요청 대상자에게 알림을 발송한다.
+     * - 요청자가 영업사원이면: 같은 부서 영업관리자 + 전체 최고관리자
+     * - 요청자가 영업관리자면: 전체 최고관리자
+     */
+    private void notifyApprovers(User requester, Quote quote, Long approvalRequestId) {
+        List<User> approvers = new java.util.ArrayList<>(
+                userRepository.findByRoleAndStatus(UserRole.SUPER_ADMIN, UserStatus.ACTIVE));
+
+        if (requester.getRole() == UserRole.SALES_STAFF && requester.getDepartment() != null) {
+            approvers.addAll(userRepository.findByRoleAndDepartmentAndStatus(
+                    UserRole.SALES_MANAGER, requester.getDepartment(), UserStatus.ACTIVE));
+        }
+
+        String title = "새 승인 요청";
+        String message = requester.getName() + "님이 견적 " + quote.getQuoteNumber() + " 승인을 요청했습니다.";
+
+        for (User approver : approvers) {
+            // 요청자 본인(활성 SUPER_ADMIN 등)이 포함될 수 있으므로 자기 알림은 제외
+            if (approver.getId().equals(requester.getId())) {
+                continue;
+            }
+            eventPublisher.publishEvent(new NotificationCreateEvent(
+                    approver.getId(),
+                    NotificationType.APPROVAL_REQUESTED,
+                    title,
+                    message,
+                    NotificationRelatedType.APPROVAL,
+                    approvalRequestId));
+        }
     }
 
     // ── 2. 승인 처리 ──
@@ -133,6 +173,15 @@ public class ApprovalService {
 
         // 견적 작성자 통계 갱신 (승인 + 발송 카운트 반영) - 커밋 이후 재집계
         userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
+
+        // 견적 작성자에게 승인 알림 (트랜잭션 커밋 후 발행)
+        eventPublisher.publishEvent(new NotificationCreateEvent(
+                quote.getCreatedBy().getId(),
+                NotificationType.QUOTE_APPROVED,
+                "견적 승인 완료",
+                "견적 " + quote.getQuoteNumber() + " 이(가) 승인되었습니다.",
+                NotificationRelatedType.QUOTE,
+                quote.getId()));
 
         return approvalRequest;
     }
@@ -183,6 +232,15 @@ public class ApprovalService {
 
         // 견적 작성자 통계 갱신 (반려 카운트 반영) - 커밋 이후 재집계
         userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
+
+        // 견적 작성자에게 반려 알림 (사유 포함, 트랜잭션 커밋 후 발행)
+        eventPublisher.publishEvent(new NotificationCreateEvent(
+                quote.getCreatedBy().getId(),
+                NotificationType.QUOTE_REJECTED,
+                "견적 반려",
+                "견적 " + quote.getQuoteNumber() + " 이(가) 반려되었습니다. 사유: " + rejectReason,
+                NotificationRelatedType.QUOTE,
+                quote.getId()));
 
         return approvalRequest;
     }

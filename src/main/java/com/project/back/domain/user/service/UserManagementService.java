@@ -13,7 +13,11 @@ import com.project.back.domain.user.entity.UserStatus;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
+import com.project.back.notification.entity.NotificationRelatedType;
+import com.project.back.notification.entity.NotificationType;
+import com.project.back.notification.event.NotificationCreateEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.data.domain.Page;
@@ -31,6 +35,7 @@ public class UserManagementService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final InitialPasswordSetupService initialPasswordSetupService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${account.email-domain:quoteguard.com}")
     private String emailDomain;
@@ -128,6 +133,14 @@ public class UserManagementService {
         User user = findUserById(userId);
         user.changeRole(request.getRole());
         User saved = userRepository.saveAndFlush(user);
+        eventPublisher.publishEvent(new NotificationCreateEvent(
+                userId,
+                NotificationType.ROLE_CHANGED,
+                "권한 변경",
+                "회원님의 권한이 " + request.getRole().getLabel() + "(으)로 변경되었습니다.",
+                NotificationRelatedType.USER,
+                userId));
+
         return buildUserDetailResponse(saved);
     }
 
@@ -143,6 +156,14 @@ public class UserManagementService {
         }
         user.suspend(requesterId);
         User saved = userRepository.saveAndFlush(user);
+        eventPublisher.publishEvent(new NotificationCreateEvent(
+                userId,
+                NotificationType.USER_SUSPENDED,
+                "계정 정지",
+                "회원님의 계정이 정지되었습니다. 자세한 사항은 관리자에게 문의하세요.",
+                NotificationRelatedType.USER,
+                userId));
+
         return buildUserDetailResponse(saved);
     }
 
@@ -155,6 +176,14 @@ public class UserManagementService {
         }
         user.reactivate();
         User saved = userRepository.saveAndFlush(user);
+        eventPublisher.publishEvent(new NotificationCreateEvent(
+                userId,
+                NotificationType.USER_REACTIVATED,
+                "계정 재활성화",
+                "회원님의 계정이 다시 활성화되었습니다.",
+                NotificationRelatedType.USER,
+                userId));
+
         return buildUserDetailResponse(saved);
     }
 

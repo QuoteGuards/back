@@ -54,6 +54,17 @@ public interface QuoteRepository extends JpaRepository<Quote, Long>, QuoteReposi
             "AND q.status IN :statuses")
     List<Quote> findExpiredQuotes(@Param("statuses") List<QuoteStatus> statuses);
 
+    // 만료 임박(오늘~기준일) 구간의 최신 견적을 작성자와 함께 조회 (만료 임박 알림용)
+    // 스케줄러가 하루 건너뛰어도 놓치지 않도록 구간 조회 + 미발송(notifiedExpiringAt IS NULL) 조건으로 중복 방지
+    @Query("SELECT q FROM Quote q JOIN FETCH q.createdBy " +
+            "WHERE q.validUntil BETWEEN :from AND :to " +
+            "AND q.status IN :statuses " +
+            "AND q.isLatest = true " +
+            "AND q.notifiedExpiringAt IS NULL")
+    List<Quote> findExpiringBetween(@Param("from") java.time.LocalDate from,
+                                    @Param("to") java.time.LocalDate to,
+                                    @Param("statuses") List<QuoteStatus> statuses);
+
     @Query("SELECT q FROM Quote q JOIN FETCH q.customer JOIN FETCH q.createdBy " +
             "WHERE q.status = 'DRAFT' AND q.isLatest = true AND q.createdAt <= :before")
     List<Quote> findDraftQuotesCreatedBefore(@Param("before") java.time.LocalDateTime before);

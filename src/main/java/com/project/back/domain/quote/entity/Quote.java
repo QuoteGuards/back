@@ -126,6 +126,10 @@ public class Quote {
     @Column(name = "expired_at")
     private LocalDateTime expiredAt;
 
+    // 만료 임박 알림을 보낸 날짜. 중복 발송(스케줄러 catch-up) 방지용
+    @Column(name = "notified_expiring_at")
+    private LocalDate notifiedExpiringAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -204,6 +208,10 @@ public class Quote {
     public void markAsSent() {
         this.status = QuoteStatus.SENT;
         this.sentAt = LocalDateTime.now();
+    }
+
+    public void markExpiringNotified(LocalDate notifiedAt) {
+        this.notifiedExpiringAt = notifiedAt;
     }
 
     public void markAsNotLatest() {
