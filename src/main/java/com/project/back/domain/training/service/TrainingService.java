@@ -25,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -44,6 +45,7 @@ public class TrainingService {
     private final GuideConfirmationRepository guideConfirmationRepository;
     private final UserRepository userRepository;
     private final VideoFileStorage videoFileStorage;
+    private final ObjectMapper objectMapper;
 
     //견적 작성 필수 교육 콘텐츠 조회(활성화된 QUOTE_WRITE 타입 콘텐츠 반환)
     public TrainingContent getQuoteWritingContent() {
@@ -158,6 +160,22 @@ public class TrainingService {
         String url = videoFileStorage.store(file, "trainings");
         content.updateVideoUrl(url);
         return url;
+    }
+
+    @Transactional
+    public TrainingContent updateQuoteWritingGuideContent(String guideContent) {
+        validateGuideContentJson(guideContent);
+        TrainingContent content = getQuoteWritingContent();
+        content.updateGuideContent(guideContent.trim());
+        return content;
+    }
+
+    private void validateGuideContentJson(String guideContent) {
+        try {
+            objectMapper.readTree(guideContent);
+        } catch (Exception e) {
+            throw new CustomException(ErrorCode.INVALID_INPUT);
+        }
     }
 
     // 활성 영업사원 기준 교육 이수 현황 (미시작 포함)

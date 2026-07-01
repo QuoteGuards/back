@@ -55,4 +55,8 @@ public class TrainingContent {
     public void updateVideoUrl(String videoUrl) {
         this.videoUrl = videoUrl;
     }
+
+    public void updateGuideContent(String guideContent) {
+        this.guideContent = guideContent;
+    }
 }
