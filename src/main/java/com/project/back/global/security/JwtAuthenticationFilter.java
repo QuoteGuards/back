@@ -90,21 +90,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    private static final String SSE_SUBSCRIBE_PATH = "/api/notifications/subscribe";
-
     private String resolveToken(HttpServletRequest request) {
         String bearerToken = request.getHeader(AUTHORIZATION_HEADER);
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(BEARER_PREFIX)) {
             return bearerToken.substring(BEARER_PREFIX.length());
         }
-        // SSE 구독은 EventSource가 Authorization 헤더를 실을 수 없으므로
-        // 해당 경로에 한해 쿼리파라미터(token) 토큰을 허용한다.
-        if (request.getRequestURI().endsWith(SSE_SUBSCRIBE_PATH)) {
-            String queryToken = request.getParameter("token");
-            if (StringUtils.hasText(queryToken)) {
-                return queryToken;
-            }
-        }
+        // SSE 구독은 장기 JWT를 URL에 노출하지 않고 별도의 단기 SSE 토큰으로 인증한다.
+        // (NotificationController.subscribe + SseTokenService 참조)
         return null;
     }
 }
