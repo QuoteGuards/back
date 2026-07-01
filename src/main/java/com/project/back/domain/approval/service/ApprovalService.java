@@ -17,6 +17,9 @@ import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.global.enums.QuoteStatus;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
+import com.project.back.notification.entity.NotificationRelatedType;
+import com.project.back.notification.entity.NotificationType;
+import com.project.back.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +41,7 @@ public class ApprovalService {
     private final UserRepository userRepository;
     private final QuoteRepository quoteRepository;
     private final UserStatsUpdateService userStatsUpdateService;
+    private final NotificationService notificationService;
 
     // ── 1. 승인 요청 ──
     @Transactional
@@ -134,6 +138,15 @@ public class ApprovalService {
         // 견적 작성자 통계 갱신 (승인 + 발송 카운트 반영) - 커밋 이후 재집계
         userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
 
+        // 견적 작성자에게 승인 알림
+        notificationService.create(
+                quote.getCreatedBy().getId(),
+                NotificationType.QUOTE_APPROVED,
+                "견적 승인 완료",
+                "견적 " + quote.getQuoteNumber() + " 이(가) 승인되었습니다.",
+                NotificationRelatedType.QUOTE,
+                quote.getId());
+
         return approvalRequest;
     }
 
@@ -183,6 +196,15 @@ public class ApprovalService {
 
         // 견적 작성자 통계 갱신 (반려 카운트 반영) - 커밋 이후 재집계
         userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
+
+        // 견적 작성자에게 반려 알림 (사유 포함)
+        notificationService.create(
+                quote.getCreatedBy().getId(),
+                NotificationType.QUOTE_REJECTED,
+                "견적 반려",
+                "견적 " + quote.getQuoteNumber() + " 이(가) 반려되었습니다. 사유: " + rejectReason,
+                NotificationRelatedType.QUOTE,
+                quote.getId());
 
         return approvalRequest;
     }

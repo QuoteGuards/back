@@ -11,6 +11,9 @@ import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
+import com.project.back.notification.entity.NotificationRelatedType;
+import com.project.back.notification.entity.NotificationType;
+import com.project.back.notification.service.NotificationService;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -37,6 +40,7 @@ public class QuoteEmailService {
     private final UserRepository userRepository;
     private final QuoteDocumentService documentService;
     private final EmailHistoryService emailHistoryService;
+    private final NotificationService notificationService;
 
     @Value("${mail.from-address}")
     private String fromAddress;
@@ -84,12 +88,26 @@ public class QuoteEmailService {
         } catch (MessagingException | IOException | RuntimeException e) {
             log.error("견적서 이메일 발송 실패 - quoteNumber={}, to={}", quoteNumber, maskEmail(request.to()), e);
             emailHistoryService.record(user, quote, request, EmailSendStatus.FAILED, e.getMessage());
+            notificationService.create(
+                    userId,
+                    NotificationType.EMAIL_FAILED,
+                    "견적서 발송 실패",
+                    "견적서 " + quoteNumber + " 이메일 발송에 실패했습니다.",
+                    NotificationRelatedType.QUOTE,
+                    quote.getId());
             throw new CustomException(ErrorCode.EMAIL_SEND_FAILED);
         }
 
         // 발송 성공 후 이력 저장 - 이력 저장 실패가 발송 결과를 FAILED로 뒤집지 않도록 try 밖에서 처리
         emailHistoryService.record(user, quote, request, EmailSendStatus.SENT, null);
         quoteService.markQuoteAsSent(quote);
+        notificationService.create(
+                userId,
+                NotificationType.EMAIL_SENT,
+                "견적서 발송 완료",
+                "견적서 " + quoteNumber + " 이메일을 발송했습니다.",
+                NotificationRelatedType.QUOTE,
+                quote.getId());
     }
 
     // 로그에 수신자 이메일을 평문 노출하지 않도록 로컬 파트 앞 2자만 남기고 마스킹
