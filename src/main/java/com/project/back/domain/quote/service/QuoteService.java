@@ -28,6 +28,7 @@ import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import jakarta.validation.constraints.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +45,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -359,13 +361,19 @@ public class QuoteService {
                 Arrays.asList(QuoteStatus.APPROVAL_NOT_REQUIRED, QuoteStatus.APPROVED, QuoteStatus.SENT));
 
         for (Quote quote : quotes) {
-            notificationService.create(
-                    quote.getCreatedBy().getId(),
-                    com.project.back.notification.entity.NotificationType.QUOTE_EXPIRING,
-                    "견적 만료 임박",
-                    "견적 " + quote.getQuoteNumber() + " 이(가) 3일 후 만료됩니다.",
-                    com.project.back.notification.entity.NotificationRelatedType.QUOTE,
-                    quote.getId());
+            // 한 건의 알림 실패가 나머지 배치를 중단시키지 않도록 항목별로 격리한다.
+            try {
+                notificationService.create(
+                        quote.getCreatedBy().getId(),
+                        com.project.back.notification.entity.NotificationType.QUOTE_EXPIRING,
+                        "견적 만료 임박",
+                        "견적 " + quote.getQuoteNumber() + " 이(가) 3일 후 만료됩니다.",
+                        com.project.back.notification.entity.NotificationRelatedType.QUOTE,
+                        quote.getId());
+            } catch (Exception e) {
+                log.warn("만료 임박 알림 생성 실패 - quoteId={}, quoteNumber={}",
+                        quote.getId(), quote.getQuoteNumber(), e);
+            }
         }
     }
 
