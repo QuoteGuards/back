@@ -6,19 +6,15 @@ import com.project.back.notification.dto.response.NotificationResponse;
 import com.project.back.notification.entity.Notification;
 import com.project.back.notification.entity.NotificationRelatedType;
 import com.project.back.notification.entity.NotificationType;
-import com.project.back.notification.event.NotificationCreateEvent;
 import com.project.back.notification.repository.NotificationRepository;
 import com.project.back.notification.sse.NotificationSseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.event.TransactionalEventListener;
-import org.springframework.transaction.event.TransactionPhase;
 
 import java.util.List;
 
-@lombok.extern.slf4j.Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -69,21 +65,6 @@ public class NotificationService {
         NotificationResponse response = NotificationResponse.from(notification);
         sseService.sendNotification(userId, response);
         return response;
-    }
-
-    /**
-     * 발행 도메인의 트랜잭션이 커밋된 후에만 알림을 생성한다.
-     * 트랜잭션이 롤백되면 이벤트가 발행되지 않아 고아 알림이 생기지 않는다.
-     */
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void handleNotificationCreate(NotificationCreateEvent event) {
-        // 알림은 부가 작업이므로 저장/전송 실패가 이미 커밋된 본 작업에 영향을 주지 않도록 흡수한다.
-        try {
-            create(event.userId(), event.type(), event.title(),
-                    event.message(), event.relatedType(), event.relatedId());
-        } catch (Exception e) {
-            log.warn("알림 생성 실패 - userId={}, type={}", event.userId(), event.type(), e);
-        }
     }
 
     // 안 읽은 알림 전체 읽음 처리
