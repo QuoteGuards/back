@@ -9,13 +9,11 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 USE quoteguard;
 
-DROP TABLE IF EXISTS ai_generation_logs;
 DROP TABLE IF EXISTS guide_confirmations;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS email_sends;
 DROP TABLE IF EXISTS quote_approval_histories;
 DROP TABLE IF EXISTS approval_requests;
-DROP TABLE IF EXISTS consultation_memos;
 DROP TABLE IF EXISTS quote_approval_reasons;
 DROP TABLE IF EXISTS quote_items;
 DROP TABLE IF EXISTS quotes;
@@ -480,36 +478,6 @@ CREATE TABLE quote_approval_reasons (
 ) COMMENT = '견적 승인 필요 사유를 다중 저장하는 테이블';
 
 
-CREATE TABLE consultation_memos (
-    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '상담 메모 식별자',
-
-    quote_id BIGINT NULL COMMENT '상담 메모가 연결된 견적 ID',
-    customer_id BIGINT NULL COMMENT '상담 메모가 연결된 고객 ID',
-    created_by BIGINT NOT NULL COMMENT '상담 메모 작성자 ID',
-
-    content TEXT NOT NULL COMMENT '고객 상담 원문 메모',
-    ai_summary TEXT NULL COMMENT 'AI가 생성한 상담 메모 요약',
-
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '상담 메모 생성 일시',
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '상담 메모 수정 일시',
-
-    CONSTRAINT fk_consultation_memos_quote
-        FOREIGN KEY (quote_id)
-        REFERENCES quotes(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_consultation_memos_customer
-        FOREIGN KEY (customer_id)
-        REFERENCES customers(id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT fk_consultation_memos_created_by
-        FOREIGN KEY (created_by)
-        REFERENCES users(id)
-        ON DELETE RESTRICT
-) COMMENT = '고객 상담 메모와 AI 상담 요약 결과를 저장하는 테이블';
-
-
 CREATE TABLE approval_requests (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '견적 승인 요청 식별자',
 
@@ -653,27 +621,6 @@ CREATE TABLE guide_confirmations (
 ) COMMENT = '견적 작성 절차, 할인율 기준, 승인 요청 조건 등 가이드 확인 완료 여부를 저장하는 테이블';
 
 
-CREATE TABLE ai_generation_logs (
-    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'AI 생성 로그 식별자',
-    user_id BIGINT NOT NULL COMMENT 'AI 기능을 사용한 사용자 ID',
-    quote_id BIGINT NULL COMMENT 'AI 결과가 연결된 견적 ID',
-    type ENUM('CONSULTATION_SUMMARY', 'PROPOSAL_TEXT', 'RISK_SUMMARY') NOT NULL COMMENT 'AI 생성 유형: 상담 요약, 제안 문구, 리스크 요약',
-    input_text MEDIUMTEXT NULL COMMENT 'AI 생성에 사용된 입력 내용',
-    output_text MEDIUMTEXT NOT NULL COMMENT 'AI가 생성한 결과 내용',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'AI 생성 일시',
-
-    CONSTRAINT fk_ai_generation_logs_user
-        FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_ai_generation_logs_quote
-        FOREIGN KEY (quote_id)
-        REFERENCES quotes(id)
-        ON DELETE SET NULL
-) COMMENT = 'AI 상담 메모 요약, 제안 문구 생성, 리스크 요약 결과를 저장하는 테이블';
-
-
 -- ================================================================================================================================
 -- 조회 성능 개선용 인덱스
 -- ================================================================================================================================
@@ -791,17 +738,6 @@ CREATE INDEX idx_quote_approval_reasons_quote ON quote_approval_reasons (quote_i
 CREATE INDEX idx_quote_approval_reasons_type ON quote_approval_reasons (reason_type);
 
 
--- consultation_memos 테이블 인덱스
--- consultation_memos 테이블의 quote_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_consultation_memos_quote ON consultation_memos (quote_id);
-
--- consultation_memos 테이블의 customer_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_consultation_memos_customer ON consultation_memos (customer_id);
-
--- consultation_memos 테이블의 created_by 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_consultation_memos_created_by ON consultation_memos (created_by);
-
-
 -- approval_requests 테이블 인덱스
 -- approval_requests 테이블의 quote_id 컬럼 조회 성능 개선용 인덱스
 CREATE INDEX idx_approval_requests_quote ON approval_requests (quote_id);
@@ -839,11 +775,3 @@ CREATE INDEX idx_email_sends_status ON email_sends (status);
 -- notifications 테이블 인덱스
 -- notifications 테이블의 user_id 컬럼 조회 성능 개선용 인덱스
 CREATE INDEX idx_notifications_user_read_created ON notifications (user_id, is_read, created_at DESC);
-
-
--- ai_generation_logs 테이블 인덱스
--- ai_generation_logs 테이블의 user_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_ai_generation_logs_user ON ai_generation_logs (user_id);
-
--- ai_generation_logs 테이블의 quote_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_ai_generation_logs_quote ON ai_generation_logs (quote_id);
