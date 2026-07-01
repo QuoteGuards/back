@@ -98,6 +98,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/products/**").hasRole("SUPER_ADMIN")
                             // 할인정책관리도 관리자만 가능
                         .requestMatchers("/api/admin/discounts/**").hasRole("SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/admin/trainings/status").hasAnyRole("SALES_MANAGER", "SUPER_ADMIN")
+                        .requestMatchers("/api/admin/trainings/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/dashboard/me").authenticated()
                         .anyRequest().authenticated()
                 )
