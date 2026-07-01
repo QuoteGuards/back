@@ -276,13 +276,61 @@ public class ApprovalService {
         );
     }
 
-    // ── 6. 승인 이력 조회 ──
+    // ── 6. 승인 이력 조회 (SUPER_ADMIN - 전체) ──
     public List<QuoteApprovalHistory> getApprovalHistories(Long quoteId) {
         return quoteApprovalHistoryRepository.findAllByQuoteId(quoteId);
     }
 
-    // ── 7. 승인 필요 사유 조회 ──
+    // ── 6-1. 승인 이력 조회 (SALES_STAFF - 본인 견적만) ──
+    public List<QuoteApprovalHistory> getApprovalHistoriesForStaff(Long quoteId, Long userId) {
+        Quote quote = quoteRepository.findById(quoteId)
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+        if (!quote.getCreatedBy().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.APPROVAL_ACCESS_DENIED);
+        }
+        return quoteApprovalHistoryRepository.findAllByQuoteId(quoteId);
+    }
+
+    // ── 6-2. 승인 이력 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
+    public List<QuoteApprovalHistory> getApprovalHistoriesForManager(Long quoteId, Long managerId) {
+        Quote quote = quoteRepository.findById(quoteId)
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+        User manager = userRepository.findById(managerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        String managerDept = manager.getDepartment();
+        String creatorDept = quote.getCreatedBy().getDepartment();
+        if (managerDept == null || !managerDept.equals(creatorDept)) {
+            throw new CustomException(ErrorCode.APPROVAL_DEPT_MISMATCH);
+        }
+        return quoteApprovalHistoryRepository.findAllByQuoteId(quoteId);
+    }
+
+    // ── 7. 승인 필요 사유 조회 (SUPER_ADMIN - 전체) ──
     public List<QuoteApprovalReason> getApprovalReasons(Long quoteId) {
+        return quoteApprovalReasonRepository.findByQuote_Id(quoteId);
+    }
+
+    // ── 7-1. 승인 필요 사유 조회 (SALES_STAFF - 본인 견적만) ──
+    public List<QuoteApprovalReason> getApprovalReasonsForStaff(Long quoteId, Long userId) {
+        Quote quote = quoteRepository.findById(quoteId)
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+        if (!quote.getCreatedBy().getId().equals(userId)) {
+            throw new CustomException(ErrorCode.APPROVAL_ACCESS_DENIED);
+        }
+        return quoteApprovalReasonRepository.findByQuote_Id(quoteId);
+    }
+
+    // ── 7-2. 승인 필요 사유 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
+    public List<QuoteApprovalReason> getApprovalReasonsForManager(Long quoteId, Long managerId) {
+        Quote quote = quoteRepository.findById(quoteId)
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+        User manager = userRepository.findById(managerId)
+                .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
+        String managerDept = manager.getDepartment();
+        String creatorDept = quote.getCreatedBy().getDepartment();
+        if (managerDept == null || !managerDept.equals(creatorDept)) {
+            throw new CustomException(ErrorCode.APPROVAL_DEPT_MISMATCH);
+        }
         return quoteApprovalReasonRepository.findByQuote_Id(quoteId);
     }
 
