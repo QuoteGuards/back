@@ -73,7 +73,7 @@ public class UserManagementService {
         // 5. 사용 불가 비밀번호 placeholder 생성 (원문 미사용 — BCrypt만 저장)
         String unusablePlaceholder = generateUnusablePlaceholder();
 
-        // 6. 계정 생성 - passwordInitialized=false, mustChangePassword=false
+        // 6. 계정 생성 - passwordInitialized=false (이메일 초기 설정 링크로 로그인 가능해짐)
         User user = User.builder()
                 .memberNumber(memberNumber)
                 .email(email)
@@ -85,7 +85,6 @@ public class UserManagementService {
                 .role(request.getRole())
                 .status(UserStatus.ACTIVE)
                 .passwordInitialized(false)
-                .mustChangePassword(false)
                 .createdBy(createdBy)
                 .build();
 

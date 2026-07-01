@@ -7,7 +7,6 @@ import com.project.back.domain.auth.ratelimit.PasswordResetRateLimiter;
 import com.project.back.domain.auth.service.AuthService;
 import com.project.back.domain.auth.service.InitialPasswordSetupService;
 import com.project.back.domain.auth.service.PasswordResetService;
-import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import com.project.back.global.security.JwtAccessDeniedHandler;
@@ -57,18 +56,15 @@ class AuthControllerTest {
     @MockitoBean
     private PasswordResetRateLimiter passwordResetRateLimiter;
 
-    @MockitoBean
-    private UserRepository userRepository;
-
     @Autowired
     private JwtTokenProvider jwtTokenProvider;
 
     @Test
-    @DisplayName("POST /api/auth/login - 200 OK (success, mustChangePassword=false)")
+    @DisplayName("POST /api/auth/login - 200 OK (success)")
     @WithMockUser
     void login_success() throws Exception {
         given(authService.login(any()))
-                .willReturn(LoginResponse.of("mock.jwt.token", "mock.refresh.token", false));
+                .willReturn(LoginResponse.of("mock.jwt.token", "mock.refresh.token"));
 
         mockMvc.perform(post("/api/auth/login")
                         .with(csrf())
@@ -81,26 +77,7 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.status").value("success"))
                 .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
                 .andExpect(jsonPath("$.data.accessToken").value("mock.jwt.token"))
-                .andExpect(jsonPath("$.data.refreshToken").value("mock.refresh.token"))
-                .andExpect(jsonPath("$.data.mustChangePassword").value(false));
-    }
-
-    @Test
-    @DisplayName("POST /api/auth/login - 200 OK (mustChangePassword=true)")
-    @WithMockUser
-    void login_mustChangePassword() throws Exception {
-        given(authService.login(any()))
-                .willReturn(LoginResponse.of("mock.jwt.token", "mock.refresh.token", true));
-
-        mockMvc.perform(post("/api/auth/login")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(Map.of(
-                                "email", "2026001@quoteguard.com",
-                                "password", "QG-ABCD1234"
-                        ))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.mustChangePassword").value(true));
+                .andExpect(jsonPath("$.data.refreshToken").value("mock.refresh.token"));
     }
 
     @Test

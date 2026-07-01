@@ -75,7 +75,7 @@ public class AuthService {
         String rawRefreshToken = issueRefreshToken(user.getId());
 
         log.info("Login success: loginId={}, userId={}, ip={}", maskEmail(request.getEmail()), user.getId(), ipAddress);
-        return LoginResponse.of(accessToken, rawRefreshToken, user.isMustChangePassword());
+        return LoginResponse.of(accessToken, rawRefreshToken);
     }
 
     @Transactional

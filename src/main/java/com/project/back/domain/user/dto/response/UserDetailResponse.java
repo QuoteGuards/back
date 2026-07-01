@@ -20,7 +20,6 @@ public class UserDetailResponse {
     private final String role;
     private final String status;
     private final boolean passwordInitialized;
-    private final boolean mustChangePassword;
 
     // 계정 생성자 정보
     private final Long createdBy;
@@ -57,7 +56,6 @@ public class UserDetailResponse {
                 .role(user.getRole().name())
                 .status(user.getStatus().name())
                 .passwordInitialized(user.isPasswordInitialized())
-                .mustChangePassword(user.isMustChangePassword())
                 .createdBy(user.getCreatedBy())
                 .createdByName(createdByName)
                 .createdByMemberNumber(createdByMemberNumber)

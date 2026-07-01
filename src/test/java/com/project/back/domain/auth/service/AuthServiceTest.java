@@ -61,7 +61,7 @@ class AuthServiceTest {
         void login_passwordNotInitialized_blocked() {
             LoginRequest request = mockLoginRequest("2026001@quoteguard.com", "Pass@1234");
             given(userRepository.findByEmail("2026001@quoteguard.com"))
-                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, false, false)));
+                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, false)));
 
             assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "TestAgent"))
                     .isInstanceOf(CustomException.class)
@@ -70,11 +70,11 @@ class AuthServiceTest {
         }
 
         @Test
-        @DisplayName("ACTIVE - success, mustChangePassword=false")
+        @DisplayName("ACTIVE - success")
         void login_active_success() {
             LoginRequest request = mockLoginRequest("2026001@quoteguard.com", "Pass@1234");
             given(userRepository.findByEmail("2026001@quoteguard.com"))
-                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, false)));
+                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE)));
             given(passwordEncoder.matches("Pass@1234", "encodedPassword")).willReturn(true);
             given(jwtTokenProvider.createAccessToken(any(Long.class), anyString(), anyString()))
                     .willReturn("mock.jwt.token");
@@ -87,25 +87,6 @@ class AuthServiceTest {
             assertThat(response.getAccessToken()).isEqualTo("mock.jwt.token");
             assertThat(response.getRefreshToken()).isNotBlank();
             assertThat(response.getTokenType()).isEqualTo("Bearer");
-            assertThat(response.isMustChangePassword()).isFalse();
-        }
-
-        @Test
-        @DisplayName("mustChangePassword=true - returned in response")
-        void login_mustChangePassword_returnedInResponse() {
-            LoginRequest request = mockLoginRequest("2026001@quoteguard.com", "QG-ABCD1234");
-            given(userRepository.findByEmail("2026001@quoteguard.com"))
-                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, true)));
-            given(passwordEncoder.matches("QG-ABCD1234", "encodedPassword")).willReturn(true);
-            given(jwtTokenProvider.createAccessToken(any(Long.class), anyString(), anyString()))
-                    .willReturn("mock.jwt.token");
-            given(jwtTokenProvider.getRefreshTokenValidityMs()).willReturn(604800000L);
-            given(refreshTokenRepository.save(any(RefreshToken.class)))
-                    .willAnswer(inv -> inv.getArgument(0));
-
-            LoginResponse response = authService.login(request, "127.0.0.1", "TestAgent");
-
-            assertThat(response.isMustChangePassword()).isTrue();
         }
 
         @Test
@@ -125,7 +106,7 @@ class AuthServiceTest {
         void login_invalidPassword() {
             LoginRequest request = mockLoginRequest("2026001@quoteguard.com", "wrongPass");
             given(userRepository.findByEmail("2026001@quoteguard.com"))
-                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, false)));
+                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE)));
             given(passwordEncoder.matches("wrongPass", "encodedPassword")).willReturn(false);
 
             assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "TestAgent"))
@@ -149,7 +130,7 @@ class AuthServiceTest {
         private void assertLoginStatusException(UserStatus status, ErrorCode expectedCode) {
             LoginRequest request = mockLoginRequest("2026001@quoteguard.com", "Pass@1234");
             given(userRepository.findByEmail("2026001@quoteguard.com"))
-                    .willReturn(Optional.of(buildUser(status, false)));
+                    .willReturn(Optional.of(buildUser(status)));
             given(passwordEncoder.matches("Pass@1234", "encodedPassword")).willReturn(true);
 
             assertThatThrownBy(() -> authService.login(request, "127.0.0.1", "TestAgent"))
@@ -175,7 +156,7 @@ class AuthServiceTest {
             given(refreshTokenRepository.findByToken(sha256(raw)))
                     .willReturn(Optional.of(stored));
             given(userRepository.findById(1L))
-                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE, false)));
+                    .willReturn(Optional.of(buildUser(UserStatus.ACTIVE)));
             given(jwtTokenProvider.createAccessToken(any(Long.class), anyString(), anyString()))
                     .willReturn("new.access.token");
 
@@ -241,11 +222,11 @@ class AuthServiceTest {
         }
     }
 
-    private User buildUser(UserStatus status, boolean mustChangePassword) {
-        return buildUser(status, mustChangePassword, true);
+    private User buildUser(UserStatus status) {
+        return buildUser(status, true);
     }
 
-    private User buildUser(UserStatus status, boolean mustChangePassword, boolean passwordInitialized) {
+    private User buildUser(UserStatus status, boolean passwordInitialized) {
         return User.builder()
                 .id(1L)
                 .memberNumber("2026001")
@@ -254,7 +235,6 @@ class AuthServiceTest {
                 .name("tester")
                 .role(UserRole.SALES_STAFF)
                 .status(status)
-                .mustChangePassword(mustChangePassword)
                 .passwordInitialized(passwordInitialized)
                 .build();
     }
