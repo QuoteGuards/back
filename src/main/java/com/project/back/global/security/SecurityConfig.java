@@ -12,7 +12,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import com.project.back.domain.user.repository.UserRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -30,8 +29,6 @@ public class SecurityConfig {
     private final JwtTokenProvider jwtTokenProvider;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
-    private final UserRepository userRepository;
-    private final SecurityErrorResponseWriter securityErrorResponseWriter;
 
     @Value("${cors.allowed-origin:http://localhost:5173}")
     private String allowedOrigin;
@@ -106,10 +103,6 @@ public class SecurityConfig {
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtTokenProvider, jwtAuthenticationEntryPoint),
                         UsernamePasswordAuthenticationFilter.class
-                )
-                .addFilterAfter(
-                        new MustChangePasswordFilter(userRepository, securityErrorResponseWriter),
-                        JwtAuthenticationFilter.class
                 );
 
         return http.build();

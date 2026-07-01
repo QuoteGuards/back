@@ -27,7 +27,6 @@ DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS user_stats;
 DROP TABLE IF EXISTS refresh_tokens;
 DROP TABLE IF EXISTS password_reset_tokens;
-DROP TABLE IF EXISTS user_account_histories;
 DROP TABLE IF EXISTS user_training_progress;
 DROP TABLE IF EXISTS training_contents;
 DROP TABLE IF EXISTS users;
@@ -40,7 +39,6 @@ CREATE TABLE users (
     member_number VARCHAR(20) NOT NULL COMMENT '시스템 자동 생성 로그인용 회원번호. 중복 불가',
     email VARCHAR(100) NOT NULL COMMENT '사용자 실제 수신 이메일. 비밀번호 재설정 링크 발송에 사용하며 로그인 ID로는 사용하지 않음',
     password VARCHAR(255) NOT NULL COMMENT 'BCrypt 등으로 암호화된 비밀번호 해시값',
-    must_change_password BOOLEAN NOT NULL DEFAULT FALSE COMMENT '비밀번호 설정 완료 후 보안 정책상 다음 로그인 시 비밀번호 변경 필요 여부',
     password_initialized BOOLEAN NOT NULL DEFAULT FALSE COMMENT '사용자가 초기 비밀번호 설정 링크 또는 재설정 절차를 통해 실제 비밀번호를 설정했는지 여부',
     password_changed_at DATETIME NULL COMMENT '마지막 비밀번호 변경 일시',
 
@@ -160,36 +158,6 @@ CREATE TABLE user_training_progress (
         REFERENCES training_contents(id)
         ON DELETE RESTRICT
 ) COMMENT = '사용자 교육 이수 현황';
-
-
-CREATE TABLE user_account_histories (
-    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '사용자 처리 이력 식별자',
-
-    user_id BIGINT NOT NULL COMMENT '처리 대상 사용자 ID',
-    admin_id BIGINT NULL COMMENT '처리한 관리자 ID. 시스템 자동 처리인 경우 NULL 가능',
-
-    action_type ENUM('CREATE', 'SUSPEND', 'REACTIVATE', 'ROLE_CHANGE', 'INFO_UPDATE', 'PASSWORD_RESET', 'DELETE') NOT NULL COMMENT '사용자 계정 처리 유형: 생성, 정지, 재활성화, 권한 변경, 정보 수정, 비밀번호 초기화, 삭제',
-
-    before_status ENUM('ACTIVE', 'SUSPENDED', 'DELETED') NULL COMMENT '변경 전 사용자 상태',
-    after_status ENUM('ACTIVE', 'SUSPENDED', 'DELETED') NULL COMMENT '변경 후 사용자 상태',
-    before_role ENUM('SUPER_ADMIN', 'SALES_MANAGER', 'SALES_STAFF') NULL COMMENT '변경 전 사용자 권한',
-    after_role ENUM('SUPER_ADMIN', 'SALES_MANAGER', 'SALES_STAFF') NULL COMMENT '변경 후 사용자 권한',
-
-    reason VARCHAR(500) NULL COMMENT '계정 생성, 정지, 권한 변경, 비밀번호 초기화 등의 처리 사유',
-
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '처리 이력 생성 일시',
-
-    CONSTRAINT fk_user_account_histories_user
-        FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_user_account_histories_admin
-        FOREIGN KEY (admin_id)
-        REFERENCES users(id)
-        ON DELETE SET NULL
-) COMMENT = '관리자 계정 생성, 정지, 권한 변경, 비밀번호 초기화 등 사용자 관리 이력을 저장하는 테이블';
-
 
 
 
@@ -731,16 +699,6 @@ CREATE INDEX idx_user_training_progress_user_status ON user_training_progress (u
 
 -- 관리자 교육 이수 현황 화면에서 특정 교육 콘텐츠를 수강한 사용자 목록을 조회할 때 사용한다.
 CREATE INDEX idx_user_training_progress_content ON user_training_progress (training_content_id);
-
-
--- user_account_histories 테이블 인덱스
--- user_account_histories 테이블의 user_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_user_account_histories_user ON user_account_histories (user_id);
-
--- user_account_histories 테이블의 admin_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_user_account_histories_admin ON user_account_histories (admin_id);
-
-
 
 
 -- password_reset_tokens 테이블 인덱스
