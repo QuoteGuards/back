@@ -137,7 +137,7 @@ public class UserManagementService {
                 userId,
                 NotificationType.ROLE_CHANGED,
                 "권한 변경",
-                "회원님의 권한이 " + request.getRole().name() + " 으로 변경되었습니다.",
+                "회원님의 권한이 " + request.getRole().getLabel() + "(으)로 변경되었습니다.",
                 NotificationRelatedType.USER,
                 userId));
 
