@@ -24,7 +24,7 @@ public class TrainingController {
 
     //견적 작성 필수 교육 조회
     @GetMapping("/quote-writing")
-    @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SALES_STAFF')")
     public ResponseEntity<ApiResponse<TrainingContentResponse>> getQuoteWritingContent() {
         return ResponseEntity.ok(
                 ApiResponse.success(TrainingContentResponse.from(trainingService.getQuoteWritingContent()))
@@ -33,7 +33,7 @@ public class TrainingController {
 
     //교육 시청 진도율 저장
     @PatchMapping("/quote-writing/progress")
-    @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
+    @PreAuthorize("hasRole('SALES_STAFF')")
     public ResponseEntity<ApiResponse<Void>> updateProgress(
             @AuthenticationPrincipal Long userId,
             @RequestBody @Valid TrainingProgressRequest request) {
@@ -53,7 +53,7 @@ public class TrainingController {
     public ResponseEntity<ApiResponse<TrainingStatusResponse>> getMyStatus(
             @AuthenticationPrincipal Long userId) {
 
-        TrainingService.TrainingStatusResult result = trainingService.getMyTrainingStatus(userId);
+        TrainingService.TrainingStatusResult result = trainingService.getMyTrainingStatus(getUser(userId));
         return ResponseEntity.ok(ApiResponse.success(TrainingStatusResponse.from(result)));
     }
 

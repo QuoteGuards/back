@@ -150,7 +150,7 @@ class QuoteCalculationServiceTest {
         }
 
         @Test
-        @DisplayName("이익률 계산 - 공급가 480,000 / 원가 360,000 → 이익률 25%")
+        @DisplayName("이익률 계산 - 공급가 380,000 / 원가 300,000 → 이익률 21.05%")
         void profitRateCalculation() {
             // given: 원가율 75% → 이익률 25%
             // 항목: 단가 200,000 * 수량 2, 할인 5%, 원가 150,000

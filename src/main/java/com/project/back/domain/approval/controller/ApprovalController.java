@@ -182,12 +182,26 @@ public class ApprovalController {
     @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
     @GetMapping("/quotes/{quoteId}/approval-histories")
     public ResponseEntity<List<ApprovalHistoryResponse>> getApprovalHistories(
-            @PathVariable Long quoteId
+            @PathVariable Long quoteId,
+            @AuthenticationPrincipal Long userId,
+            Authentication authentication
     ) {
-        List<ApprovalHistoryResponse> result = approvalService.getApprovalHistories(quoteId)
-                .stream()
-                .map(ApprovalHistoryResponse::from)
-                .toList();
+        boolean isSuperAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
+        boolean isSalesManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SALES_MANAGER"));
+
+        List<ApprovalHistoryResponse> result;
+        if (isSuperAdmin) {
+            result = approvalService.getApprovalHistories(quoteId).stream()
+                    .map(ApprovalHistoryResponse::from).toList();
+        } else if (isSalesManager) {
+            result = approvalService.getApprovalHistoriesForManager(quoteId, userId).stream()
+                    .map(ApprovalHistoryResponse::from).toList();
+        } else {
+            result = approvalService.getApprovalHistoriesForStaff(quoteId, userId).stream()
+                    .map(ApprovalHistoryResponse::from).toList();
+        }
         return ResponseEntity.ok(result);
     }
 
@@ -219,12 +233,26 @@ public class ApprovalController {
     @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
     @GetMapping("/quotes/{quoteId}/approval-reasons")
     public ResponseEntity<List<ApprovalReasonResponse>> getApprovalReasons(
-            @PathVariable Long quoteId
+            @PathVariable Long quoteId,
+            @AuthenticationPrincipal Long userId,
+            Authentication authentication
     ) {
-        List<ApprovalReasonResponse> result = approvalService.getApprovalReasons(quoteId)
-                .stream()
-                .map(ApprovalReasonResponse::from)
-                .toList();
+        boolean isSuperAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
+        boolean isSalesManager = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SALES_MANAGER"));
+
+        List<ApprovalReasonResponse> result;
+        if (isSuperAdmin) {
+            result = approvalService.getApprovalReasons(quoteId).stream()
+                    .map(ApprovalReasonResponse::from).toList();
+        } else if (isSalesManager) {
+            result = approvalService.getApprovalReasonsForManager(quoteId, userId).stream()
+                    .map(ApprovalReasonResponse::from).toList();
+        } else {
+            result = approvalService.getApprovalReasonsForStaff(quoteId, userId).stream()
+                    .map(ApprovalReasonResponse::from).toList();
+        }
         return ResponseEntity.ok(result);
     }
 }

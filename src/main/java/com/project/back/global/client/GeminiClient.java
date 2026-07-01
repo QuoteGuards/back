@@ -7,9 +7,11 @@ import com.project.back.global.exception.ErrorCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 @Slf4j
 @Component
@@ -48,6 +50,13 @@ public class GeminiClient {
 
         } catch (CustomException e) {
             throw e;
+        } catch (RestClientResponseException e) {
+            HttpStatusCode status = e.getStatusCode();
+            log.error("Gemini API 호출 실패: status={}", status);
+            if (status.value() == 429) {
+                throw new CustomException(ErrorCode.AI_SUMMARY_RATE_LIMITED);
+            }
+            throw new CustomException(ErrorCode.AI_SUMMARY_GENERATION_FAILED);
         } catch (RuntimeException e) {
             log.error("Gemini API 호출 실패: {}", e.getClass().getSimpleName());
             throw new CustomException(ErrorCode.AI_SUMMARY_GENERATION_FAILED);

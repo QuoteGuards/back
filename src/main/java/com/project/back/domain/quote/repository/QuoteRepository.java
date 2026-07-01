@@ -62,6 +62,10 @@ public interface QuoteRepository extends JpaRepository<Quote, Long>, QuoteReposi
     List<Quote> findExpiringOn(@Param("date") java.time.LocalDate date,
                                @Param("statuses") List<QuoteStatus> statuses);
 
+    @Query("SELECT q FROM Quote q JOIN FETCH q.customer JOIN FETCH q.createdBy " +
+            "WHERE q.status = 'DRAFT' AND q.isLatest = true AND q.createdAt <= :before")
+    List<Quote> findDraftQuotesCreatedBefore(@Param("before") java.time.LocalDateTime before);
+
     @Query("SELECT MAX(q.quoteNumber) FROM Quote q WHERE q.quoteNumber LIKE :prefix%")
     Optional<String> findMaxQuoteNumberByPrefix(@Param("prefix") String prefix);
 }

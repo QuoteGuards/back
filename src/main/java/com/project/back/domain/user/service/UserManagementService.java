@@ -53,7 +53,7 @@ public class UserManagementService {
      * </ul>
      */
     @Transactional
-    public AdminCreateUserResponse createUser(AdminCreateUserRequest request) {
+    public AdminCreateUserResponse createUser(AdminCreateUserRequest request, Long createdBy) {
         // 1. 회원번호 자동 생성
         String memberNumber = generateMemberNumber();
 
@@ -78,7 +78,7 @@ public class UserManagementService {
         // 5. 사용 불가 비밀번호 placeholder 생성 (원문 미사용 — BCrypt만 저장)
         String unusablePlaceholder = generateUnusablePlaceholder();
 
-        // 6. 계정 생성 - passwordInitialized=false, mustChangePassword=false
+        // 6. 계정 생성 - passwordInitialized=false (이메일 초기 설정 링크로 로그인 가능해짐)
         User user = User.builder()
                 .memberNumber(memberNumber)
                 .email(email)
@@ -90,7 +90,7 @@ public class UserManagementService {
                 .role(request.getRole())
                 .status(UserStatus.ACTIVE)
                 .passwordInitialized(false)
-                .mustChangePassword(false)
+                .createdBy(createdBy)
                 .build();
 
         User savedUser = userRepository.save(user);
@@ -111,7 +111,8 @@ public class UserManagementService {
     // 사용자 상세 조회
     @Transactional(readOnly = true)
     public UserDetailResponse getUserDetail(Long userId) {
-        return UserDetailResponse.from(findUserById(userId));
+        User user = findUserById(userId);
+        return buildUserDetailResponse(user);
     }
 
     // 사용자 정보 수정
@@ -120,7 +121,7 @@ public class UserManagementService {
         User user = findUserById(userId);
         user.updateInfo(request.getName(), request.getPhone(), request.getDepartment(), request.getPosition());
         User saved = userRepository.saveAndFlush(user);
-        return UserDetailResponse.from(saved);
+        return buildUserDetailResponse(saved);
     }
 
     // 사용자 권한 변경
@@ -132,7 +133,6 @@ public class UserManagementService {
         User user = findUserById(userId);
         user.changeRole(request.getRole());
         User saved = userRepository.saveAndFlush(user);
-
         eventPublisher.publishEvent(new NotificationCreateEvent(
                 userId,
                 NotificationType.ROLE_CHANGED,
@@ -141,7 +141,7 @@ public class UserManagementService {
                 NotificationRelatedType.USER,
                 userId));
 
-        return UserDetailResponse.from(saved);
+        return buildUserDetailResponse(saved);
     }
 
     // 사용자 비활성화
@@ -156,7 +156,6 @@ public class UserManagementService {
         }
         user.suspend(requesterId);
         User saved = userRepository.saveAndFlush(user);
-
         eventPublisher.publishEvent(new NotificationCreateEvent(
                 userId,
                 NotificationType.USER_SUSPENDED,
@@ -165,7 +164,7 @@ public class UserManagementService {
                 NotificationRelatedType.USER,
                 userId));
 
-        return UserDetailResponse.from(saved);
+        return buildUserDetailResponse(saved);
     }
 
     // 사용자 재활성화
@@ -177,7 +176,6 @@ public class UserManagementService {
         }
         user.reactivate();
         User saved = userRepository.saveAndFlush(user);
-
         eventPublisher.publishEvent(new NotificationCreateEvent(
                 userId,
                 NotificationType.USER_REACTIVATED,
@@ -186,7 +184,23 @@ public class UserManagementService {
                 NotificationRelatedType.USER,
                 userId));
 
-        return UserDetailResponse.from(saved);
+        return buildUserDetailResponse(saved);
+    }
+
+    /**
+     * 계정 생성자 메타데이터(createdByName, createdByMemberNumber)를 보강하여
+     * UserDetailResponse를 조립한다. UserDetailResponse를 반환하는 모든 경로에서
+     * 동일한 보강 로직을 사용하도록 공통 헬퍼로 분리했다.
+     */
+    private UserDetailResponse buildUserDetailResponse(User user) {
+        String createdByName = null;
+        String createdByMemberNumber = null;
+        if (user.getCreatedBy() != null) {
+            var creator = userRepository.findById(user.getCreatedBy());
+            createdByName = creator.map(User::getName).orElse(null);
+            createdByMemberNumber = creator.map(User::getMemberNumber).orElse(null);
+        }
+        return UserDetailResponse.from(user, createdByName, createdByMemberNumber);
     }
 
     // 사용자 삭제 (소프트 삭제)
@@ -218,8 +232,9 @@ public class UserManagementService {
     }
 
     /**
-     * 사용 불가 비밀번호 placeholder: 외부에 절대 노출하지 않으며 로그인에 사용할 수 없다.
-     * BCrypt 해시 후 저장하므로 원문 복원 불가.
+     * 사용 불가 비밀번호 placeholder를 생성한다.
+     * 외부에 절대 노출하지 않으며 로그인에 사용할 수 없다.
+     * BCrypt 해시 후 저장하므로 원문 복원은 불가능하다.
      */
     private String generateUnusablePlaceholder() {
         byte[] bytes = new byte[32];

@@ -17,19 +17,19 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id", nullable = false)
+    @Column(name = "user_id", nullable = false, unique = true)
     private Long userId;
 
-    @Column(nullable = false, unique = true, length = 512)
-    private String token;
+    @Column(name = "token_hash", nullable = false, unique = true, length = 64)
+    private String tokenHash;
 
     @Column(name = "expiry_date", nullable = false)
     private LocalDateTime expiryDate;
 
-    public static RefreshToken of(Long userId, String token, LocalDateTime expiryDate) {
+    public static RefreshToken of(Long userId, String tokenHash, LocalDateTime expiryDate) {
         return RefreshToken.builder()
                 .userId(userId)
-                .token(token)
+                .tokenHash(tokenHash)
                 .expiryDate(expiryDate)
                 .build();
     }

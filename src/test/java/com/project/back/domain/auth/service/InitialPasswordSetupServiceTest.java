@@ -67,7 +67,6 @@ class InitialPasswordSetupServiceTest {
                 .role(UserRole.SALES_STAFF)
                 .status(UserStatus.ACTIVE)
                 .passwordInitialized(passwordInitialized)
-                .mustChangePassword(false)
                 .build();
         setField(user, "id", 1L);
         setField(user, "createdAt", LocalDateTime.now());
@@ -123,7 +122,6 @@ class InitialPasswordSetupServiceTest {
             service.setInitialPassword("raw_token", "ValidPass1!", "ValidPass1!");
 
             assertThat(user.isPasswordInitialized()).isTrue();
-            assertThat(user.isMustChangePassword()).isFalse();
             verify(passwordEncoder).encode("ValidPass1!");
         }
 
