@@ -11,6 +11,7 @@ import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
+import com.project.back.domain.user.entity.UserStatus;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.domain.user.service.UserStatsUpdateService;
 import com.project.back.global.enums.ApprovalReasonType;
@@ -92,7 +93,38 @@ public class ApprovalService {
                 requestMemo
         );
 
+        // 승인 권한자에게 알림 발송
+        notifyApprovers(requester, quote, approvalRequest.getId());
+
         return approvalRequest;
+    }
+
+    /**
+     * 승인 요청 대상자에게 알림을 발송한다.
+     * - 요청자가 영업사원이면: 같은 부서 영업관리자 + 전체 최고관리자
+     * - 요청자가 영업관리자면: 전체 최고관리자
+     */
+    private void notifyApprovers(User requester, Quote quote, Long approvalRequestId) {
+        List<User> approvers = new java.util.ArrayList<>(
+                userRepository.findByRoleAndStatus(UserRole.SUPER_ADMIN, UserStatus.ACTIVE));
+
+        if (requester.getRole() == UserRole.SALES_STAFF && requester.getDepartment() != null) {
+            approvers.addAll(userRepository.findByRoleAndDepartmentAndStatus(
+                    UserRole.SALES_MANAGER, requester.getDepartment(), UserStatus.ACTIVE));
+        }
+
+        String title = "새 승인 요청";
+        String message = requester.getName() + "님이 견적 " + quote.getQuoteNumber() + " 승인을 요청했습니다.";
+
+        for (User approver : approvers) {
+            notificationService.create(
+                    approver.getId(),
+                    NotificationType.APPROVAL_REQUESTED,
+                    title,
+                    message,
+                    NotificationRelatedType.APPROVAL,
+                    approvalRequestId);
+        }
     }
 
     // ── 2. 승인 처리 ──
