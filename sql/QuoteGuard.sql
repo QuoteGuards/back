@@ -9,13 +9,11 @@ SET FOREIGN_KEY_CHECKS = 0;
 
 USE quoteguard;
 
-DROP TABLE IF EXISTS ai_generation_logs;
 DROP TABLE IF EXISTS guide_confirmations;
 DROP TABLE IF EXISTS notifications;
 DROP TABLE IF EXISTS email_sends;
 DROP TABLE IF EXISTS quote_approval_histories;
 DROP TABLE IF EXISTS approval_requests;
-DROP TABLE IF EXISTS consultation_memos;
 DROP TABLE IF EXISTS quote_approval_reasons;
 DROP TABLE IF EXISTS quote_items;
 DROP TABLE IF EXISTS quotes;
@@ -25,9 +23,8 @@ DROP TABLE IF EXISTS product_favorites;
 DROP TABLE IF EXISTS products;
 DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS user_stats;
-DROP TABLE IF EXISTS login_histories;
+DROP TABLE IF EXISTS refresh_tokens;
 DROP TABLE IF EXISTS password_reset_tokens;
-DROP TABLE IF EXISTS user_account_histories;
 DROP TABLE IF EXISTS user_training_progress;
 DROP TABLE IF EXISTS training_contents;
 DROP TABLE IF EXISTS users;
@@ -38,9 +35,8 @@ CREATE TABLE users (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '사용자 식별자',
 
     member_number VARCHAR(20) NOT NULL COMMENT '시스템 자동 생성 로그인용 회원번호. 중복 불가',
-    email VARCHAR(100) NOT NULL COMMENT '사용자 실제 수신 이메일. 비밀번호 재설정 링크 발송에 사용하며 로그인 ID로는 사용하지 않음',
+    email VARCHAR(100) NOT NULL COMMENT '시스템 자동 생성 로그인용 이메일({member_number}@{account.email-domain} 형식). 실제 인증(로그인 조회) 및 초기 비밀번호 설정·재설정 링크 발송에 사용',
     password VARCHAR(255) NOT NULL COMMENT 'BCrypt 등으로 암호화된 비밀번호 해시값',
-    must_change_password BOOLEAN NOT NULL DEFAULT FALSE COMMENT '비밀번호 설정 완료 후 보안 정책상 다음 로그인 시 비밀번호 변경 필요 여부',
     password_initialized BOOLEAN NOT NULL DEFAULT FALSE COMMENT '사용자가 초기 비밀번호 설정 링크 또는 재설정 절차를 통해 실제 비밀번호를 설정했는지 여부',
     password_changed_at DATETIME NULL COMMENT '마지막 비밀번호 변경 일시',
 
@@ -82,7 +78,7 @@ CREATE TABLE password_reset_tokens (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '비밀번호 재설정 토큰 식별자',
 
     user_id BIGINT NOT NULL COMMENT '비밀번호 재설정을 요청한 사용자 ID',
-    token_hash VARCHAR(255) NOT NULL COMMENT '원본 토큰을 해시 처리한 값. 원본 토큰은 DB에 저장하지 않음',
+    token_hash VARCHAR(64) NOT NULL COMMENT '원본 토큰의 SHA-256 해시값(64자). 원본 토큰은 DB에 저장하지 않음',
     purpose ENUM('PASSWORD_RESET', 'INITIAL_PASSWORD_SETUP') NOT NULL DEFAULT 'PASSWORD_RESET' COMMENT '토큰 목적: PASSWORD_RESET=비밀번호 찾기, INITIAL_PASSWORD_SETUP=관리자 생성 계정의 초기 비밀번호 설정',
 
     expires_at DATETIME NOT NULL COMMENT '토큰 만료 일시',
@@ -94,6 +90,24 @@ CREATE TABLE password_reset_tokens (
         REFERENCES users(id)
         ON DELETE CASCADE
 ) COMMENT = '이메일 기반 비밀번호 재설정 및 초기 비밀번호 설정 요청 토큰을 저장하는 테이블';
+
+
+CREATE TABLE refresh_tokens (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'Refresh Token 식별자',
+
+    user_id BIGINT NOT NULL COMMENT '토큰 소유 사용자 ID',
+    token_hash VARCHAR(64) NOT NULL COMMENT '원본 Refresh Token을 SHA-256으로 해시 처리한 값(64자). 원본 토큰은 DB에 저장하지 않음',
+
+    expiry_date DATETIME NOT NULL COMMENT '토큰 만료 일시',
+
+    CONSTRAINT uk_refresh_tokens_token_hash UNIQUE (token_hash),
+    CONSTRAINT uk_refresh_tokens_user UNIQUE (user_id),
+
+    CONSTRAINT fk_refresh_tokens_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
+) COMMENT = 'JWT Refresh Token을 저장하는 테이블. 토큰 갱신 및 로그아웃 처리에 사용';
 
 
 CREATE TABLE training_contents (
@@ -144,59 +158,12 @@ CREATE TABLE user_training_progress (
 ) COMMENT = '사용자 교육 이수 현황';
 
 
-CREATE TABLE user_account_histories (
-    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '사용자 처리 이력 식별자',
-
-    user_id BIGINT NOT NULL COMMENT '처리 대상 사용자 ID',
-    admin_id BIGINT NULL COMMENT '처리한 관리자 ID. 시스템 자동 처리인 경우 NULL 가능',
-
-    action_type ENUM('CREATE', 'SUSPEND', 'REACTIVATE', 'ROLE_CHANGE', 'INFO_UPDATE', 'PASSWORD_RESET', 'DELETE') NOT NULL COMMENT '사용자 계정 처리 유형: 생성, 정지, 재활성화, 권한 변경, 정보 수정, 비밀번호 초기화, 삭제',
-
-    before_status ENUM('ACTIVE', 'SUSPENDED', 'DELETED') NULL COMMENT '변경 전 사용자 상태',
-    after_status ENUM('ACTIVE', 'SUSPENDED', 'DELETED') NULL COMMENT '변경 후 사용자 상태',
-    before_role ENUM('SUPER_ADMIN', 'SALES_MANAGER', 'SALES_STAFF') NULL COMMENT '변경 전 사용자 권한',
-    after_role ENUM('SUPER_ADMIN', 'SALES_MANAGER', 'SALES_STAFF') NULL COMMENT '변경 후 사용자 권한',
-
-    reason VARCHAR(500) NULL COMMENT '계정 생성, 정지, 권한 변경, 비밀번호 초기화 등의 처리 사유',
-
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '처리 이력 생성 일시',
-
-    CONSTRAINT fk_user_account_histories_user
-        FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_user_account_histories_admin
-        FOREIGN KEY (admin_id)
-        REFERENCES users(id)
-        ON DELETE SET NULL
-) COMMENT = '관리자 계정 생성, 정지, 권한 변경, 비밀번호 초기화 등 사용자 관리 이력을 저장하는 테이블';
-
-
-CREATE TABLE login_histories (
-    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '로그인 이력 식별자',
-
-    user_id BIGINT NULL COMMENT '로그인한 사용자 ID (존재하지 않는 회원번호로 실패한 경우 NULL 가능)',
-    login_id VARCHAR(50) NOT NULL COMMENT '로그인 시도에 사용된 회원번호',
-
-    success BOOLEAN NOT NULL COMMENT '로그인 성공 여부. TRUE=성공, FALSE=실패',
-    failure_reason ENUM('USER_NOT_FOUND', 'INVALID_PASSWORD', 'PASSWORD_NOT_INITIALIZED', 'SUSPENDED_USER', 'DELETED_USER') NULL COMMENT '로그인 실패 사유. 성공 시 NULL',
-
-    ip_address VARCHAR(45) NULL COMMENT '로그인 시도 IP 주소 (IPv6까지 고려하여 45자 사용)',
-    user_agent VARCHAR(500) NULL COMMENT '브라우저 및 기기 정보 (긴 User-Agent 문자열을 고려해 500자 사용)',
-
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '로그인 시도 일시',
-
-    CONSTRAINT fk_login_histories_user
-        FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE SET NULL
-) COMMENT = '회원번호 기반 로그인 성공/실패 기록과 최근 로그인 정보를 저장하는 테이블';
-
 
 CREATE TABLE user_stats (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '사용자 통계 식별자',
     user_id BIGINT NOT NULL COMMENT '통계 대상 사용자 ID',
+
+    version BIGINT NOT NULL DEFAULT 0 COMMENT 'JPA 낙관적 락 버전. 동시 통계 갱신 시 충돌 감지에 사용',
 
     total_quotes INT NOT NULL DEFAULT 0 COMMENT '사용자가 작성한 전체 견적 수',
     approved_quotes INT NOT NULL DEFAULT 0 COMMENT '승인 완료된 견적 수',
@@ -383,19 +350,19 @@ CREATE TABLE quotes (
         'CANCELLED'
     ) NOT NULL DEFAULT 'DRAFT' COMMENT '견적 상태: 임시저장, 작성완료, 승인불필요, 승인대기, 승인완료, 반려, 수정중, 발송완료, 만료, 취소',
 
-    company_name VARCHAR(200) NULL COMMENT '발행 시점 자사명',
-    company_business_number VARCHAR(30) NULL COMMENT '발행 시점 자사 사업자번호',
-    company_email VARCHAR(255) NULL COMMENT '발행 시점 자사 이메일',
-    company_phone VARCHAR(20) NULL COMMENT '발행 시점 자사 연락처',
+    company_name VARCHAR(100) NULL COMMENT '발행 시점 자사명',
+    company_business_number VARCHAR(20) NULL COMMENT '발행 시점 자사 사업자번호',
+    company_email VARCHAR(100) NULL COMMENT '발행 시점 자사 이메일',
+    company_phone VARCHAR(30) NULL COMMENT '발행 시점 자사 연락처',
     company_address TEXT NULL COMMENT '발행 시점 자사 주소지',
-    customer_company_name VARCHAR(200) NULL COMMENT '발행 시점 거래처명',
-    customer_contact_name VARCHAR(100) NULL COMMENT '발행 시점 고객 담당자명',
-    customer_email VARCHAR(255) NULL COMMENT '발행 시점 고객 이메일',
-    customer_phone VARCHAR(20) NULL COMMENT '발행 시점 고객 연락처',
+    customer_company_name VARCHAR(100) NULL COMMENT '발행 시점 거래처명',
+    customer_contact_name VARCHAR(50) NULL COMMENT '발행 시점 고객 담당자명',
+    customer_email VARCHAR(100) NULL COMMENT '발행 시점 고객 이메일',
+    customer_phone VARCHAR(30) NULL COMMENT '발행 시점 고객 연락처',
     customer_address TEXT NULL COMMENT '발행 시점 고객 주소지',
-    
+
     issued_date DATE NULL COMMENT '견적 발행일',
-    delivery_term VARCHAR(255) NULL COMMENT '납기 및 인도 조건',
+    delivery_term VARCHAR(100) NULL COMMENT '납기 및 인도 조건',
 
     subtotal DECIMAL(18, 2) NOT NULL DEFAULT 0.00 COMMENT '할인 및 VAT 적용 전 상품 금액 합계',
     discount_amount DECIMAL(18, 2) NOT NULL DEFAULT 0.00 COMMENT '견적 전체 할인 금액 합계',
@@ -468,6 +435,8 @@ CREATE TABLE quote_items (
     line_supply_amount DECIMAL(18, 2) NOT NULL DEFAULT 0.00 COMMENT '항목별 VAT 제외 공급가액',
     line_total DECIMAL(18, 2) NOT NULL COMMENT '항목 최종 금액. 수량, 단가, 할인, VAT를 반영한 금액',
 
+    discount_reason VARCHAR(255) NULL COMMENT '할인 적용 사유 (선택 입력)',
+
     sort_order INT NOT NULL DEFAULT 0 COMMENT '견적서 내 항목 표시 순서',
 
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '견적 항목 생성 일시',
@@ -509,36 +478,6 @@ CREATE TABLE quote_approval_reasons (
 ) COMMENT = '견적 승인 필요 사유를 다중 저장하는 테이블';
 
 
-CREATE TABLE consultation_memos (
-    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '상담 메모 식별자',
-
-    quote_id BIGINT NULL COMMENT '상담 메모가 연결된 견적 ID',
-    customer_id BIGINT NULL COMMENT '상담 메모가 연결된 고객 ID',
-    created_by BIGINT NOT NULL COMMENT '상담 메모 작성자 ID',
-
-    content TEXT NOT NULL COMMENT '고객 상담 원문 메모',
-    ai_summary TEXT NULL COMMENT 'AI가 생성한 상담 메모 요약',
-
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '상담 메모 생성 일시',
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '상담 메모 수정 일시',
-
-    CONSTRAINT fk_consultation_memos_quote
-        FOREIGN KEY (quote_id)
-        REFERENCES quotes(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_consultation_memos_customer
-        FOREIGN KEY (customer_id)
-        REFERENCES customers(id)
-        ON DELETE SET NULL,
-
-    CONSTRAINT fk_consultation_memos_created_by
-        FOREIGN KEY (created_by)
-        REFERENCES users(id)
-        ON DELETE RESTRICT
-) COMMENT = '고객 상담 메모와 AI 상담 요약 결과를 저장하는 테이블';
-
-
 CREATE TABLE approval_requests (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '견적 승인 요청 식별자',
 
@@ -551,6 +490,7 @@ CREATE TABLE approval_requests (
 
     request_memo TEXT NULL COMMENT '영업사원이 작성한 승인 요청 사유',
     reject_reason TEXT NULL COMMENT '관리자가 입력한 반려 사유',
+    approve_memo TEXT NULL COMMENT '관리자가 승인 시 입력한 메모',
 
     ai_risk_summary TEXT NULL COMMENT '할인율, 총액, 이익률 등을 기반으로 생성된 AI 리스크 요약',
     request_count INT NOT NULL DEFAULT 1 COMMENT '동일 견적에 대한 승인 요청 또는 재요청 횟수',
@@ -681,27 +621,6 @@ CREATE TABLE guide_confirmations (
 ) COMMENT = '견적 작성 절차, 할인율 기준, 승인 요청 조건 등 가이드 확인 완료 여부를 저장하는 테이블';
 
 
-CREATE TABLE ai_generation_logs (
-    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT 'AI 생성 로그 식별자',
-    user_id BIGINT NOT NULL COMMENT 'AI 기능을 사용한 사용자 ID',
-    quote_id BIGINT NULL COMMENT 'AI 결과가 연결된 견적 ID',
-    type ENUM('CONSULTATION_SUMMARY', 'PROPOSAL_TEXT', 'RISK_SUMMARY') NOT NULL COMMENT 'AI 생성 유형: 상담 요약, 제안 문구, 리스크 요약',
-    input_text MEDIUMTEXT NULL COMMENT 'AI 생성에 사용된 입력 내용',
-    output_text MEDIUMTEXT NOT NULL COMMENT 'AI가 생성한 결과 내용',
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT 'AI 생성 일시',
-
-    CONSTRAINT fk_ai_generation_logs_user
-        FOREIGN KEY (user_id)
-        REFERENCES users(id)
-        ON DELETE RESTRICT,
-
-    CONSTRAINT fk_ai_generation_logs_quote
-        FOREIGN KEY (quote_id)
-        REFERENCES quotes(id)
-        ON DELETE SET NULL
-) COMMENT = 'AI 상담 메모 요약, 제안 문구 생성, 리스크 요약 결과를 저장하는 테이블';
-
-
 -- ================================================================================================================================
 -- 조회 성능 개선용 인덱스
 -- ================================================================================================================================
@@ -727,22 +646,6 @@ CREATE INDEX idx_user_training_progress_user_status ON user_training_progress (u
 
 -- 관리자 교육 이수 현황 화면에서 특정 교육 콘텐츠를 수강한 사용자 목록을 조회할 때 사용한다.
 CREATE INDEX idx_user_training_progress_content ON user_training_progress (training_content_id);
-
-
--- user_account_histories 테이블 인덱스
--- user_account_histories 테이블의 user_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_user_account_histories_user ON user_account_histories (user_id);
-
--- user_account_histories 테이블의 admin_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_user_account_histories_admin ON user_account_histories (admin_id);
-
-
--- login_histories 테이블 인덱스
--- login_histories 테이블의 user_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_login_histories_user ON login_histories (user_id);
-
--- 로그인 실패 이력 분석 시 회원번호 기준으로 로그인 시도 기록을 빠르게 조회한다.
-CREATE INDEX idx_login_histories_login_id ON login_histories (login_id);
 
 
 -- password_reset_tokens 테이블 인덱스
@@ -835,17 +738,6 @@ CREATE INDEX idx_quote_approval_reasons_quote ON quote_approval_reasons (quote_i
 CREATE INDEX idx_quote_approval_reasons_type ON quote_approval_reasons (reason_type);
 
 
--- consultation_memos 테이블 인덱스
--- consultation_memos 테이블의 quote_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_consultation_memos_quote ON consultation_memos (quote_id);
-
--- consultation_memos 테이블의 customer_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_consultation_memos_customer ON consultation_memos (customer_id);
-
--- consultation_memos 테이블의 created_by 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_consultation_memos_created_by ON consultation_memos (created_by);
-
-
 -- approval_requests 테이블 인덱스
 -- approval_requests 테이블의 quote_id 컬럼 조회 성능 개선용 인덱스
 CREATE INDEX idx_approval_requests_quote ON approval_requests (quote_id);
@@ -883,11 +775,3 @@ CREATE INDEX idx_email_sends_status ON email_sends (status);
 -- notifications 테이블 인덱스
 -- notifications 테이블의 user_id 컬럼 조회 성능 개선용 인덱스
 CREATE INDEX idx_notifications_user_read_created ON notifications (user_id, is_read, created_at DESC);
-
-
--- ai_generation_logs 테이블 인덱스
--- ai_generation_logs 테이블의 user_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_ai_generation_logs_user ON ai_generation_logs (user_id);
-
--- ai_generation_logs 테이블의 quote_id 컬럼 조회 성능 개선용 인덱스
-CREATE INDEX idx_ai_generation_logs_quote ON ai_generation_logs (quote_id);

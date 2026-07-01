@@ -3,19 +3,16 @@ package com.project.back.domain.user.controller;
 import tools.jackson.databind.json.JsonMapper;
 import com.project.back.domain.auth.service.InitialPasswordSetupService;
 import com.project.back.domain.user.dto.response.AdminCreateUserResponse;
-import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
 import com.project.back.domain.user.service.UserManagementService;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
-import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.security.JwtAccessDeniedHandler;
 import com.project.back.global.security.JwtAuthenticationEntryPoint;
 import com.project.back.global.security.JwtTokenProvider;
 import com.project.back.global.security.SecurityConfig;
 import com.project.back.global.security.SecurityErrorResponseWriter;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -33,10 +30,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -62,23 +57,6 @@ class AdminUserControllerTest {
 
     @MockitoBean
     private JwtTokenProvider jwtTokenProvider;
-
-    @MockitoBean
-    private UserRepository userRepository;
-
-    @BeforeEach
-    void stubUserRepository() {
-        User activeUser = User.builder()
-                .memberNumber("2600001")
-                .email("2600001@quoteguard.com")
-                .password("encoded")
-                .name("테스트")
-                .role(UserRole.SALES_STAFF)
-                .status(UserStatus.ACTIVE)
-                .mustChangePassword(false)
-                .build();
-        given(userRepository.findById(anyLong())).willReturn(Optional.of(activeUser));
-    }
 
     private RequestPostProcessor asUser(Long userId, String role) {
         Authentication auth = new UsernamePasswordAuthenticationToken(
@@ -109,7 +87,7 @@ class AdminUserControllerTest {
                     .createdAt(LocalDateTime.now())
                     .build();
 
-            given(userManagementService.createUser(any())).willReturn(mockResponse);
+            given(userManagementService.createUser(any(), any())).willReturn(mockResponse);
 
             mockMvc.perform(post("/api/admin/users")
                             .with(asUser(1L, "SUPER_ADMIN"))
@@ -216,7 +194,7 @@ class AdminUserControllerTest {
         @Test
         @DisplayName("이메일 중복(자동 생성 충돌) 시 409 Conflict")
         void createUser_duplicateEmail_conflict() throws Exception {
-            given(userManagementService.createUser(any()))
+            given(userManagementService.createUser(any(), any()))
                     .willThrow(new CustomException(ErrorCode.DUPLICATE_EMAIL));
 
             mockMvc.perform(post("/api/admin/users")

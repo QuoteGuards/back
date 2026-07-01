@@ -15,7 +15,6 @@ public enum ErrorCode {
     USER_SUSPENDED(HttpStatus.FORBIDDEN, "AUTH_004", "정지된 계정입니다. 관리자에게 문의하세요."),
     USER_DELETED(HttpStatus.FORBIDDEN, "AUTH_005", "삭제된 계정입니다. 관리자에게 문의하세요."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "AUTH_006", "접근 권한이 없습니다."),
-    MUST_CHANGE_PASSWORD(HttpStatus.FORBIDDEN, "AUTH_007", "초기 비밀번호를 변경해야 합니다."),
 
     // User Management
     CANNOT_MODIFY_SELF(HttpStatus.BAD_REQUEST, "USER_001", "자기 자신의 권한 변경 또는 비활성화는 불가합니다."),
@@ -114,6 +113,8 @@ public enum ErrorCode {
     FILE_TOO_LARGE(HttpStatus.BAD_REQUEST, "FILE_002", "파일 크기가 너무 큽니다. (최대 5MB)"),
     FILE_INVALID_TYPE(HttpStatus.BAD_REQUEST, "FILE_003", "이미지 파일만 업로드할 수 있습니다."),
     FILE_UPLOAD_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "FILE_004", "파일 업로드에 실패했습니다."),
+    FILE_VIDEO_TOO_LARGE(HttpStatus.BAD_REQUEST, "FILE_005", "영상 파일 크기가 너무 큽니다. (최대 300MB)"),
+    FILE_VIDEO_INVALID_TYPE(HttpStatus.BAD_REQUEST, "FILE_006", "MP4 영상 파일만 업로드할 수 있습니다."),
 
     // Common
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "입력값이 유효하지 않습니다."),

@@ -75,7 +75,6 @@ class AdminUserAccountServiceTest {
                 .role(UserRole.SALES_STAFF)
                 .status(UserStatus.ACTIVE)
                 .passwordInitialized(false)
-                .mustChangePassword(false)
                 .build();
         setField(user, "id", 1L);
         setField(user, "createdAt", LocalDateTime.now());

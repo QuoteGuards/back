@@ -72,7 +72,7 @@ public class QuoteService {
                            List<QuoteItemCommand> itemCommands) {
 
         validateQuoteWriterRole(createdBy);
-        validateTrainingCompleted(createdBy.getId());
+        validateTrainingCompleted(createdBy);
         validateQuoteDates(issuedDate, validUntil);
         Customer customer = getCustomerOrThrow(customerId, createdBy.getId());
         DiscountPolicy policy = resolveDiscountPolicy(discountPolicyId);
@@ -121,7 +121,7 @@ public class QuoteService {
     @Transactional
     public Quote submitQuote(Long quoteId, User requester) {
         validateQuoteWriterRole(requester);
-        validateTrainingCompleted(requester.getId());
+        validateTrainingCompleted(requester);
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
         validateEditable(quote);
@@ -138,10 +138,7 @@ public class QuoteService {
 
         if (approvalRequired) {
             List<QuoteApprovalReason> reasonEntities = reasons.stream()
-                    .map(r -> QuoteApprovalReason.of(
-                            quote,
-                            QuoteApprovalReason.ReasonType.valueOf(r.name()),
-                            r.name()))
+                    .map(r -> QuoteApprovalReason.of(quote, r, r.name()))
                     .toList();
             approvalReasonRepository.saveAll(reasonEntities);
         }
@@ -161,7 +158,7 @@ public class QuoteService {
                              List<QuoteItemCommand> itemCommands) {
 
         validateQuoteWriterRole(requester);
-        validateTrainingCompleted(requester.getId());
+        validateTrainingCompleted(requester);
         validateQuoteDates(issuedDate, validUntil);
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateOwner(quote, requester);
@@ -267,7 +264,7 @@ public class QuoteService {
     @Transactional
     public Quote reuseQuote(Long sourceQuoteId, User requester) {
         validateQuoteWriterRole(requester);
-        validateTrainingCompleted(requester.getId());
+        validateTrainingCompleted(requester);
         Quote source = getQuoteWithDetailsOrThrow(sourceQuoteId);
         validateOwner(source, requester);
 
@@ -297,7 +294,7 @@ public class QuoteService {
     @Transactional
     public Quote rewriteExpiredQuote(Long expiredQuoteId, User requester) {
         validateQuoteWriterRole(requester);
-        validateTrainingCompleted(requester.getId());
+        validateTrainingCompleted(requester);
         Quote expired = getQuoteWithDetailsOrThrow(expiredQuoteId);
         validateOwner(expired, requester);
 
@@ -390,7 +387,7 @@ public class QuoteService {
     public QuoteProductContextResponse getProductContextForQuote(Long productId, Long userId) {
         User user = findUser(userId);
         validateQuoteWriterRole(user);
-        validateTrainingCompleted(userId);
+        validateTrainingCompleted(user);
 
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new CustomException(ErrorCode.PRODUCT_NOT_FOUND));
@@ -463,8 +460,8 @@ public class QuoteService {
             throw new CustomException(ErrorCode.QUOTE_NOT_EDITABLE);
     }
 
-    private void validateTrainingCompleted(Long userId) {
-        if (!trainingService.isTrainingCompleted(userId)) {
+    private void validateTrainingCompleted(User user) {
+        if (!trainingService.isTrainingCompleted(user)) {
             throw new CustomException(ErrorCode.TRAINING_NOT_COMPLETED);
         }
     }

@@ -20,7 +20,7 @@ public class User {
     @Column(name = "member_number", unique = true, nullable = false, length = 20)
     private String memberNumber;
 
-    @Column(unique = true, length = 100)
+    @Column(unique = true, nullable = false, length = 100)
     private String email;
 
     @Column(nullable = false)
@@ -34,15 +34,6 @@ public class User {
     @Column(name = "password_initialized", nullable = false)
     @Builder.Default
     private boolean passwordInitialized = false;
-
-    /**
-     * 보안 정책상 비밀번호 변경 필요 여부.
-     * passwordInitialized=true인 상태에서만 의미가 있다.
-     * 현재는 초기 설정 링크 방식으로 변경되어 사용하지 않으나 하위 호환을 위해 유지.
-     */
-    @Column(name = "must_change_password", nullable = false)
-    @Builder.Default
-    private boolean mustChangePassword = false;
 
     @Column(nullable = false, length = 50)
     private String name;
@@ -66,11 +57,20 @@ public class User {
     @Builder.Default
     private UserStatus status = UserStatus.ACTIVE;
 
+    @Column(name = "created_by")
+    private Long createdBy;
+
     @Column(name = "suspended_by")
     private Long suspendedBy;
 
     @Column(name = "suspended_at")
     private LocalDateTime suspendedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    @Column(name = "password_changed_at")
+    private LocalDateTime passwordChangedAt;
 
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
@@ -106,6 +106,7 @@ public class User {
 
     public void delete() {
         this.status = UserStatus.DELETED;
+        this.deletedAt = LocalDateTime.now();
     }
 
     public void updateInfo(String name, String phone, String department, String position) {
@@ -126,7 +127,7 @@ public class User {
     public void setInitialPassword(String encodedPassword) {
         this.password = encodedPassword;
         this.passwordInitialized = true;
-        this.mustChangePassword = false;
+        this.passwordChangedAt = LocalDateTime.now();
     }
 
     /**
@@ -134,7 +135,7 @@ public class User {
      */
     public void changePassword(String encodedPassword) {
         this.password = encodedPassword;
-        this.mustChangePassword = false;
+        this.passwordChangedAt = LocalDateTime.now();
     }
 
     public void changeRole(UserRole newRole) {

@@ -222,7 +222,6 @@ class PasswordResetServiceTest {
                 .name("테스터")
                 .role(UserRole.SALES_STAFF)
                 .status(UserStatus.ACTIVE)
-                .mustChangePassword(false)
                 .build();
     }
 
