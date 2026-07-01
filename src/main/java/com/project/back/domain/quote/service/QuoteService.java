@@ -350,23 +350,29 @@ public class QuoteService {
 
     // 매일 자정, 3일 후 만료 예정인 견적의 작성자에게 만료 임박 알림을 발송한다.
     @Scheduled(cron = "0 5 0 * * *")
-    @Transactional(readOnly = true)
+    @Transactional
     public void notifyExpiringQuotes() {
-        LocalDate target = LocalDate.now().plusDays(3);
-        List<Quote> quotes = quoteRepository.findExpiringOn(
-                target,
+        LocalDate today = LocalDate.now();
+        LocalDate until = today.plusDays(3);
+        // 오늘~3일 후 만료 예정이면서 아직 알림을 보내지 않은 견적 (스케줄러 누락 시 catch-up)
+        List<Quote> quotes = quoteRepository.findExpiringBetween(
+                today, until,
                 Arrays.asList(QuoteStatus.APPROVAL_NOT_REQUIRED, QuoteStatus.APPROVED, QuoteStatus.SENT));
 
         for (Quote quote : quotes) {
             // 한 건의 알림 실패가 나머지 배치를 중단시키지 않도록 항목별로 격리한다.
             try {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(today, quote.getValidUntil());
+                String when = days <= 0 ? "오늘" : days + "일 후";
                 notificationService.create(
                         quote.getCreatedBy().getId(),
                         com.project.back.notification.entity.NotificationType.QUOTE_EXPIRING,
                         "견적 만료 임박",
-                        "견적 " + quote.getQuoteNumber() + " 이(가) 3일 후 만료됩니다.",
+                        "견적 " + quote.getQuoteNumber() + " 이(가) " + when + " 만료됩니다.",
                         com.project.back.notification.entity.NotificationRelatedType.QUOTE,
                         quote.getId());
+                // 중복 발송 방지 플래그 (알림 성공 시에만 기록)
+                quote.markExpiringNotified(today);
             } catch (Exception e) {
                 log.warn("만료 임박 알림 생성 실패 - quoteId={}, quoteNumber={}",
                         quote.getId(), quote.getQuoteNumber(), e);
