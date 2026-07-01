@@ -20,7 +20,7 @@ import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import com.project.back.notification.entity.NotificationRelatedType;
 import com.project.back.notification.entity.NotificationType;
-import com.project.back.notification.service.NotificationService;
+import com.project.back.notification.event.NotificationCreateEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,7 +42,7 @@ public class ApprovalService {
     private final UserRepository userRepository;
     private final QuoteRepository quoteRepository;
     private final UserStatsUpdateService userStatsUpdateService;
-    private final NotificationService notificationService;
+    private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     // ── 1. 승인 요청 ──
     @Transactional
@@ -117,13 +117,17 @@ public class ApprovalService {
         String message = requester.getName() + "님이 견적 " + quote.getQuoteNumber() + " 승인을 요청했습니다.";
 
         for (User approver : approvers) {
-            notificationService.create(
+            // 요청자 본인(활성 SUPER_ADMIN 등)이 포함될 수 있으므로 자기 알림은 제외
+            if (approver.getId().equals(requester.getId())) {
+                continue;
+            }
+            eventPublisher.publishEvent(new NotificationCreateEvent(
                     approver.getId(),
                     NotificationType.APPROVAL_REQUESTED,
                     title,
                     message,
                     NotificationRelatedType.APPROVAL,
-                    approvalRequestId);
+                    approvalRequestId));
         }
     }
 
@@ -170,14 +174,14 @@ public class ApprovalService {
         // 견적 작성자 통계 갱신 (승인 + 발송 카운트 반영) - 커밋 이후 재집계
         userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
 
-        // 견적 작성자에게 승인 알림
-        notificationService.create(
+        // 견적 작성자에게 승인 알림 (트랜잭션 커밋 후 발행)
+        eventPublisher.publishEvent(new NotificationCreateEvent(
                 quote.getCreatedBy().getId(),
                 NotificationType.QUOTE_APPROVED,
                 "견적 승인 완료",
                 "견적 " + quote.getQuoteNumber() + " 이(가) 승인되었습니다.",
                 NotificationRelatedType.QUOTE,
-                quote.getId());
+                quote.getId()));
 
         return approvalRequest;
     }
@@ -229,14 +233,14 @@ public class ApprovalService {
         // 견적 작성자 통계 갱신 (반려 카운트 반영) - 커밋 이후 재집계
         userStatsUpdateService.recalculateAfterCommit(quote.getCreatedBy().getId());
 
-        // 견적 작성자에게 반려 알림 (사유 포함)
-        notificationService.create(
+        // 견적 작성자에게 반려 알림 (사유 포함, 트랜잭션 커밋 후 발행)
+        eventPublisher.publishEvent(new NotificationCreateEvent(
                 quote.getCreatedBy().getId(),
                 NotificationType.QUOTE_REJECTED,
                 "견적 반려",
                 "견적 " + quote.getQuoteNumber() + " 이(가) 반려되었습니다. 사유: " + rejectReason,
                 NotificationRelatedType.QUOTE,
-                quote.getId());
+                quote.getId()));
 
         return approvalRequest;
     }
