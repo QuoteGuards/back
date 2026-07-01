@@ -554,6 +554,7 @@ CREATE TABLE approval_requests (
 
     request_memo TEXT NULL COMMENT '영업사원이 작성한 승인 요청 사유',
     reject_reason TEXT NULL COMMENT '관리자가 입력한 반려 사유',
+    approve_memo TEXT NULL COMMENT '관리자가 승인 시 입력한 메모',
 
     ai_risk_summary TEXT NULL COMMENT '할인율, 총액, 이익률 등을 기반으로 생성된 AI 리스크 요약',
     request_count INT NOT NULL DEFAULT 1 COMMENT '동일 견적에 대한 승인 요청 또는 재요청 횟수',

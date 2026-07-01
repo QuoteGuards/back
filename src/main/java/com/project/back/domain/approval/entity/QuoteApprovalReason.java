@@ -1,6 +1,7 @@
 package com.project.back.domain.approval.entity;
 
 import com.project.back.domain.quote.entity.Quote;
+import com.project.back.global.enums.ApprovalReasonType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -25,7 +26,7 @@ public class QuoteApprovalReason {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private ReasonType reasonType;
+    private ApprovalReasonType reasonType;
 
     @Column(length = 500)
     private String reasonMessage;
@@ -38,13 +39,7 @@ public class QuoteApprovalReason {
         this.createdAt = LocalDateTime.now();
     }
 
-    public enum ReasonType {
-        DISCOUNT_EXCEEDED,
-        LOW_PROFIT,
-        HIGH_AMOUNT
-    }
-
-    public static QuoteApprovalReason of(Quote quote, ReasonType reasonType, String message) {
+    public static QuoteApprovalReason of(Quote quote, ApprovalReasonType reasonType, String message) {
         return QuoteApprovalReason.builder()
                 .quote(quote)
                 .reasonType(reasonType)
