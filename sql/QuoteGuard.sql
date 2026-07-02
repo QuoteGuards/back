@@ -25,6 +25,8 @@ DROP TABLE IF EXISTS categories;
 DROP TABLE IF EXISTS user_stats;
 DROP TABLE IF EXISTS refresh_tokens;
 DROP TABLE IF EXISTS password_reset_tokens;
+DROP TABLE IF EXISTS user_training_video_progress;
+DROP TABLE IF EXISTS training_videos;
 DROP TABLE IF EXISTS user_training_progress;
 DROP TABLE IF EXISTS training_contents;
 DROP TABLE IF EXISTS users;
@@ -125,6 +127,56 @@ CREATE TABLE training_contents (
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일'
 ) COMMENT = '교육 콘텐츠';
+
+
+CREATE TABLE training_videos (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '교육 영상 ID',
+
+    training_content_id BIGINT NOT NULL COMMENT '소속 교육 콘텐츠 ID',
+    title VARCHAR(100) NOT NULL COMMENT '영상 제목',
+    video_url VARCHAR(500) NOT NULL COMMENT '영상 URL 또는 파일 경로',
+    sort_order INT NOT NULL DEFAULT 0 COMMENT '노출 순서',
+    active BOOLEAN NOT NULL DEFAULT FALSE COMMENT '활성 여부. true인 영상만 사원에게 노출되며 이수 판정에 포함',
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
+
+    CONSTRAINT fk_training_videos_content
+        FOREIGN KEY (training_content_id)
+        REFERENCES training_contents(id)
+        ON DELETE RESTRICT
+) COMMENT = '교육 콘텐츠에 속한 영상 목록';
+
+
+CREATE TABLE user_training_video_progress (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '사용자 영상 시청 진도 ID',
+
+    user_id BIGINT NOT NULL COMMENT '사용자 ID',
+    training_video_id BIGINT NOT NULL COMMENT '교육 영상 ID',
+
+    progress_rate DECIMAL(5, 2) NOT NULL DEFAULT 0.00 COMMENT '영상 시청률',
+    status ENUM('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED') NOT NULL DEFAULT 'NOT_STARTED' COMMENT '영상 이수 상태',
+
+    watched_seconds INT NOT NULL DEFAULT 0 COMMENT '시청한 영상 시간',
+    last_watched_seconds INT NOT NULL DEFAULT 0 COMMENT '마지막 시청 위치. 이어보기 기능에 사용',
+
+    completed_at DATETIME NULL COMMENT '영상 이수 완료 시간',
+
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '생성일',
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '수정일',
+
+    CONSTRAINT uk_user_training_video_progress_user_video UNIQUE (user_id, training_video_id),
+
+    CONSTRAINT fk_user_training_video_progress_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE RESTRICT,
+
+    CONSTRAINT fk_user_training_video_progress_video
+        FOREIGN KEY (training_video_id)
+        REFERENCES training_videos(id)
+        ON DELETE RESTRICT
+) COMMENT = '사용자별 교육 영상 시청 진도';
 
 
 CREATE TABLE user_training_progress (
@@ -638,6 +690,13 @@ CREATE INDEX idx_users_status ON users (status);
 -- training_contents 테이블 인덱스
 -- 견적 작성 화면 진입 시 활성화된 필수 교육 콘텐츠를 training_type과 active 조건으로 빠르게 찾기 위해 사용한다.
 CREATE INDEX idx_training_contents_type_active ON training_contents (training_type, active);
+
+
+CREATE INDEX idx_training_videos_content_active ON training_videos (training_content_id, active, sort_order);
+
+CREATE INDEX idx_user_training_video_progress_user ON user_training_video_progress (user_id);
+
+CREATE INDEX idx_user_training_video_progress_video ON user_training_video_progress (training_video_id);
 
 
 -- user_training_progress 테이블 인덱스

@@ -1,12 +1,16 @@
 package com.project.back.domain.training.service;
 
 import com.project.back.domain.training.dto.response.AdminTrainingStatusResponse;
+import com.project.back.domain.training.dto.response.TrainingContentResponse;
+import com.project.back.domain.training.dto.response.TrainingVideoResponse;
 import com.project.back.domain.training.entity.GuideConfirmation;
 import com.project.back.domain.training.entity.TrainingContent;
-import com.project.back.domain.training.entity.UserTrainingProgress;
+import com.project.back.domain.training.entity.TrainingVideo;
+import com.project.back.domain.training.entity.UserTrainingVideoProgress;
 import com.project.back.domain.training.repository.GuideConfirmationRepository;
 import com.project.back.domain.training.repository.TrainingContentRepository;
-import com.project.back.domain.training.repository.UserTrainingProgressRepository;
+import com.project.back.domain.training.repository.TrainingVideoRepository;
+import com.project.back.domain.training.repository.UserTrainingVideoProgressRepository;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
@@ -18,6 +22,8 @@ import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import com.project.back.global.storage.VideoFileStorage;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -28,11 +34,13 @@ import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,55 +48,80 @@ import java.util.stream.Collectors;
 @Transactional(readOnly = true)
 public class TrainingService {
 
+    private static final Logger log = LoggerFactory.getLogger(TrainingService.class);
+    private static final BigDecimal COMPLETE_THRESHOLD = new BigDecimal("80.00");
+
     private final TrainingContentRepository trainingContentRepository;
-    private final UserTrainingProgressRepository userTrainingProgressRepository;
+    private final TrainingVideoRepository trainingVideoRepository;
+    private final UserTrainingVideoProgressRepository userTrainingVideoProgressRepository;
     private final GuideConfirmationRepository guideConfirmationRepository;
     private final UserRepository userRepository;
     private final VideoFileStorage videoFileStorage;
     private final ObjectMapper objectMapper;
 
-    //견적 작성 필수 교육 콘텐츠 조회(활성화된 QUOTE_WRITE 타입 콘텐츠 반환)
     public TrainingContent getQuoteWritingContent() {
         return trainingContentRepository
                 .findFirstByTrainingTypeAndActiveTrueOrderByUpdatedAtDesc(TrainingType.QUOTE_WRITE)
                 .orElseThrow(() -> new CustomException(ErrorCode.TRAINING_CONTENT_NOT_FOUND));
     }
 
-    //교육 영상 시청 진도율 저장 (이어보기 지원) (진도율 80% 이상 도달 시 자동으로 COMPLETED 전이)
-    @Transactional
-    public UserTrainingProgress updateProgress(User user,
-                                               BigDecimal progressRate,
-                                               int watchedSeconds,
-                                               int lastWatchedSeconds) {
+    public TrainingContentResponse getQuoteWritingContentForStaff(User user) {
         TrainingContent content = getQuoteWritingContent();
+        List<TrainingVideo> activeVideos = getActiveVideos(content.getId());
+        Map<Long, UserTrainingVideoProgress> progressByVideoId = getProgressMap(user.getId(), content.getId());
 
-        UserTrainingProgress progress = userTrainingProgressRepository
-                .findByUserIdAndTrainingContentId(user.getId(), content.getId())
-                .orElseGet(() -> createInitialProgress(user, content));
+        List<TrainingVideoResponse> videos = activeVideos.stream()
+                .map(video -> TrainingVideoResponse.forStaff(video, progressByVideoId.get(video.getId())))
+                .toList();
+
+        return TrainingContentResponse.from(content, videos);
+    }
+
+    public TrainingContentResponse getQuoteWritingContentForAdmin() {
+        TrainingContent content = getQuoteWritingContent();
+        List<TrainingVideoResponse> videos = trainingVideoRepository
+                .findByTrainingContentIdOrderBySortOrderAscIdAsc(content.getId())
+                .stream()
+                .map(TrainingVideoResponse::forAdmin)
+                .toList();
+
+        return TrainingContentResponse.from(content, videos);
+    }
+
+    @Transactional
+    public UserTrainingVideoProgress updateVideoProgress(User user,
+                                                         Long videoId,
+                                                         BigDecimal progressRate,
+                                                         int watchedSeconds,
+                                                         int lastWatchedSeconds) {
+        TrainingContent content = getQuoteWritingContent();
+        TrainingVideo video = trainingVideoRepository.findByIdAndTrainingContentId(videoId, content.getId())
+                .orElseThrow(() -> new CustomException(ErrorCode.TRAINING_CONTENT_NOT_FOUND));
+
+        if (!video.isActive()) {
+            throw new CustomException(ErrorCode.ACCESS_DENIED);
+        }
+
+        UserTrainingVideoProgress progress = userTrainingVideoProgressRepository
+                .findByUserIdAndTrainingVideoId(user.getId(), videoId)
+                .orElseGet(() -> createInitialVideoProgress(user, video));
 
         progress.updateProgress(progressRate, watchedSeconds, lastWatchedSeconds);
         return progress;
     }
 
-    //내 교육 이수 상태 조회
     public TrainingStatusResult getMyTrainingStatus(User user) {
         if (!isTrainingRequired(user)) {
             return TrainingStatusResult.notRequired();
         }
 
         TrainingContent content = getQuoteWritingContent();
-
-        UserTrainingProgress progress = userTrainingProgressRepository
-                .findByUserIdAndTrainingContentId(user.getId(), content.getId())
-                .orElse(null);
-
         boolean guideConfirmed = guideConfirmationRepository
                 .existsByUserIdAndGuideType(user.getId(), GuideType.QUOTE_WRITE_GUIDE);
 
-        return new TrainingStatusResult(progress, guideConfirmed, true);
+        return buildStatusResult(user.getId(), content.getId(), guideConfirmed);
     }
 
-    //교육 이수 완료 여부 확인 (견적 작성 차단 판단용 — 영업사원만 대상)
     public static boolean isTrainingRequired(User user) {
         return user != null && user.getRole() == UserRole.SALES_STAFF;
     }
@@ -97,25 +130,12 @@ public class TrainingService {
         if (!isTrainingRequired(user)) {
             return true;
         }
-        return isTrainingCompletedForStaff(user.getId());
-    }
-
-    private boolean isTrainingCompletedForStaff(Long userId) {
         TrainingContent content = getQuoteWritingContent();
-
-        UserTrainingProgress progress = userTrainingProgressRepository
-                .findByUserIdAndTrainingContentId(userId, content.getId())
-                .orElse(null);
-
-        boolean videoCompleted = (progress != null && progress.getStatus() == TrainingStatus.COMPLETED);
-
         boolean guideConfirmed = guideConfirmationRepository
-                .existsByUserIdAndGuideType(userId, GuideType.QUOTE_WRITE_GUIDE);
-
-        return videoCompleted && guideConfirmed;
+                .existsByUserIdAndGuideType(user.getId(), GuideType.QUOTE_WRITE_GUIDE);
+        return isVideoRequirementMet(user.getId(), content.getId()) && guideConfirmed;
     }
 
-    //견적 작성 가이드 조회
     public TrainingContent getQuoteWritingGuide() {
         return getQuoteWritingContent();
     }
@@ -136,7 +156,6 @@ public class TrainingService {
         guideConfirmationRepository.saveAndFlush(confirmation);
     }
 
-    //견적 작성 가이드 확인 완료 처리
     @Transactional
     public void confirmGuide(User user) {
         boolean alreadyConfirmed = guideConfirmationRepository
@@ -144,22 +163,64 @@ public class TrainingService {
 
         if (!alreadyConfirmed) {
             try {
-                GuideConfirmation confirmation = GuideConfirmation.builder().user(user).guideType(GuideType.QUOTE_WRITE_GUIDE).build();
-                saveGuideConfirmation(confirmation); // 격리된 트랜잭션 호출
+                GuideConfirmation confirmation = GuideConfirmation.builder()
+                        .user(user)
+                        .guideType(GuideType.QUOTE_WRITE_GUIDE)
+                        .build();
+                saveGuideConfirmation(confirmation);
             } catch (DataIntegrityViolationException e) {
-                if (!isDuplicateConstraint(e, "uk_guide_confirmation_user_type")) throw e;
+                if (!isDuplicateConstraint(e, "uk_guide_confirmation_user_type")) {
+                    throw e;
+                }
             }
         }
     }
 
-    // ── 관리자: 교육 콘텐츠 · 이수 현황 ────────────────────────
-
     @Transactional
-    public String uploadQuoteWritingVideo(MultipartFile file) {
+    public TrainingVideoResponse uploadQuoteWritingVideo(MultipartFile file, String title) {
         TrainingContent content = getQuoteWritingContent();
         String url = videoFileStorage.store(file, "trainings");
-        content.updateVideoUrl(url);
-        return url;
+
+        List<TrainingVideo> existing = trainingVideoRepository
+                .findByTrainingContentIdOrderBySortOrderAscIdAsc(content.getId());
+        int nextSortOrder = existing.stream()
+                .mapToInt(TrainingVideo::getSortOrder)
+                .max()
+                .orElse(0) + 1;
+
+        String resolvedTitle = (title == null || title.isBlank())
+                ? "교육 영상 " + nextSortOrder
+                : title.trim();
+
+        TrainingVideo saved = trainingVideoRepository.save(TrainingVideo.builder()
+                .trainingContent(content)
+                .title(resolvedTitle)
+                .videoUrl(url)
+                .sortOrder(nextSortOrder)
+                .active(false)
+                .build());
+
+        return TrainingVideoResponse.forAdmin(saved);
+    }
+
+    @Transactional
+    public TrainingVideoResponse updateQuoteWritingVideoActive(Long videoId, boolean active) {
+        TrainingContent content = getQuoteWritingContent();
+        TrainingVideo video = trainingVideoRepository.findByIdAndTrainingContentId(videoId, content.getId())
+                .orElseThrow(() -> new CustomException(ErrorCode.TRAINING_CONTENT_NOT_FOUND));
+
+        video.setActive(active);
+        return TrainingVideoResponse.forAdmin(video);
+    }
+
+    @Transactional
+    public TrainingVideoResponse updateQuoteWritingVideoTitle(Long videoId, String title) {
+        TrainingContent content = getQuoteWritingContent();
+        TrainingVideo video = trainingVideoRepository.findByIdAndTrainingContentId(videoId, content.getId())
+                .orElseThrow(() -> new CustomException(ErrorCode.TRAINING_CONTENT_NOT_FOUND));
+
+        video.updateTitle(title.trim());
+        return TrainingVideoResponse.forAdmin(video);
     }
 
     @Transactional
@@ -178,8 +239,6 @@ public class TrainingService {
         }
     }
 
-    // 활성 영업사원 기준 교육 이수 현황 (미시작 포함)
-    // SUPER_ADMIN: 전체, SALES_MANAGER: 동일 부서 영업사원만
     public List<AdminTrainingStatusResponse> getAdminTrainingStatusOverview(User requester) {
         if (requester.getRole() == UserRole.SALES_MANAGER) {
             if (requester.getDepartment() == null || requester.getDepartment().isBlank()) {
@@ -190,6 +249,8 @@ public class TrainingService {
         }
 
         TrainingContent content = getQuoteWritingContent();
+        List<TrainingVideo> activeVideos = getActiveVideos(content.getId());
+        List<Long> activeVideoIds = activeVideos.stream().map(TrainingVideo::getId).toList();
 
         List<User> salesUsers = new ArrayList<>();
         int page = 0;
@@ -207,10 +268,10 @@ public class TrainingService {
                     .toList();
         }
 
-        List<UserTrainingProgress> progressList = userTrainingProgressRepository
-                .findAllByTrainingContentIdWithUser(content.getId());
-        Map<Long, UserTrainingProgress> progressByUserId = progressList.stream()
-                .collect(Collectors.toMap(p -> p.getUser().getId(), p -> p, (left, right) -> left));
+        Map<Long, List<UserTrainingVideoProgress>> progressByUserId = activeVideoIds.isEmpty()
+                ? Map.of()
+                : userTrainingVideoProgressRepository.findAllByTrainingVideoIdIn(activeVideoIds).stream()
+                .collect(Collectors.groupingBy(p -> p.getUser().getId()));
 
         List<Long> userIds = salesUsers.stream().map(User::getId).toList();
         Set<Long> guideConfirmedUserIds = userIds.isEmpty()
@@ -221,60 +282,167 @@ public class TrainingService {
                 .collect(Collectors.toSet());
 
         return salesUsers.stream()
-                .map(user -> AdminTrainingStatusResponse.from(
-                        user,
-                        content,
-                        progressByUserId.get(user.getId()),
-                        guideConfirmedUserIds.contains(user.getId())))
+                .map(user -> {
+                    TrainingStatusResult result = buildStatusResult(
+                            user.getId(),
+                            content.getId(),
+                            guideConfirmedUserIds.contains(user.getId())
+                    );
+                    return AdminTrainingStatusResponse.from(user, content, result);
+                })
                 .sorted(Comparator.comparing(AdminTrainingStatusResponse::userName))
                 .toList();
     }
 
-    // @deprecated getAdminTrainingStatusOverview() 사용
-    public List<UserTrainingProgress> getAllTrainingStatus() {
-        TrainingContent content = getQuoteWritingContent();
-        return userTrainingProgressRepository
-                .findAllByTrainingContentIdWithUser(content.getId());
+    private List<TrainingVideo> getActiveVideos(Long contentId) {
+        return trainingVideoRepository.findByTrainingContentIdAndActiveTrueOrderBySortOrderAscIdAsc(contentId);
+    }
+
+    private Map<Long, UserTrainingVideoProgress> getProgressMap(Long userId, Long contentId) {
+        return userTrainingVideoProgressRepository.findAllByUserIdAndContentId(userId, contentId).stream()
+                .collect(Collectors.toMap(p -> p.getTrainingVideo().getId(), Function.identity(), (left, right) -> left));
+    }
+
+    private boolean isVideoRequirementMet(Long userId, Long contentId) {
+        List<TrainingVideo> activeVideos = getActiveVideos(contentId);
+        if (activeVideos.isEmpty()) {
+            return false;
+        }
+
+        Map<Long, UserTrainingVideoProgress> progressByVideoId = getProgressMap(userId, contentId);
+        return activeVideos.stream().allMatch(video -> {
+            UserTrainingVideoProgress progress = progressByVideoId.get(video.getId());
+            return progress != null && progress.getProgressRate().compareTo(COMPLETE_THRESHOLD) >= 0;
+        });
+    }
+
+    private TrainingStatusResult buildStatusResult(Long userId, Long contentId, boolean guideConfirmed) {
+        List<TrainingVideo> activeVideos = getActiveVideos(contentId);
+        Map<Long, UserTrainingVideoProgress> progressByVideoId = getProgressMap(userId, contentId);
+
+        List<TrainingVideoResponse> videos = activeVideos.stream()
+                .map(video -> TrainingVideoResponse.forStaff(video, progressByVideoId.get(video.getId())))
+                .toList();
+
+        int activeVideoCount = activeVideos.size();
+        int completedVideoCount = (int) activeVideos.stream()
+                .filter(video -> {
+                    UserTrainingVideoProgress progress = progressByVideoId.get(video.getId());
+                    return progress != null && progress.getProgressRate().compareTo(COMPLETE_THRESHOLD) >= 0;
+                })
+                .count();
+
+        BigDecimal aggregateProgressRate = activeVideoCount == 0
+                ? BigDecimal.ZERO
+                : activeVideos.stream()
+                .map(video -> progressByVideoId.get(video.getId()))
+                .map(progress -> progress == null ? BigDecimal.ZERO : progress.getProgressRate())
+                .min(BigDecimal::compareTo)
+                .orElse(BigDecimal.ZERO)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        int aggregateWatchedSeconds = activeVideos.stream()
+                .mapToInt(video -> {
+                    UserTrainingVideoProgress progress = progressByVideoId.get(video.getId());
+                    return progress == null ? 0 : progress.getWatchedSeconds();
+                })
+                .sum();
+
+        int aggregateLastWatchedSeconds = activeVideos.stream()
+                .mapToInt(video -> {
+                    UserTrainingVideoProgress progress = progressByVideoId.get(video.getId());
+                    return progress == null ? 0 : progress.getLastWatchedSeconds();
+                })
+                .max()
+                .orElse(0);
+
+        TrainingStatus aggregateStatus;
+        if (activeVideoCount == 0) {
+            aggregateStatus = TrainingStatus.NOT_STARTED;
+        } else if (completedVideoCount == activeVideoCount) {
+            aggregateStatus = TrainingStatus.COMPLETED;
+        } else if (completedVideoCount > 0 || activeVideos.stream().anyMatch(video -> {
+            UserTrainingVideoProgress progress = progressByVideoId.get(video.getId());
+            return progress != null && progress.getProgressRate().compareTo(BigDecimal.ZERO) > 0;
+        })) {
+            aggregateStatus = TrainingStatus.IN_PROGRESS;
+        } else {
+            aggregateStatus = TrainingStatus.NOT_STARTED;
+        }
+
+        boolean videoCompleted = completedVideoCount == activeVideoCount && activeVideoCount > 0;
+        boolean completed = videoCompleted && guideConfirmed;
+        boolean additionalTrainingRequired = !completed
+                && activeVideoCount > 0
+                && (guideConfirmed || completedVideoCount > 0);
+
+        return new TrainingStatusResult(
+                aggregateStatus,
+                aggregateProgressRate,
+                aggregateWatchedSeconds,
+                aggregateLastWatchedSeconds,
+                guideConfirmed,
+                true,
+                activeVideoCount,
+                completedVideoCount,
+                additionalTrainingRequired,
+                videos,
+                completed
+        );
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public UserTrainingProgress saveInitialProgress(User user, TrainingContent content) {
-        UserTrainingProgress progress = UserTrainingProgress.builder()
+    public UserTrainingVideoProgress saveInitialVideoProgress(User user, TrainingVideo video) {
+        UserTrainingVideoProgress progress = UserTrainingVideoProgress.builder()
                 .user(user)
-                .trainingContent(content)
+                .trainingVideo(video)
                 .build();
-        return userTrainingProgressRepository.saveAndFlush(progress);
+        return userTrainingVideoProgressRepository.saveAndFlush(progress);
     }
 
-    private UserTrainingProgress createInitialProgress(User user, TrainingContent content) {
+    private UserTrainingVideoProgress createInitialVideoProgress(User user, TrainingVideo video) {
         try {
-            return saveInitialProgress(user, content);
+            return saveInitialVideoProgress(user, video);
         } catch (DataIntegrityViolationException e) {
-            if (!isDuplicateConstraint(e, "uk_user_training_progress_user_content")) {
+            if (!isDuplicateConstraint(e, "uk_user_training_video_progress_user_video")) {
                 throw e;
             }
-            return userTrainingProgressRepository.findByUserIdAndTrainingContentId(user.getId(), content.getId())
+            return userTrainingVideoProgressRepository.findByUserIdAndTrainingVideoId(user.getId(), video.getId())
                     .orElseThrow(() -> e);
         }
     }
 
-    //교육 이수 상태 조회 결과
     public record TrainingStatusResult(
-            UserTrainingProgress progress,
+            TrainingStatus aggregateStatus,
+            BigDecimal aggregateProgressRate,
+            int aggregateWatchedSeconds,
+            int aggregateLastWatchedSeconds,
             boolean guideConfirmed,
-            boolean trainingRequired
+            boolean trainingRequired,
+            int activeVideoCount,
+            int completedVideoCount,
+            boolean additionalTrainingRequired,
+            List<TrainingVideoResponse> videos,
+            boolean completed
     ) {
         public static TrainingStatusResult notRequired() {
-            return new TrainingStatusResult(null, true, false);
+            return new TrainingStatusResult(
+                    TrainingStatus.COMPLETED,
+                    new BigDecimal("100.00"),
+                    0,
+                    0,
+                    true,
+                    false,
+                    0,
+                    0,
+                    false,
+                    List.of(),
+                    true
+            );
         }
 
         public boolean isCompleted() {
-            if (!trainingRequired) {
-                return true;
-            }
-            return progress != null
-                    && progress.getStatus() == TrainingStatus.COMPLETED
-                    && guideConfirmed;
+            return completed;
         }
     }
 }

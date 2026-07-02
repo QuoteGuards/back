@@ -1,10 +1,10 @@
 package com.project.back.domain.training.dto.response;
 
-import com.project.back.domain.training.entity.UserTrainingProgress;
 import com.project.back.domain.training.service.TrainingService.TrainingStatusResult;
 import com.project.back.global.enums.TrainingStatus;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 public record TrainingStatusResponse(
         TrainingStatus status,
@@ -12,29 +12,24 @@ public record TrainingStatusResponse(
         int watchedSeconds,
         int lastWatchedSeconds,
         boolean guideConfirmed,
-        boolean completed
+        boolean completed,
+        int activeVideoCount,
+        int completedVideoCount,
+        boolean additionalTrainingRequired,
+        List<TrainingVideoResponse> videos
 ) {
     public static TrainingStatusResponse from(TrainingStatusResult result) {
-        UserTrainingProgress progress = result.progress();
-
-        if (progress == null) {
-            return new TrainingStatusResponse(
-                    TrainingStatus.NOT_STARTED,
-                    BigDecimal.ZERO,
-                    0,
-                    0,
-                    result.guideConfirmed(),
-                    false
-            );
-        }
-
         return new TrainingStatusResponse(
-                progress.getStatus(),
-                progress.getProgressRate(),
-                progress.getWatchedSeconds(),
-                progress.getLastWatchedSeconds(),
+                result.aggregateStatus(),
+                result.aggregateProgressRate(),
+                result.aggregateWatchedSeconds(),
+                result.aggregateLastWatchedSeconds(),
                 result.guideConfirmed(),
-                result.isCompleted()
+                result.isCompleted(),
+                result.activeVideoCount(),
+                result.completedVideoCount(),
+                result.additionalTrainingRequired(),
+                result.videos()
         );
     }
 }

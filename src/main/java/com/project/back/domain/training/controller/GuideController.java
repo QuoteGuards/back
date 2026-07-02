@@ -2,6 +2,8 @@ package com.project.back.domain.training.controller;
 
 import com.project.back.domain.training.dto.response.TrainingContentResponse;
 import com.project.back.domain.training.service.TrainingService;
+
+import java.util.List;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.common.ApiResponse;
@@ -24,7 +26,7 @@ public class GuideController {
     @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<TrainingContentResponse>> getQuoteWritingGuide() {
         return ResponseEntity.ok(
-                ApiResponse.success(TrainingContentResponse.from(trainingService.getQuoteWritingGuide()))
+                ApiResponse.success(TrainingContentResponse.from(trainingService.getQuoteWritingGuide(), List.of()))
         );
     }
 
