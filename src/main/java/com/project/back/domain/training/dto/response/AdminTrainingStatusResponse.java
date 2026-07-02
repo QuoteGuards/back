@@ -1,7 +1,7 @@
 package com.project.back.domain.training.dto.response;
 
 import com.project.back.domain.training.entity.TrainingContent;
-import com.project.back.domain.training.service.TrainingService.TrainingStatusResult;
+import com.project.back.domain.training.service.TrainingService.CourseTrainingStatusResult;
 import com.project.back.domain.user.entity.User;
 import com.project.back.global.enums.TrainingStatus;
 
@@ -28,9 +28,9 @@ public record AdminTrainingStatusResponse(
     public static AdminTrainingStatusResponse from(
             User user,
             TrainingContent content,
-            TrainingStatusResult result
+            CourseTrainingStatusResult result
     ) {
-        LocalDateTime completedAt = result.isCompleted() ? LocalDateTime.now() : null;
+        LocalDateTime completedAt = result.completed() ? LocalDateTime.now() : null;
         if (result.completedVideoCount() == result.activeVideoCount()
                 && result.activeVideoCount() > 0
                 && result.guideConfirmed()) {
@@ -49,7 +49,7 @@ public record AdminTrainingStatusResponse(
                 result.aggregateWatchedSeconds(),
                 result.aggregateLastWatchedSeconds(),
                 result.guideConfirmed(),
-                result.isCompleted(),
+                result.completed(),
                 result.activeVideoCount(),
                 result.completedVideoCount(),
                 completedAt

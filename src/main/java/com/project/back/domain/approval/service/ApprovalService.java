@@ -9,6 +9,7 @@ import com.project.back.domain.approval.repository.QuoteApprovalHistoryRepositor
 import com.project.back.domain.approval.repository.QuoteApprovalReasonRepository;
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.repository.QuoteRepository;
+import com.project.back.domain.training.service.TrainingService;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
@@ -43,17 +44,11 @@ public class ApprovalService {
     private final QuoteRepository quoteRepository;
     private final UserStatsUpdateService userStatsUpdateService;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private final TrainingService trainingService;
 
     // ── 1. 승인 요청 ──
     @Transactional
     public ApprovalRequest requestApproval(Long quoteId, Long requesterId, String requestMemo) {
-
-        // TODO: training 팀원 UserTrainingProgress 완성 후 LMS 교육 이수 여부 체크 추가
-        // boolean isCompleted = userTrainingProgressRepository
-        //         .existsByUserIdAndStatus(requesterId, UserTrainingProgress.Status.COMPLETED);
-        // if (!isCompleted) {
-        //     throw new IllegalStateException("필수 교육을 이수해야 승인 요청이 가능합니다.");
-        // }
 
         // 이미 PENDING 상태 승인 요청이 있으면 중복 요청 방지
         if (approvalRequestRepository.existsByQuote_IdAndStatus(
@@ -147,6 +142,7 @@ public class ApprovalService {
 
         // PENDING 상태만 승인 가능
         validatePendingStatus(approvalRequest);
+        validateApproverTraining(approver);
 
         ApprovalRequest.ApprovalStatus beforeStatus = approvalRequest.getStatus();
 
@@ -207,6 +203,7 @@ public class ApprovalService {
 
         // PENDING 상태만 반려 가능
         validatePendingStatus(approvalRequest);
+        validateApproverTraining(approver);
 
         ApprovalRequest.ApprovalStatus beforeStatus = approvalRequest.getStatus();
 
@@ -397,6 +394,12 @@ public class ApprovalService {
     private ApprovalRequest findApprovalRequestById(Long approvalRequestId) {
         return approvalRequestRepository.findByIdWithUsers(approvalRequestId)
                 .orElseThrow(() -> new CustomException(ErrorCode.APPROVAL_REQUEST_NOT_FOUND));
+    }
+
+    private void validateApproverTraining(User approver) {
+        if (!trainingService.canReviewApproval(approver)) {
+            throw new CustomException(ErrorCode.TRAINING_APPROVAL_NOT_COMPLETED);
+        }
     }
 
     private void validatePendingStatus(ApprovalRequest approvalRequest) {

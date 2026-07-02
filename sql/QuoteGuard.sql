@@ -115,7 +115,7 @@ CREATE TABLE refresh_tokens (
 CREATE TABLE training_contents (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '교육 콘텐츠 ID',
 
-    training_type ENUM('QUOTE_WRITE') NOT NULL COMMENT '교육 유형. QUOTE_WRITE는 견적 작성 필수 교육',
+    training_type ENUM('QUOTE_WRITE', 'MANAGER_OPERATIONS') NOT NULL COMMENT '교육 유형',
     title VARCHAR(100) NOT NULL COMMENT '교육 제목',
     description TEXT NULL COMMENT '교육 설명',
     video_url VARCHAR(500) NULL COMMENT '교육 영상 URL 또는 파일 경로',
@@ -661,7 +661,7 @@ CREATE TABLE notifications (
 CREATE TABLE guide_confirmations (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '가이드 확인 이력 식별자',
     user_id BIGINT NOT NULL COMMENT '가이드를 확인한 사용자 ID',
-    guide_type ENUM('QUOTE_WRITE_GUIDE') NOT NULL COMMENT '가이드 유형 (현재는 견적 작성 가이드)',
+    guide_type ENUM('QUOTE_WRITE_GUIDE', 'MANAGER_OPERATIONS_GUIDE') NOT NULL COMMENT '가이드 유형',
     confirmed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '확인 완료 버튼을 누른 일시',
 
     CONSTRAINT uk_guide_confirmations_user_type UNIQUE (user_id, guide_type),

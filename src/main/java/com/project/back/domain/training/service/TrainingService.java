@@ -11,6 +11,7 @@ import com.project.back.domain.training.repository.GuideConfirmationRepository;
 import com.project.back.domain.training.repository.TrainingContentRepository;
 import com.project.back.domain.training.repository.TrainingVideoRepository;
 import com.project.back.domain.training.repository.UserTrainingVideoProgressRepository;
+import com.project.back.domain.training.support.TrainingCourseSupport;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
@@ -59,14 +60,18 @@ public class TrainingService {
     private final VideoFileStorage videoFileStorage;
     private final ObjectMapper objectMapper;
 
-    public TrainingContent getQuoteWritingContent() {
+    public TrainingContent getContent(TrainingType trainingType) {
         return trainingContentRepository
-                .findFirstByTrainingTypeAndActiveTrueOrderByUpdatedAtDesc(TrainingType.QUOTE_WRITE)
+                .findFirstByTrainingTypeAndActiveTrueOrderByUpdatedAtDesc(trainingType)
                 .orElseThrow(() -> new CustomException(ErrorCode.TRAINING_CONTENT_NOT_FOUND));
     }
 
-    public TrainingContentResponse getQuoteWritingContentForStaff(User user) {
-        TrainingContent content = getQuoteWritingContent();
+    public TrainingContent getQuoteWritingContent() {
+        return getContent(TrainingType.QUOTE_WRITE);
+    }
+
+    public TrainingContentResponse getContentForStaff(User user, TrainingType trainingType) {
+        TrainingContent content = getContent(trainingType);
         List<TrainingVideo> activeVideos = getActiveVideos(content.getId());
         Map<Long, UserTrainingVideoProgress> progressByVideoId = getProgressMap(user.getId(), content.getId());
 
@@ -77,8 +82,12 @@ public class TrainingService {
         return TrainingContentResponse.from(content, videos);
     }
 
-    public TrainingContentResponse getQuoteWritingContentForAdmin() {
-        TrainingContent content = getQuoteWritingContent();
+    public TrainingContentResponse getQuoteWritingContentForStaff(User user) {
+        return getContentForStaff(user, TrainingType.QUOTE_WRITE);
+    }
+
+    public TrainingContentResponse getContentForAdmin(TrainingType trainingType) {
+        TrainingContent content = getContent(trainingType);
         List<TrainingVideoResponse> videos = trainingVideoRepository
                 .findByTrainingContentIdOrderBySortOrderAscIdAsc(content.getId())
                 .stream()
@@ -88,13 +97,18 @@ public class TrainingService {
         return TrainingContentResponse.from(content, videos);
     }
 
+    public TrainingContentResponse getQuoteWritingContentForAdmin() {
+        return getContentForAdmin(TrainingType.QUOTE_WRITE);
+    }
+
     @Transactional
     public UserTrainingVideoProgress updateVideoProgress(User user,
+                                                         TrainingType trainingType,
                                                          Long videoId,
                                                          BigDecimal progressRate,
                                                          int watchedSeconds,
                                                          int lastWatchedSeconds) {
-        TrainingContent content = getQuoteWritingContent();
+        TrainingContent content = getContent(trainingType);
         TrainingVideo video = trainingVideoRepository.findByIdAndTrainingContentId(videoId, content.getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.TRAINING_CONTENT_NOT_FOUND));
 
@@ -110,30 +124,114 @@ public class TrainingService {
         return progress;
     }
 
+    public List<TrainingType> getRequiredCourses(User user) {
+        if (user == null) {
+            return List.of();
+        }
+
+        return switch (user.getRole()) {
+            case SALES_STAFF -> List.of(TrainingType.QUOTE_WRITE);
+            case SALES_MANAGER -> {
+                List<TrainingType> courses = new ArrayList<>();
+                courses.add(TrainingType.MANAGER_OPERATIONS);
+                if (!isCourseCompleted(user, TrainingType.QUOTE_WRITE)) {
+                    courses.add(TrainingType.QUOTE_WRITE);
+                }
+                yield List.copyOf(courses);
+            }
+            default -> List.of();
+        };
+    }
+
+    public boolean isCourseCompleted(User user, TrainingType trainingType) {
+        if (user == null) {
+            return false;
+        }
+
+        TrainingContent content = trainingContentRepository
+                .findFirstByTrainingTypeAndActiveTrueOrderByUpdatedAtDesc(trainingType)
+                .orElse(null);
+        if (content == null) {
+            return false;
+        }
+
+        GuideType guideType = TrainingCourseSupport.guideTypeFor(trainingType);
+        boolean guideConfirmed = guideConfirmationRepository.existsByUserIdAndGuideType(user.getId(), guideType);
+        return isVideoRequirementMet(user.getId(), content.getId()) && guideConfirmed;
+    }
+
     public TrainingStatusResult getMyTrainingStatus(User user) {
-        if (!isTrainingRequired(user)) {
+        List<TrainingType> requiredCourses = getRequiredCourses(user);
+        if (requiredCourses.isEmpty()) {
             return TrainingStatusResult.notRequired();
         }
 
-        TrainingContent content = getQuoteWritingContent();
-        boolean guideConfirmed = guideConfirmationRepository
-                .existsByUserIdAndGuideType(user.getId(), GuideType.QUOTE_WRITE_GUIDE);
+        List<CourseTrainingStatusResult> courses = requiredCourses.stream()
+                .map(type -> buildCourseStatusResult(user.getId(), type))
+                .toList();
 
-        return buildStatusResult(user.getId(), content.getId(), guideConfirmed);
+        boolean canWriteQuote = user.getRole() != UserRole.SALES_STAFF
+                || courses.stream()
+                .filter(course -> course.trainingType() == TrainingType.QUOTE_WRITE)
+                .findFirst()
+                .map(CourseTrainingStatusResult::completed)
+                .orElse(false);
+
+        boolean canReviewApproval = canReviewApproval(user);
+
+        CourseTrainingStatusResult primary = courses.stream()
+                .filter(course -> !course.completed())
+                .findFirst()
+                .orElse(courses.get(0));
+
+        boolean allCompleted = courses.stream().allMatch(CourseTrainingStatusResult::completed);
+        boolean additionalTrainingRequired = courses.stream()
+                .anyMatch(CourseTrainingStatusResult::additionalTrainingRequired);
+
+        return new TrainingStatusResult(
+                primary.aggregateStatus(),
+                primary.aggregateProgressRate(),
+                primary.aggregateWatchedSeconds(),
+                primary.aggregateLastWatchedSeconds(),
+                primary.guideConfirmed(),
+                true,
+                primary.activeVideoCount(),
+                primary.completedVideoCount(),
+                additionalTrainingRequired,
+                primary.videos(),
+                allCompleted,
+                canWriteQuote,
+                canReviewApproval,
+                courses
+        );
     }
 
     public static boolean isTrainingRequired(User user) {
-        return user != null && user.getRole() == UserRole.SALES_STAFF;
+        return user != null && (user.getRole() == UserRole.SALES_STAFF || user.getRole() == UserRole.SALES_MANAGER);
     }
 
     public boolean isTrainingCompleted(User user) {
-        if (!isTrainingRequired(user)) {
+        if (user == null || user.getRole() != UserRole.SALES_STAFF) {
             return true;
         }
-        TrainingContent content = getQuoteWritingContent();
-        boolean guideConfirmed = guideConfirmationRepository
-                .existsByUserIdAndGuideType(user.getId(), GuideType.QUOTE_WRITE_GUIDE);
-        return isVideoRequirementMet(user.getId(), content.getId()) && guideConfirmed;
+        return isCourseCompleted(user, TrainingType.QUOTE_WRITE);
+    }
+
+    public boolean canReviewApproval(User user) {
+        if (user == null) {
+            return false;
+        }
+        if (user.getRole() == UserRole.SUPER_ADMIN) {
+            return true;
+        }
+        if (user.getRole() != UserRole.SALES_MANAGER) {
+            return true;
+        }
+        return getRequiredCourses(user).stream().allMatch(type -> isCourseCompleted(user, type));
+    }
+
+    public TrainingContent getGuideContent(TrainingType trainingType) {
+        return getContent(trainingType);
     }
 
     public TrainingContent getQuoteWritingGuide() {
@@ -157,15 +255,15 @@ public class TrainingService {
     }
 
     @Transactional
-    public void confirmGuide(User user) {
-        boolean alreadyConfirmed = guideConfirmationRepository
-                .existsByUserIdAndGuideType(user.getId(), GuideType.QUOTE_WRITE_GUIDE);
+    public void confirmGuide(User user, TrainingType trainingType) {
+        GuideType guideType = TrainingCourseSupport.guideTypeFor(trainingType);
+        boolean alreadyConfirmed = guideConfirmationRepository.existsByUserIdAndGuideType(user.getId(), guideType);
 
         if (!alreadyConfirmed) {
             try {
                 GuideConfirmation confirmation = GuideConfirmation.builder()
                         .user(user)
-                        .guideType(GuideType.QUOTE_WRITE_GUIDE)
+                        .guideType(guideType)
                         .build();
                 saveGuideConfirmation(confirmation);
             } catch (DataIntegrityViolationException e) {
@@ -177,8 +275,13 @@ public class TrainingService {
     }
 
     @Transactional
-    public TrainingVideoResponse uploadQuoteWritingVideo(MultipartFile file, String title) {
-        TrainingContent content = getQuoteWritingContent();
+    public void confirmGuide(User user) {
+        confirmGuide(user, TrainingType.QUOTE_WRITE);
+    }
+
+    @Transactional
+    public TrainingVideoResponse uploadVideo(TrainingType trainingType, MultipartFile file, String title) {
+        TrainingContent content = getContent(trainingType);
         String url = videoFileStorage.store(file, "trainings");
 
         List<TrainingVideo> existing = trainingVideoRepository
@@ -204,8 +307,13 @@ public class TrainingService {
     }
 
     @Transactional
-    public TrainingVideoResponse updateQuoteWritingVideoActive(Long videoId, boolean active) {
-        TrainingContent content = getQuoteWritingContent();
+    public TrainingVideoResponse uploadQuoteWritingVideo(MultipartFile file, String title) {
+        return uploadVideo(TrainingType.QUOTE_WRITE, file, title);
+    }
+
+    @Transactional
+    public TrainingVideoResponse updateVideoActive(TrainingType trainingType, Long videoId, boolean active) {
+        TrainingContent content = getContent(trainingType);
         TrainingVideo video = trainingVideoRepository.findByIdAndTrainingContentId(videoId, content.getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.TRAINING_CONTENT_NOT_FOUND));
 
@@ -214,8 +322,13 @@ public class TrainingService {
     }
 
     @Transactional
-    public TrainingVideoResponse updateQuoteWritingVideoTitle(Long videoId, String title) {
-        TrainingContent content = getQuoteWritingContent();
+    public TrainingVideoResponse updateQuoteWritingVideoActive(Long videoId, boolean active) {
+        return updateVideoActive(TrainingType.QUOTE_WRITE, videoId, active);
+    }
+
+    @Transactional
+    public TrainingVideoResponse updateVideoTitle(TrainingType trainingType, Long videoId, String title) {
+        TrainingContent content = getContent(trainingType);
         TrainingVideo video = trainingVideoRepository.findByIdAndTrainingContentId(videoId, content.getId())
                 .orElseThrow(() -> new CustomException(ErrorCode.TRAINING_CONTENT_NOT_FOUND));
 
@@ -224,11 +337,21 @@ public class TrainingService {
     }
 
     @Transactional
-    public TrainingContent updateQuoteWritingGuideContent(String guideContent) {
+    public TrainingVideoResponse updateQuoteWritingVideoTitle(Long videoId, String title) {
+        return updateVideoTitle(TrainingType.QUOTE_WRITE, videoId, title);
+    }
+
+    @Transactional
+    public TrainingContent updateGuideContent(TrainingType trainingType, String guideContent) {
         validateGuideContentJson(guideContent);
-        TrainingContent content = getQuoteWritingContent();
+        TrainingContent content = getContent(trainingType);
         content.updateGuideContent(guideContent.trim());
         return content;
+    }
+
+    @Transactional
+    public TrainingContent updateQuoteWritingGuideContent(String guideContent) {
+        return updateGuideContent(TrainingType.QUOTE_WRITE, guideContent);
     }
 
     private void validateGuideContentJson(String guideContent) {
@@ -239,7 +362,7 @@ public class TrainingService {
         }
     }
 
-    public List<AdminTrainingStatusResponse> getAdminTrainingStatusOverview(User requester) {
+    public List<AdminTrainingStatusResponse> getAdminTrainingStatusOverview(User requester, TrainingType trainingType) {
         if (requester.getRole() == UserRole.SALES_MANAGER) {
             if (requester.getDepartment() == null || requester.getDepartment().isBlank()) {
                 throw new CustomException(ErrorCode.ACCESS_DENIED);
@@ -248,22 +371,26 @@ public class TrainingService {
             throw new CustomException(ErrorCode.ACCESS_DENIED);
         }
 
-        TrainingContent content = getQuoteWritingContent();
+        TrainingContent content = getContent(trainingType);
         List<TrainingVideo> activeVideos = getActiveVideos(content.getId());
         List<Long> activeVideoIds = activeVideos.stream().map(TrainingVideo::getId).toList();
 
-        List<User> salesUsers = new ArrayList<>();
+        UserRole targetRole = trainingType == TrainingType.MANAGER_OPERATIONS
+                ? UserRole.SALES_MANAGER
+                : UserRole.SALES_STAFF;
+
+        List<User> targetUsers = new ArrayList<>();
         int page = 0;
-        Page<User> salesUserPage;
+        Page<User> userPage;
         do {
-            salesUserPage = userRepository
-                    .findAllWithFilters(UserRole.SALES_STAFF, UserStatus.ACTIVE, null, PageRequest.of(page++, 1000));
-            salesUsers.addAll(salesUserPage.getContent());
-        } while (salesUserPage.hasNext());
+            userPage = userRepository
+                    .findAllWithFilters(targetRole, UserStatus.ACTIVE, null, PageRequest.of(page++, 1000));
+            targetUsers.addAll(userPage.getContent());
+        } while (userPage.hasNext());
 
         if (requester.getRole() == UserRole.SALES_MANAGER) {
             String managerDepartment = requester.getDepartment();
-            salesUsers = salesUsers.stream()
+            targetUsers = targetUsers.stream()
                     .filter(user -> managerDepartment.equals(user.getDepartment()))
                     .toList();
         }
@@ -273,25 +400,31 @@ public class TrainingService {
                 : userTrainingVideoProgressRepository.findAllByTrainingVideoIdIn(activeVideoIds).stream()
                 .collect(Collectors.groupingBy(p -> p.getUser().getId()));
 
-        List<Long> userIds = salesUsers.stream().map(User::getId).toList();
+        GuideType guideType = TrainingCourseSupport.guideTypeFor(trainingType);
+        List<Long> userIds = targetUsers.stream().map(User::getId).toList();
         Set<Long> guideConfirmedUserIds = userIds.isEmpty()
                 ? Set.of()
-                : guideConfirmationRepository.findByGuideTypeAndUserIdIn(GuideType.QUOTE_WRITE_GUIDE, userIds)
+                : guideConfirmationRepository.findByGuideTypeAndUserIdIn(guideType, userIds)
                 .stream()
                 .map(gc -> gc.getUser().getId())
                 .collect(Collectors.toSet());
 
-        return salesUsers.stream()
+        return targetUsers.stream()
                 .map(user -> {
-                    TrainingStatusResult result = buildStatusResult(
+                    CourseTrainingStatusResult result = buildCourseStatusResult(
                             user.getId(),
-                            content.getId(),
-                            guideConfirmedUserIds.contains(user.getId())
+                            trainingType,
+                            guideConfirmedUserIds.contains(user.getId()),
+                            progressByUserId.getOrDefault(user.getId(), List.of())
                     );
                     return AdminTrainingStatusResponse.from(user, content, result);
                 })
                 .sorted(Comparator.comparing(AdminTrainingStatusResponse::userName))
                 .toList();
+    }
+
+    public List<AdminTrainingStatusResponse> getAdminTrainingStatusOverview(User requester) {
+        return getAdminTrainingStatusOverview(requester, TrainingType.QUOTE_WRITE);
     }
 
     private List<TrainingVideo> getActiveVideos(Long contentId) {
@@ -316,9 +449,22 @@ public class TrainingService {
         });
     }
 
-    private TrainingStatusResult buildStatusResult(Long userId, Long contentId, boolean guideConfirmed) {
-        List<TrainingVideo> activeVideos = getActiveVideos(contentId);
-        Map<Long, UserTrainingVideoProgress> progressByVideoId = getProgressMap(userId, contentId);
+    private CourseTrainingStatusResult buildCourseStatusResult(Long userId, TrainingType trainingType) {
+        GuideType guideType = TrainingCourseSupport.guideTypeFor(trainingType);
+        boolean guideConfirmed = guideConfirmationRepository.existsByUserIdAndGuideType(userId, guideType);
+        return buildCourseStatusResult(userId, trainingType, guideConfirmed, List.of());
+    }
+
+    private CourseTrainingStatusResult buildCourseStatusResult(Long userId,
+                                                               TrainingType trainingType,
+                                                               boolean guideConfirmed,
+                                                               List<UserTrainingVideoProgress> knownProgress) {
+        TrainingContent content = getContent(trainingType);
+        List<TrainingVideo> activeVideos = getActiveVideos(content.getId());
+        Map<Long, UserTrainingVideoProgress> progressByVideoId = knownProgress.isEmpty()
+                ? getProgressMap(userId, content.getId())
+                : knownProgress.stream()
+                .collect(Collectors.toMap(p -> p.getTrainingVideo().getId(), Function.identity(), (left, right) -> left));
 
         List<TrainingVideoResponse> videos = activeVideos.stream()
                 .map(video -> TrainingVideoResponse.forStaff(video, progressByVideoId.get(video.getId())))
@@ -376,13 +522,13 @@ public class TrainingService {
                 && activeVideoCount > 0
                 && (guideConfirmed || completedVideoCount > 0);
 
-        return new TrainingStatusResult(
+        return new CourseTrainingStatusResult(
+                trainingType,
                 aggregateStatus,
                 aggregateProgressRate,
                 aggregateWatchedSeconds,
                 aggregateLastWatchedSeconds,
                 guideConfirmed,
-                true,
                 activeVideoCount,
                 completedVideoCount,
                 additionalTrainingRequired,
@@ -412,6 +558,21 @@ public class TrainingService {
         }
     }
 
+    public record CourseTrainingStatusResult(
+            TrainingType trainingType,
+            TrainingStatus aggregateStatus,
+            BigDecimal aggregateProgressRate,
+            int aggregateWatchedSeconds,
+            int aggregateLastWatchedSeconds,
+            boolean guideConfirmed,
+            int activeVideoCount,
+            int completedVideoCount,
+            boolean additionalTrainingRequired,
+            List<TrainingVideoResponse> videos,
+            boolean completed
+    ) {
+    }
+
     public record TrainingStatusResult(
             TrainingStatus aggregateStatus,
             BigDecimal aggregateProgressRate,
@@ -423,7 +584,10 @@ public class TrainingService {
             int completedVideoCount,
             boolean additionalTrainingRequired,
             List<TrainingVideoResponse> videos,
-            boolean completed
+            boolean completed,
+            boolean canWriteQuote,
+            boolean canReviewApproval,
+            List<CourseTrainingStatusResult> courses
     ) {
         public static TrainingStatusResult notRequired() {
             return new TrainingStatusResult(
@@ -437,7 +601,10 @@ public class TrainingService {
                     0,
                     false,
                     List.of(),
-                    true
+                    true,
+                    true,
+                    true,
+                    List.of()
             );
         }
 
