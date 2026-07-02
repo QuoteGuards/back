@@ -4,6 +4,7 @@ import com.project.back.domain.training.dto.response.TrainingContentResponse;
 import com.project.back.domain.training.service.TrainingService;
 import com.project.back.domain.training.support.TrainingCoursePaths;
 import com.project.back.domain.user.entity.User;
+import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.common.ApiResponse;
 import com.project.back.global.enums.TrainingType;
@@ -30,12 +31,15 @@ public class GuideController {
     @GetMapping("/{courseKey}")
     @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<TrainingContentResponse>> getGuide(
+            @AuthenticationPrincipal Long userId,
             @PathVariable String courseKey
     ) {
+        User user = getUser(userId);
         TrainingType trainingType = TrainingCoursePaths.fromPathSegment(courseKey);
-        return ResponseEntity.ok(
-                ApiResponse.success(TrainingContentResponse.from(trainingService.getGuideContent(trainingType), List.of()))
-        );
+        TrainingContentResponse response = user.getRole() == UserRole.SUPER_ADMIN
+                ? TrainingContentResponse.from(trainingService.getGuideContent(trainingType), List.of())
+                : TrainingContentResponse.from(trainingService.getGuideContent(user, trainingType), List.of());
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PostMapping("/{courseKey}/confirm")

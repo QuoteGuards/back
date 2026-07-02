@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,15 +40,18 @@ public class TrainingContentSeed {
             return;
         }
 
-        trainingContentRepository.save(TrainingContent.builder()
-                .trainingType(trainingType)
-                .title(title)
-                .description(description)
-                .guideContent(EMPTY_GUIDE)
-                .required(true)
-                .active(true)
-                .build());
-
-        log.info("Seeded training content for {}", trainingType);
+        try {
+            trainingContentRepository.save(TrainingContent.builder()
+                    .trainingType(trainingType)
+                    .title(title)
+                    .description(description)
+                    .guideContent(EMPTY_GUIDE)
+                    .required(true)
+                    .active(true)
+                    .build());
+            log.info("Seeded training content for {}", trainingType);
+        } catch (DataIntegrityViolationException e) {
+            log.debug("Training content already seeded for {} (concurrent startup)", trainingType);
+        }
     }
 }

@@ -14,5 +14,7 @@ public interface TrainingVideoRepository extends JpaRepository<TrainingVideo, Lo
 
     Optional<TrainingVideo> findByIdAndTrainingContentId(Long id, Long trainingContentId);
 
+    Optional<TrainingVideo> findByTrainingContentIdAndSortOrder(Long trainingContentId, int sortOrder);
+
     boolean existsByTrainingContentId(Long trainingContentId);
 }

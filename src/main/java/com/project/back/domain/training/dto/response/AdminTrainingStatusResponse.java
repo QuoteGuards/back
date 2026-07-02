@@ -30,13 +30,6 @@ public record AdminTrainingStatusResponse(
             TrainingContent content,
             CourseTrainingStatusResult result
     ) {
-        LocalDateTime completedAt = result.completed() ? LocalDateTime.now() : null;
-        if (result.completedVideoCount() == result.activeVideoCount()
-                && result.activeVideoCount() > 0
-                && result.guideConfirmed()) {
-            completedAt = LocalDateTime.now();
-        }
-
         return new AdminTrainingStatusResponse(
                 user.getId(),
                 user.getMemberNumber(),
@@ -52,7 +45,7 @@ public record AdminTrainingStatusResponse(
                 result.completed(),
                 result.activeVideoCount(),
                 result.completedVideoCount(),
-                completedAt
+                result.completedAt()
         );
     }
 }
