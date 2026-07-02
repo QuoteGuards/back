@@ -98,6 +98,7 @@ public enum ErrorCode {
     AI_SUMMARY_GENERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "APPROVAL_009", "AI 리스크 요약 생성에 실패했습니다. 잠시 후 다시 시도해주세요."),
     APPROVAL_QUOTE_NOT_SUBMITTED(HttpStatus.BAD_REQUEST, "APPROVAL_010", "제출 완료된 견적만 승인 요청이 가능합니다."),
     AI_SUMMARY_RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "APPROVAL_011", "AI 리스크 요약 호출 한도를 초과했습니다. 잠시 후 다시 시도해주세요."),
+    APPROVAL_QUOTE_MISMATCH(HttpStatus.BAD_REQUEST, "APPROVAL_012", "요청 경로의 견적과 승인 요청의 견적이 일치하지 않습니다."),
 
     // Customer
     CUSTOMER_NOT_FOUND(HttpStatus.NOT_FOUND, "CUSTOMER_001", "존재하지 않는 고객입니다."),

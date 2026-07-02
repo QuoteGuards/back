@@ -125,6 +125,7 @@ public class ApprovalController {
             @AuthenticationPrincipal Long userId
     ) {
         ApprovalRequest result = approvalService.approve(
+                quoteId,
                 request.getApprovalRequestId(),
                 userId,
                 request.getMemo());
@@ -141,6 +142,7 @@ public class ApprovalController {
             @AuthenticationPrincipal Long userId
     ) {
         ApprovalRequest result = approvalService.reject(
+                quoteId,
                 request.getApprovalRequestId(),
                 userId,
                 request.getRejectReason());
@@ -157,6 +159,7 @@ public class ApprovalController {
             @AuthenticationPrincipal Long userId
     ) {
         ApprovalRequest result = approvalService.reRequest(
+                quoteId,
                 request.getApprovalRequestId(),
                 userId,
                 request.getRequestMemo());

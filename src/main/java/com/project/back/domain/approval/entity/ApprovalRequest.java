@@ -83,6 +83,9 @@ public class ApprovalRequest {
         this.requestMemo = requestMemo;
         this.requestCount++;
         this.processedAt = null;
+        this.rejectReason = null;
+        this.aiRiskSummary = null;
+        this.requestedAt = LocalDateTime.now();
     }
 
     public void cancel() {
