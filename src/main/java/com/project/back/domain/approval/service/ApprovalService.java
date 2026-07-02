@@ -8,7 +8,10 @@ import com.project.back.domain.approval.repository.ApprovalRequestRepository;
 import com.project.back.domain.approval.repository.QuoteApprovalHistoryRepository;
 import com.project.back.domain.approval.repository.QuoteApprovalReasonRepository;
 import com.project.back.domain.quote.entity.Quote;
+import com.project.back.domain.quote.entity.QuoteItem;
+import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
+import com.project.back.domain.quote.service.ApprovalCheckService;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
@@ -41,6 +44,8 @@ public class ApprovalService {
     private final QuoteApprovalHistoryRepository quoteApprovalHistoryRepository;
     private final UserRepository userRepository;
     private final QuoteRepository quoteRepository;
+    private final QuoteItemRepository quoteItemRepository;
+    private final ApprovalCheckService approvalCheckService;
     private final UserStatsUpdateService userStatsUpdateService;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
 
@@ -48,12 +53,8 @@ public class ApprovalService {
     @Transactional
     public ApprovalRequest requestApproval(Long quoteId, Long requesterId, String requestMemo) {
 
-        // TODO: training 팀원 UserTrainingProgress 완성 후 LMS 교육 이수 여부 체크 추가
-        // boolean isCompleted = userTrainingProgressRepository
-        //         .existsByUserIdAndStatus(requesterId, UserTrainingProgress.Status.COMPLETED);
-        // if (!isCompleted) {
-        //     throw new IllegalStateException("필수 교육을 이수해야 승인 요청이 가능합니다.");
-        // }
+        // 교육 이수 체크는 QuoteService의 작성/제출 단계(validateTrainingCompleted)에서 이미 강제됨.
+        // 승인 요청은 APPROVAL_PENDING 상태(= 작성 단계를 통과한 견적)에만 실행되므로 중복 체크 불필요.
 
         // 이미 PENDING 상태 승인 요청이 있으면 중복 요청 방지
         if (approvalRequestRepository.existsByQuote_IdAndStatus(
@@ -133,9 +134,10 @@ public class ApprovalService {
 
     // ── 2. 승인 처리 ──
     @Transactional
-    public ApprovalRequest approve(Long approvalRequestId, Long approverId, String memo) {
+    public ApprovalRequest approve(Long quoteId, Long approvalRequestId, Long approverId, String memo) {
 
         ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
+        validateQuoteMatch(quoteId, approvalRequest);
         User approver = userRepository.findById(approverId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
@@ -188,7 +190,7 @@ public class ApprovalService {
 
     // ── 3. 반려 처리 ──
     @Transactional
-    public ApprovalRequest reject(Long approvalRequestId, Long approverId, String rejectReason) {
+    public ApprovalRequest reject(Long quoteId, Long approvalRequestId, Long approverId, String rejectReason) {
 
         // 반려 사유 필수 검증
         if (rejectReason == null || rejectReason.isBlank()) {
@@ -196,6 +198,7 @@ public class ApprovalService {
         }
 
         ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
+        validateQuoteMatch(quoteId, approvalRequest);
         User approver = userRepository.findById(approverId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
@@ -247,9 +250,10 @@ public class ApprovalService {
 
     // ── 4. 재요청 ──
     @Transactional
-    public ApprovalRequest reRequest(Long approvalRequestId, Long requesterId, String requestMemo) {
+    public ApprovalRequest reRequest(Long quoteId, Long approvalRequestId, Long requesterId, String requestMemo) {
 
         ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
+        validateQuoteMatch(quoteId, approvalRequest);
         User requester = userRepository.findById(requesterId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
@@ -265,9 +269,28 @@ public class ApprovalService {
 
         ApprovalRequest.ApprovalStatus beforeStatus = approvalRequest.getStatus();
 
-        // 재요청 처리
+        // 재요청 처리 (PENDING 전환, 반려사유/AI 요약 초기화, requestedAt 갱신)
         approvalRequest.reRequest(requestMemo);
         approvalRequestRepository.save(approvalRequest);
+
+        //[견적 파트 오케스트레이션 연동]: REVISING이었던 견적을 다시 APPROVAL_PENDING으로 전이
+        Quote quote = quoteRepository.findById(approvalRequest.getQuote().getId())
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+
+        // 반려 후 수정된 내용 기준으로 승인 사유를 다시 계산해 갱신 (수정 전 사유가 그대로 남는 것 방지)
+        List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quote.getId());
+        List<ApprovalReasonType> reasons = approvalCheckService.check(
+                quote.getDiscountPolicy(), items, quote.getTotalAmount(), quote.getProfitRate());
+
+        quote.getApprovalReasons().clear();
+        if (!reasons.isEmpty()) {
+            List<QuoteApprovalReason> reasonEntities = reasons.stream()
+                    .map(r -> QuoteApprovalReason.of(quote, r, r.getDefaultMessage()))
+                    .toList();
+            quoteApprovalReasonRepository.saveAll(reasonEntities);
+        }
+
+        quote.complete(true);
 
         // 재요청 이력 저장
         saveHistory(
@@ -278,6 +301,9 @@ public class ApprovalService {
                 ApprovalRequest.ApprovalStatus.PENDING,
                 requestMemo
         );
+
+        // 승인 권한자에게 알림 발송
+        notifyApprovers(requester, quote, approvalRequest.getId());
 
         return approvalRequest;
     }
@@ -405,6 +431,13 @@ public class ApprovalService {
         }
     }
 
+    // 경로의 quoteId와 승인 요청이 실제로 가리키는 견적이 일치하는지 검증 (다른 견적 ID로 잘못 처리되는 것 방지)
+    private void validateQuoteMatch(Long quoteId, ApprovalRequest approvalRequest) {
+        if (!approvalRequest.getQuote().getId().equals(quoteId)) {
+            throw new CustomException(ErrorCode.APPROVAL_QUOTE_MISMATCH);
+        }
+    }
+
     private void validateSelfApproval(User approver, ApprovalRequest approvalRequest) {
         if (approver.getId().equals(approvalRequest.getRequester().getId())) {
             throw new CustomException(ErrorCode.APPROVAL_SELF_DENIED);
@@ -503,32 +536,6 @@ public class ApprovalService {
         quoteApprovalHistoryRepository.save(history);
 
 
-    }
-
-    @Transactional
-    public void saveApprovalReasons(Quote quote, List<ApprovalReasonType> reasonTypes) {
-
-        if (reasonTypes == null || reasonTypes.isEmpty()) {
-            return;
-        }
-
-        List<QuoteApprovalReason> reasons = reasonTypes.stream()
-                .map(type -> QuoteApprovalReason.of(
-                        quote,
-                        type,
-                        buildReasonMessage(type)
-                ))
-                .toList();
-
-        quoteApprovalReasonRepository.saveAll(reasons);
-    }
-
-    private String buildReasonMessage(ApprovalReasonType type) {
-        return switch (type) {
-            case DISCOUNT_EXCEEDED -> "할인율이 정책 기준을 초과했습니다.";
-            case LOW_PROFIT -> "이익률이 최소 기준에 미달합니다.";
-            case HIGH_AMOUNT -> "견적 총액이 고액 기준 이상입니다.";
-        };
     }
 
 }

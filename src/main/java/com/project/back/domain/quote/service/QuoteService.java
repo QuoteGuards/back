@@ -141,7 +141,7 @@ public class QuoteService {
 
         if (approvalRequired) {
             List<QuoteApprovalReason> reasonEntities = reasons.stream()
-                    .map(r -> QuoteApprovalReason.of(quote, r, r.name()))
+                    .map(r -> QuoteApprovalReason.of(quote, r, r.getDefaultMessage()))
                     .toList();
             approvalReasonRepository.saveAll(reasonEntities);
         }
