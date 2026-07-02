@@ -1,12 +1,14 @@
 package com.project.back.domain.training.dto.response;
 
-import com.project.back.domain.training.service.TrainingService.TrainingStatusResult;
+import com.project.back.domain.training.service.TrainingService.CourseTrainingStatusResult;
 import com.project.back.global.enums.TrainingStatus;
+import com.project.back.global.enums.TrainingType;
 
 import java.math.BigDecimal;
 import java.util.List;
 
-public record TrainingStatusResponse(
+public record CourseTrainingStatusResponse(
+        TrainingType trainingType,
         TrainingStatus status,
         BigDecimal progressRate,
         int watchedSeconds,
@@ -16,26 +18,21 @@ public record TrainingStatusResponse(
         int activeVideoCount,
         int completedVideoCount,
         boolean additionalTrainingRequired,
-        List<TrainingVideoResponse> videos,
-        boolean canWriteQuote,
-        boolean canReviewApproval,
-        List<CourseTrainingStatusResponse> courses
+        List<TrainingVideoResponse> videos
 ) {
-    public static TrainingStatusResponse from(TrainingStatusResult result) {
-        return new TrainingStatusResponse(
+    public static CourseTrainingStatusResponse from(CourseTrainingStatusResult result) {
+        return new CourseTrainingStatusResponse(
+                result.trainingType(),
                 result.aggregateStatus(),
                 result.aggregateProgressRate(),
                 result.aggregateWatchedSeconds(),
                 result.aggregateLastWatchedSeconds(),
                 result.guideConfirmed(),
-                result.isCompleted(),
+                result.completed(),
                 result.activeVideoCount(),
                 result.completedVideoCount(),
                 result.additionalTrainingRequired(),
-                result.videos(),
-                result.canWriteQuote(),
-                result.canReviewApproval(),
-                result.courses().stream().map(CourseTrainingStatusResponse::from).toList()
+                result.videos()
         );
     }
 }
