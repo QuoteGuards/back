@@ -26,6 +26,7 @@ import com.project.back.notification.entity.NotificationRelatedType;
 import com.project.back.notification.entity.NotificationType;
 import com.project.back.notification.event.NotificationCreateEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,8 +34,10 @@ import com.project.back.domain.approval.dto.response.ApprovalMonthlyStatsRespons
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -139,6 +142,39 @@ public class ApprovalService {
 
         approvers.removeIf(approver -> approver.getId().equals(requester.getId()));
         return approvers;
+    }
+
+    // ── SLA 초과 승인 요청 알림 (스케줄러에서 매일 호출) ──
+    public void notifySlaBreaches(int slaDays) {
+        LocalDateTime threshold = LocalDateTime.now().minusDays(slaDays);
+        List<ApprovalRequest> breaches = approvalRequestRepository.findPendingRequestedBefore(threshold);
+
+        for (ApprovalRequest approvalRequest : breaches) {
+            try {
+                notifySlaBreach(approvalRequest);
+            } catch (Exception e) {
+                log.warn("SLA 초과 알림 생성 실패 - approvalRequestId={}", approvalRequest.getId(), e);
+            }
+        }
+    }
+
+    private void notifySlaBreach(ApprovalRequest approvalRequest) {
+        User requester = approvalRequest.getRequester();
+        Quote quote = approvalRequest.getQuote();
+        long daysPending = ChronoUnit.DAYS.between(approvalRequest.getRequestedAt(), LocalDateTime.now());
+
+        String title = "승인 대기 SLA 초과";
+        String message = "견적 " + quote.getQuoteNumber() + " 승인 요청이 " + daysPending + "일째 대기 중입니다.";
+
+        for (User approver : resolveApprovers(requester)) {
+            eventPublisher.publishEvent(new NotificationCreateEvent(
+                    approver.getId(),
+                    NotificationType.APPROVAL_SLA_BREACH,
+                    title,
+                    message,
+                    NotificationRelatedType.APPROVAL,
+                    approvalRequest.getId()));
+        }
     }
 
     // ── 2. 승인 처리 ──
