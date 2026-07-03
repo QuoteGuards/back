@@ -71,4 +71,28 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("status") ApprovalRequest.ApprovalStatus status,
             @Param("department") String department
     );
+
+    // 처리 완료 목록 조회 (상태/기간/처리자/부서로 필터링, 각 조건은 null이면 무시)
+    // - status가 null이면 전체 상태(대기/승인/반려) 조회
+    // - PENDING 건은 아직 처리되지 않아 기간이 지나도 계속 조치가 필요하므로 기간 필터를 적용하지 않고,
+    //   승인/반려된(처리 완료) 건만 processedAt 기준으로 기간 필터링한다
+    @Query("""
+        SELECT ar FROM ApprovalRequest ar
+        JOIN FETCH ar.quote
+        JOIN FETCH ar.requester r
+        LEFT JOIN FETCH ar.approver
+        WHERE (:status IS NULL OR ar.status = :status)
+        AND (:department IS NULL OR r.department = :department)
+        AND (:approverId IS NULL OR ar.approver.id = :approverId)
+        AND (:from IS NULL OR ar.status = 'PENDING' OR ar.processedAt >= :from)
+        AND (:to IS NULL OR ar.status = 'PENDING' OR ar.processedAt <= :to)
+        ORDER BY COALESCE(ar.processedAt, ar.requestedAt) DESC
+        """)
+    List<ApprovalRequest> search(
+            @Param("status") ApprovalRequest.ApprovalStatus status,
+            @Param("department") String department,
+            @Param("approverId") Long approverId,
+            @Param("from") LocalDateTime from,
+            @Param("to") LocalDateTime to
+    );
 }

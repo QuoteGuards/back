@@ -5,6 +5,8 @@ import com.project.back.domain.approval.entity.QuoteApprovalReason;
 import com.project.back.domain.customer.entity.Customer;
 import com.project.back.domain.user.entity.User;
 import com.project.back.global.enums.QuoteStatus;
+import com.project.back.global.exception.CustomException;
+import com.project.back.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -216,6 +218,15 @@ public class Quote {
 
     public void markAsNotLatest() {
         this.isLatest = false;
+    }
+
+    // 취소 가능 상태: DRAFT, SUBMITTED, APPROVAL_NOT_REQUIRED, APPROVAL_PENDING, APPROVED, REJECTED, REVISING
+    // 취소 불가 상태: SENT(고객 발송 완료), EXPIRED, CANCELLED(이미 취소됨)
+    public void cancel() {
+        if (status == QuoteStatus.SENT || status == QuoteStatus.EXPIRED || status == QuoteStatus.CANCELLED) {
+            throw new CustomException(ErrorCode.QUOTE_NOT_CANCELLABLE);
+        }
+        this.status = QuoteStatus.CANCELLED;
     }
 
     public void addItem(QuoteItem item) {

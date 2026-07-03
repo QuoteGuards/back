@@ -10,7 +10,9 @@ import com.project.back.domain.quote.dto.response.AdminQuoteListResponse;
 import com.project.back.domain.quote.dto.response.QuoteDetailResponse;
 import com.project.back.domain.quote.dto.response.QuoteProductContextResponse;
 import com.project.back.domain.quote.entity.Quote;
+import com.project.back.domain.approval.entity.ApprovalRequest;
 import com.project.back.domain.approval.entity.QuoteApprovalReason;
+import com.project.back.domain.approval.repository.ApprovalRequestRepository;
 import com.project.back.domain.quote.entity.QuoteItem;
 import com.project.back.domain.quote.entity.QuoteCustomer;
 import com.project.back.domain.quote.entity.QuoteCompany;
@@ -55,6 +57,7 @@ public class QuoteService {
     private final QuoteRepository quoteRepository;
     private final QuoteItemRepository quoteItemRepository;
     private final QuoteApprovalReasonRepository approvalReasonRepository;
+    private final ApprovalRequestRepository approvalRequestRepository;
     private final CustomerRepository customerRepository;
     private final QuoteCalculationService calculationService;
     private final ApprovalCheckService approvalCheckService;
@@ -141,13 +144,27 @@ public class QuoteService {
 
         if (approvalRequired) {
             List<QuoteApprovalReason> reasonEntities = reasons.stream()
-                    .map(r -> QuoteApprovalReason.of(quote, r, r.name()))
+                    .map(r -> QuoteApprovalReason.of(quote, r, r.getDefaultMessage()))
                     .toList();
             approvalReasonRepository.saveAll(reasonEntities);
         }
 
         quote.complete(approvalRequired);
         userStatsUpdateService.recalculateAfterCommit(requester.getId());
+
+        return quote;
+    }
+
+    // 견적 취소 — 작성자 본인 또는 SUPER_ADMIN만 가능. PENDING 승인 요청이 있으면 함께 취소 처리한다.
+    @Transactional
+    public Quote cancelQuote(Long quoteId, User requester) {
+        Quote quote = getQuoteWithDetailsOrThrow(quoteId);
+        validateCancelPermission(quote, requester);
+
+        quote.cancel();
+
+        approvalRequestRepository.findByQuote_IdAndStatus(quoteId, ApprovalRequest.ApprovalStatus.PENDING)
+                .ifPresent(ApprovalRequest::cancel);
 
         return quote;
     }
@@ -464,6 +481,15 @@ public class QuoteService {
     private void validateOwner(Quote quote, User requester) {
         if (!quote.getCreatedBy().getId().equals(requester.getId()))
             throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
+    }
+
+    // 견적 취소 권한 — 작성자 본인 또는 SUPER_ADMIN만 허용
+    private void validateCancelPermission(Quote quote, User requester) {
+        boolean isOwner = quote.getCreatedBy().getId().equals(requester.getId());
+        boolean isSuperAdmin = requester.getRole() == UserRole.SUPER_ADMIN;
+        if (!isOwner && !isSuperAdmin) {
+            throw new CustomException(ErrorCode.QUOTE_ACCESS_DENIED);
+        }
     }
 
     // 소유자, SUPER_ADMIN(전체), SALES_MANAGER(동일 부서 영업사원)

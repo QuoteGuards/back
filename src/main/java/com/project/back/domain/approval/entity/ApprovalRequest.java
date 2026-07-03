@@ -2,6 +2,8 @@ package com.project.back.domain.approval.entity;
 
 import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.user.entity.User;
+import com.project.back.global.exception.CustomException;
+import com.project.back.global.exception.ErrorCode;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -83,9 +85,16 @@ public class ApprovalRequest {
         this.requestMemo = requestMemo;
         this.requestCount++;
         this.processedAt = null;
+        this.rejectReason = null;
+        this.aiRiskSummary = null;
+        this.requestedAt = LocalDateTime.now();
     }
 
+    // PENDING 상태의 요청만 취소 가능 (이미 승인/반려/취소된 요청은 취소 불가)
     public void cancel() {
+        if (this.status != ApprovalStatus.PENDING) {
+            throw new CustomException(ErrorCode.APPROVAL_NOT_PENDING);
+        }
         this.status = ApprovalStatus.CANCELLED;
         this.processedAt = LocalDateTime.now();
     }
