@@ -338,15 +338,25 @@ public class ApprovalService {
         return new ApprovalMonthlyStatsResponse(approved, rejected);
     }
 
-    // ── 7. 승인 대기 목록 조회 (SUPER_ADMIN - 전체) ──
-    public List<ApprovalRequest> getPendingList() {
-        return approvalRequestRepository.findByStatusOrderByRequestedAtAsc(
-                ApprovalRequest.ApprovalStatus.PENDING
-        );
+    // ── 7. 승인 목록 조회 (SUPER_ADMIN - 전체) ──
+    // status/from/to/approverId가 모두 비어있으면 기존 승인 대기 목록 조회와 동일하게 동작 (하위 호환)
+    public List<ApprovalRequest> getPendingList(
+            ApprovalRequest.ApprovalStatus status, LocalDateTime from, LocalDateTime to, Long approverId
+    ) {
+        if (isDefaultPendingQuery(status, from, to, approverId)) {
+            return approvalRequestRepository.findByStatusOrderByRequestedAtAsc(
+                    ApprovalRequest.ApprovalStatus.PENDING
+            );
+        }
+
+        PeriodRange period = resolvePeriod(from, to);
+        return approvalRequestRepository.search(status, null, approverId, period.from(), period.to());
     }
 
-    // ── 7-1. 승인 대기 목록 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
-    public List<ApprovalRequest> getPendingListForManager(Long managerId) {
+    // ── 7-1. 승인 목록 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
+    public List<ApprovalRequest> getPendingListForManager(
+            Long managerId, ApprovalRequest.ApprovalStatus status, LocalDateTime from, LocalDateTime to, Long approverId
+    ) {
         User manager = userRepository.findById(managerId)
                 .orElseThrow(() -> new CustomException(ErrorCode.USER_NOT_FOUND));
 
@@ -355,10 +365,33 @@ public class ApprovalService {
             return List.of();
         }
 
-        return approvalRequestRepository.findByStatusAndRequesterDepartment(
-                ApprovalRequest.ApprovalStatus.PENDING, department
-        );
+        if (isDefaultPendingQuery(status, from, to, approverId)) {
+            return approvalRequestRepository.findByStatusAndRequesterDepartment(
+                    ApprovalRequest.ApprovalStatus.PENDING, department
+            );
+        }
+
+        PeriodRange period = resolvePeriod(from, to);
+        return approvalRequestRepository.search(status, department, approverId, period.from(), period.to());
     }
+
+    private boolean isDefaultPendingQuery(
+            ApprovalRequest.ApprovalStatus status, LocalDateTime from, LocalDateTime to, Long approverId
+    ) {
+        return status == ApprovalRequest.ApprovalStatus.PENDING
+                && from == null && to == null && approverId == null;
+    }
+
+    // from/to가 둘 다 비어있으면 이번 달 범위를 기본값으로 사용
+    private PeriodRange resolvePeriod(LocalDateTime from, LocalDateTime to) {
+        if (from != null || to != null) {
+            return new PeriodRange(from, to);
+        }
+        LocalDateTime defaultFrom = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        return new PeriodRange(defaultFrom, defaultFrom.plusMonths(1));
+    }
+
+    private record PeriodRange(LocalDateTime from, LocalDateTime to) {}
 
     // ── 6. 승인 이력 조회 (SUPER_ADMIN - 전체) ──
     public List<QuoteApprovalHistory> getApprovalHistories(Long quoteId) {
@@ -462,6 +495,7 @@ public class ApprovalService {
     public ApprovalRequestDetailResponse getApprovalDetail(Long approvalRequestId) {
 
         ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
+        Quote quote = getQuoteWithItems(approvalRequest.getQuote().getId());
 
         List<QuoteApprovalReason> reasons =
                 quoteApprovalReasonRepository.findByQuote_Id(approvalRequest.getQuote().getId());
@@ -470,7 +504,7 @@ public class ApprovalService {
                 quoteApprovalHistoryRepository
                         .findByApprovalRequestIdOrderByActedAtAsc(approvalRequestId);
 
-        return ApprovalRequestDetailResponse.from(approvalRequest, reasons, histories);
+        return ApprovalRequestDetailResponse.from(approvalRequest, quote, reasons, histories);
     }
 
     // ── 승인 상세 조회 (SALES_STAFF - 본인 요청건만) ──
@@ -482,6 +516,8 @@ public class ApprovalService {
             throw new CustomException(ErrorCode.APPROVAL_ACCESS_DENIED);
         }
 
+        Quote quote = getQuoteWithItems(approvalRequest.getQuote().getId());
+
         List<QuoteApprovalReason> reasons =
                 quoteApprovalReasonRepository.findByQuote_Id(approvalRequest.getQuote().getId());
 
@@ -489,7 +525,7 @@ public class ApprovalService {
                 quoteApprovalHistoryRepository
                         .findByApprovalRequestIdOrderByActedAtAsc(approvalRequestId);
 
-        return ApprovalRequestDetailResponse.from(approvalRequest, reasons, histories);
+        return ApprovalRequestDetailResponse.from(approvalRequest, quote, reasons, histories);
     }
 
     // ── 승인 상세 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
@@ -507,6 +543,8 @@ public class ApprovalService {
             throw new CustomException(ErrorCode.APPROVAL_DEPT_MISMATCH);
         }
 
+        Quote quote = getQuoteWithItems(approvalRequest.getQuote().getId());
+
         List<QuoteApprovalReason> reasons =
                 quoteApprovalReasonRepository.findByQuote_Id(approvalRequest.getQuote().getId());
 
@@ -514,7 +552,12 @@ public class ApprovalService {
                 quoteApprovalHistoryRepository
                         .findByApprovalRequestIdOrderByActedAtAsc(approvalRequestId);
 
-        return ApprovalRequestDetailResponse.from(approvalRequest, reasons, histories);
+        return ApprovalRequestDetailResponse.from(approvalRequest, quote, reasons, histories);
+    }
+
+    private Quote getQuoteWithItems(Long quoteId) {
+        return quoteRepository.findByIdWithDetails(quoteId)
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
     }
 
     private void saveHistory(

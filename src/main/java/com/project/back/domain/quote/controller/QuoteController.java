@@ -78,6 +78,16 @@ public class QuoteController {
         return ResponseEntity.ok(ApiResponse.success("견적이 수정되었습니다.", QuoteDetailResponse.from(quote)));
     }
 
+    // 견적 취소 (작성자 본인 또는 SUPER_ADMIN)
+    @PatchMapping("/{quoteId}/cancel")
+    public ResponseEntity<ApiResponse<QuoteDetailResponse>> cancelQuote(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long quoteId) {
+
+        Quote quote = quoteService.cancelQuote(quoteId, getUser(userId));
+        return ResponseEntity.ok(ApiResponse.success("견적이 취소되었습니다.", QuoteDetailResponse.from(quote)));
+    }
+
     // 내 견적 목록 (다중 조건 검색)
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<List<QuoteListResponse>>> getMyQuotes(

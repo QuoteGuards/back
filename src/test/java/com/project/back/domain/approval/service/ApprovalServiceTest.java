@@ -1,10 +1,12 @@
 package com.project.back.domain.approval.service;
 
+import com.project.back.domain.approval.dto.response.ApprovalRequestDetailResponse;
 import com.project.back.domain.approval.entity.ApprovalRequest;
 import com.project.back.domain.approval.repository.ApprovalRequestRepository;
 import com.project.back.domain.approval.repository.QuoteApprovalHistoryRepository;
 import com.project.back.domain.approval.repository.QuoteApprovalReasonRepository;
 import com.project.back.domain.quote.entity.Quote;
+import com.project.back.domain.quote.entity.QuoteItem;
 import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.quote.service.ApprovalCheckService;
@@ -20,8 +22,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -266,6 +271,163 @@ class ApprovalServiceTest {
                     .hasFieldOrPropertyWithValue("errorCode", ErrorCode.APPROVAL_QUOTE_MISMATCH);
 
             verifyNoInteractions(quoteRepository);
+        }
+    }
+
+    @Nested
+    @DisplayName("getApprovalDetail - 승인 상세 조회 (견적 금액 요약)")
+    class GetApprovalDetailTests {
+
+        @Test
+        @DisplayName("응답의 금액/이익률/품목 정보가 Quote 값과 일치한다")
+        void getApprovalDetail_includesQuoteAmountSummary() {
+            User requester = mock(User.class);
+            when(requester.getId()).thenReturn(1L);
+            when(requester.getName()).thenReturn("홍길동");
+
+            QuoteItem item = mock(QuoteItem.class);
+            when(item.getProductName()).thenReturn("노트북");
+            when(item.getQuantity()).thenReturn(BigDecimal.valueOf(2));
+            when(item.getUnitPrice()).thenReturn(BigDecimal.valueOf(1_000_000));
+            when(item.getLineTotal()).thenReturn(BigDecimal.valueOf(2_000_000));
+
+            Quote quote = mock(Quote.class);
+            when(quote.getId()).thenReturn(100L);
+            when(quote.getTotalAmount()).thenReturn(BigDecimal.valueOf(6_140_872));
+            when(quote.getTotalCostAmount()).thenReturn(BigDecimal.valueOf(4_820_000));
+            when(quote.getExpectedProfitAmount()).thenReturn(BigDecimal.valueOf(1_320_872));
+            when(quote.getProfitRate()).thenReturn(BigDecimal.valueOf(21.5));
+            when(quote.getItems()).thenReturn(List.of(item));
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L)
+                    .quote(quote)
+                    .requester(requester)
+                    .status(ApprovalRequest.ApprovalStatus.PENDING)
+                    .requestCount(1)
+                    .requestedAt(LocalDateTime.now())
+                    .build();
+
+            when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
+            when(quoteRepository.findByIdWithDetails(100L)).thenReturn(Optional.of(quote));
+            when(quoteApprovalReasonRepository.findByQuote_Id(100L)).thenReturn(List.of());
+            when(quoteApprovalHistoryRepository.findByApprovalRequestIdOrderByActedAtAsc(10L)).thenReturn(List.of());
+
+            ApprovalRequestDetailResponse result = service.getApprovalDetail(10L);
+
+            assertThat(result.getTotalAmount()).isEqualByComparingTo(BigDecimal.valueOf(6_140_872));
+            assertThat(result.getTotalCostAmount()).isEqualByComparingTo(BigDecimal.valueOf(4_820_000));
+            assertThat(result.getExpectedProfitAmount()).isEqualByComparingTo(BigDecimal.valueOf(1_320_872));
+            assertThat(result.getProfitRate()).isEqualByComparingTo(BigDecimal.valueOf(21.5));
+            assertThat(result.getItems()).hasSize(1);
+            assertThat(result.getItems().get(0).getProductName()).isEqualTo("노트북");
+            assertThat(result.getItems().get(0).getLineTotal()).isEqualByComparingTo(BigDecimal.valueOf(2_000_000));
+        }
+    }
+
+    @Nested
+    @DisplayName("getPendingList / getPendingListForManager - 처리 완료 목록 조회")
+    class GetPendingListTests {
+
+        @Test
+        @DisplayName("파라미터 없이 호출하면(status=PENDING, 기간/처리자 없음) 기존 승인 대기 목록 조회와 동일하게 동작한다")
+        void getPendingList_defaultParams_keepsLegacyBehavior() {
+            ApprovalRequest pending = mock(ApprovalRequest.class);
+            when(approvalRequestRepository.findByStatusOrderByRequestedAtAsc(ApprovalRequest.ApprovalStatus.PENDING))
+                    .thenReturn(List.of(pending));
+
+            List<ApprovalRequest> result = service.getPendingList(
+                    ApprovalRequest.ApprovalStatus.PENDING, null, null, null);
+
+            assertThat(result).containsExactly(pending);
+            verify(approvalRequestRepository).findByStatusOrderByRequestedAtAsc(ApprovalRequest.ApprovalStatus.PENDING);
+            verify(approvalRequestRepository, never()).search(any(), any(), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("status=APPROVED로 조회하면 search 쿼리로 위임하고 그 결과를 반환한다")
+        void getPendingList_statusApproved_usesSearchQuery() {
+            ApprovalRequest approved = mock(ApprovalRequest.class);
+            LocalDateTime from = LocalDateTime.of(2026, 7, 1, 0, 0);
+            LocalDateTime to = LocalDateTime.of(2026, 8, 1, 0, 0);
+            when(approvalRequestRepository.search(ApprovalRequest.ApprovalStatus.APPROVED, null, null, from, to))
+                    .thenReturn(List.of(approved));
+
+            List<ApprovalRequest> result = service.getPendingList(
+                    ApprovalRequest.ApprovalStatus.APPROVED, from, to, null);
+
+            assertThat(result).containsExactly(approved);
+            verify(approvalRequestRepository).search(ApprovalRequest.ApprovalStatus.APPROVED, null, null, from, to);
+        }
+
+        @Test
+        @DisplayName("approverId를 지정하면(status=REJECTED) 해당 처리자 조건으로 search 쿼리를 호출한다")
+        void getPendingList_approverIdOnly_usesSearchQueryWithApprover() {
+            LocalDateTime from = LocalDateTime.of(2026, 7, 1, 0, 0);
+            LocalDateTime to = LocalDateTime.of(2026, 8, 1, 0, 0);
+            when(approvalRequestRepository.search(ApprovalRequest.ApprovalStatus.REJECTED, null, 5L, from, to))
+                    .thenReturn(List.of());
+
+            service.getPendingList(ApprovalRequest.ApprovalStatus.REJECTED, from, to, 5L);
+
+            verify(approvalRequestRepository).search(ApprovalRequest.ApprovalStatus.REJECTED, null, 5L, from, to);
+        }
+
+        @Test
+        @DisplayName("status/from/to가 모두 비어있지 않은 확장 조회에서 from/to 미지정 시 이번 달 범위를 기본값으로 사용한다")
+        void getPendingList_noPeriodGiven_defaultsToCurrentMonth() {
+            when(approvalRequestRepository.search(eq(ApprovalRequest.ApprovalStatus.APPROVED), isNull(), isNull(), any(), any()))
+                    .thenReturn(List.of());
+
+            service.getPendingList(ApprovalRequest.ApprovalStatus.APPROVED, null, null, null);
+
+            ArgumentCaptor<LocalDateTime> fromCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+            ArgumentCaptor<LocalDateTime> toCaptor = ArgumentCaptor.forClass(LocalDateTime.class);
+            verify(approvalRequestRepository).search(
+                    eq(ApprovalRequest.ApprovalStatus.APPROVED), isNull(), isNull(),
+                    fromCaptor.capture(), toCaptor.capture());
+
+            LocalDateTime expectedFrom = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            assertThat(fromCaptor.getValue()).isEqualTo(expectedFrom);
+            assertThat(toCaptor.getValue()).isEqualTo(expectedFrom.plusMonths(1));
+        }
+
+        @Test
+        @DisplayName("SALES_MANAGER가 조회하면 자기 부서로 범위가 제한된 search 쿼리를 호출한다 (타 부서 조건 미포함)")
+        void getPendingListForManager_scopesToOwnDepartment() {
+            User manager = mock(User.class);
+            when(manager.getDepartment()).thenReturn("영업1팀");
+            when(userRepository.findById(2L)).thenReturn(Optional.of(manager));
+
+            LocalDateTime from = LocalDateTime.of(2026, 7, 1, 0, 0);
+            LocalDateTime to = LocalDateTime.of(2026, 8, 1, 0, 0);
+            when(approvalRequestRepository.search(ApprovalRequest.ApprovalStatus.APPROVED, "영업1팀", null, from, to))
+                    .thenReturn(List.of());
+
+            service.getPendingListForManager(2L, ApprovalRequest.ApprovalStatus.APPROVED, from, to, null);
+
+            verify(approvalRequestRepository).search(ApprovalRequest.ApprovalStatus.APPROVED, "영업1팀", null, from, to);
+            // 타 부서 조건이 섞이지 않는지 명시적으로 확인
+            verify(approvalRequestRepository, never()).search(any(), eq("영업2팀"), any(), any(), any());
+        }
+
+        @Test
+        @DisplayName("SALES_MANAGER가 파라미터 없이 조회하면 기존 부서별 대기 목록 조회와 동일하게 동작한다")
+        void getPendingListForManager_defaultParams_keepsLegacyBehavior() {
+            User manager = mock(User.class);
+            when(manager.getDepartment()).thenReturn("영업1팀");
+            when(userRepository.findById(2L)).thenReturn(Optional.of(manager));
+
+            ApprovalRequest pending = mock(ApprovalRequest.class);
+            when(approvalRequestRepository.findByStatusAndRequesterDepartment(
+                    ApprovalRequest.ApprovalStatus.PENDING, "영업1팀"))
+                    .thenReturn(List.of(pending));
+
+            List<ApprovalRequest> result = service.getPendingListForManager(
+                    2L, ApprovalRequest.ApprovalStatus.PENDING, null, null, null);
+
+            assertThat(result).containsExactly(pending);
+            verify(approvalRequestRepository, never()).search(any(), any(), any(), any(), any());
         }
     }
 }

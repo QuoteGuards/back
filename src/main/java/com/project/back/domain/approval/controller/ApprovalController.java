@@ -16,12 +16,15 @@ import com.project.back.domain.approval.service.AiRiskSummaryService;
 import com.project.back.domain.approval.service.ApprovalService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -76,30 +79,62 @@ public class ApprovalController {
         return ResponseEntity.ok(approvalService.getMonthlyStats());
     }
 
-    // ── 4. 승인 대기 목록 조회 (SUPER_ADMIN - 전체) ──
-    // GET /api/admin/approval-requests
+    // ── 4. 승인 목록 조회 (SUPER_ADMIN - 전체) ──
+    // GET /api/admin/approval-requests?status=&from=&to=&onlyMine=
+    // 파라미터 없이 호출하면 기존과 동일하게 승인 대기(PENDING) 목록만 반환한다 (하위 호환)
     @PreAuthorize("hasRole('SUPER_ADMIN')")
     @GetMapping("/admin/approval-requests")
-    public ResponseEntity<List<ApprovalRequestResponse>> getPendingList() {
-        List<ApprovalRequestResponse> result = approvalService.getPendingList()
+    public ResponseEntity<List<ApprovalRequestResponse>> getPendingList(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "false") boolean onlyMine,
+            @AuthenticationPrincipal Long userId
+    ) {
+        List<ApprovalRequestResponse> result = approvalService.getPendingList(
+                        parseStatus(status), toStartOfDay(from), toEndOfDay(to), onlyMine ? userId : null)
                 .stream()
                 .map(ApprovalRequestResponse::from)
                 .toList();
         return ResponseEntity.ok(result);
     }
 
-    // ── 4-1. 승인 대기 목록 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
-    // GET /api/manager/approval-requests
+    // ── 4-1. 승인 목록 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
+    // GET /api/manager/approval-requests?status=&from=&to=&onlyMine=
     @PreAuthorize("hasRole('SALES_MANAGER')")
     @GetMapping("/manager/approval-requests")
     public ResponseEntity<List<ApprovalRequestResponse>> getPendingListForManager(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(defaultValue = "false") boolean onlyMine,
             @AuthenticationPrincipal Long userId
     ) {
-        List<ApprovalRequestResponse> result = approvalService.getPendingListForManager(userId)
+        List<ApprovalRequestResponse> result = approvalService.getPendingListForManager(
+                        userId, parseStatus(status), toStartOfDay(from), toEndOfDay(to), onlyMine ? userId : null)
                 .stream()
                 .map(ApprovalRequestResponse::from)
                 .toList();
         return ResponseEntity.ok(result);
+    }
+
+    // status 쿼리 파라미터 없음 → 기존 동작(PENDING)과 동일. "ALL"이면 전체 상태(null) 조회.
+    private ApprovalRequest.ApprovalStatus parseStatus(String status) {
+        if (status == null) {
+            return ApprovalRequest.ApprovalStatus.PENDING;
+        }
+        if (status.equalsIgnoreCase("ALL")) {
+            return null;
+        }
+        return ApprovalRequest.ApprovalStatus.valueOf(status.toUpperCase());
+    }
+
+    private LocalDateTime toStartOfDay(LocalDate date) {
+        return date != null ? date.atStartOfDay() : null;
+    }
+
+    private LocalDateTime toEndOfDay(LocalDate date) {
+        return date != null ? date.plusDays(1).atStartOfDay() : null;
     }
 
     // ── 4-2. 승인 상세 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
