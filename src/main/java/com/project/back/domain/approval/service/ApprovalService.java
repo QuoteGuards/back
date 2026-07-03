@@ -108,22 +108,10 @@ public class ApprovalService {
      * - 요청자가 영업관리자면: 전체 최고관리자
      */
     private void notifyApprovers(User requester, Quote quote, Long approvalRequestId) {
-        List<User> approvers = new java.util.ArrayList<>(
-                userRepository.findByRoleAndStatus(UserRole.SUPER_ADMIN, UserStatus.ACTIVE));
-
-        if (requester.getRole() == UserRole.SALES_STAFF && requester.getDepartment() != null) {
-            approvers.addAll(userRepository.findByRoleAndDepartmentAndStatus(
-                    UserRole.SALES_MANAGER, requester.getDepartment(), UserStatus.ACTIVE));
-        }
-
         String title = "새 승인 요청";
         String message = requester.getName() + "님이 견적 " + quote.getQuoteNumber() + " 승인을 요청했습니다.";
 
-        for (User approver : approvers) {
-            // 요청자 본인(활성 SUPER_ADMIN 등)이 포함될 수 있으므로 자기 알림은 제외
-            if (approver.getId().equals(requester.getId())) {
-                continue;
-            }
+        for (User approver : resolveApprovers(requester)) {
             eventPublisher.publishEvent(new NotificationCreateEvent(
                     approver.getId(),
                     NotificationType.APPROVAL_REQUESTED,
@@ -132,6 +120,25 @@ public class ApprovalService {
                     NotificationRelatedType.APPROVAL,
                     approvalRequestId));
         }
+    }
+
+    /**
+     * 승인 권한자(담당자) 목록을 결정한다.
+     * - 요청자가 SALES_STAFF: 같은 부서 SALES_MANAGER 전원 + 전체 SUPER_ADMIN
+     * - 요청자가 SALES_MANAGER: 전체 SUPER_ADMIN만
+     * - 요청자 본인은 결과에서 제외 (본인이 SUPER_ADMIN 등으로 포함될 수 있으므로)
+     */
+    private List<User> resolveApprovers(User requester) {
+        List<User> approvers = new java.util.ArrayList<>(
+                userRepository.findByRoleAndStatus(UserRole.SUPER_ADMIN, UserStatus.ACTIVE));
+
+        if (requester.getRole() == UserRole.SALES_STAFF && requester.getDepartment() != null) {
+            approvers.addAll(userRepository.findByRoleAndDepartmentAndStatus(
+                    UserRole.SALES_MANAGER, requester.getDepartment(), UserStatus.ACTIVE));
+        }
+
+        approvers.removeIf(approver -> approver.getId().equals(requester.getId()));
+        return approvers;
     }
 
     // ── 2. 승인 처리 ──
