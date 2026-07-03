@@ -39,6 +39,10 @@ public class QuoteApprovalHistory {
     @Column(columnDefinition = "TEXT")
     private String memo;
 
+    // 반려/재요청 시점의 견적 스냅샷(JSON). action이 REJECTED/RE_REQUESTED일 때만 채워짐
+    @Column(columnDefinition = "TEXT")
+    private String quoteSnapshot;
+
     @Column(nullable = false)
     private LocalDateTime actedAt;
 
@@ -63,6 +67,18 @@ public class QuoteApprovalHistory {
             ApprovalRequest.ApprovalStatus afterStatus,
             String memo
     ) {
+        return of(approvalRequest, actor, action, beforeStatus, afterStatus, memo, null);
+    }
+
+    public static QuoteApprovalHistory of(
+            ApprovalRequest approvalRequest,
+            User actor,
+            ActionType action,
+            ApprovalRequest.ApprovalStatus beforeStatus,
+            ApprovalRequest.ApprovalStatus afterStatus,
+            String memo,
+            String quoteSnapshot
+    ) {
         return QuoteApprovalHistory.builder()
                 .approvalRequest(approvalRequest)
                 .actor(actor)
@@ -70,6 +86,7 @@ public class QuoteApprovalHistory {
                 .beforeStatus(beforeStatus)
                 .afterStatus(afterStatus)
                 .memo(memo)
+                .quoteSnapshot(quoteSnapshot)
                 .build();
     }
 }

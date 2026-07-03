@@ -201,6 +201,19 @@ public class ApprovalController {
         return ResponseEntity.ok(ApprovalRequestResponse.from(result));
     }
 
+    // ── 6-1. 승인 요청 철회 (요청자 본인만) ──
+    // POST /api/quotes/{quoteId}/approval-requests/{approvalRequestId}/cancel
+    @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER')")
+    @PostMapping("/quotes/{quoteId}/approval-requests/{approvalRequestId}/cancel")
+    public ResponseEntity<ApprovalRequestResponse> cancelRequest(
+            @PathVariable Long quoteId,
+            @PathVariable Long approvalRequestId,
+            @AuthenticationPrincipal Long userId
+    ) {
+        ApprovalRequest result = approvalService.cancelRequest(quoteId, approvalRequestId, userId);
+        return ResponseEntity.ok(ApprovalRequestResponse.from(result));
+    }
+
     // ── 7. 승인 요청 메모 수정 ──
     // PATCH /api/quotes/{quoteId}/approval-requests/{approvalRequestId}/memo
     @PreAuthorize("hasRole('SALES_STAFF')")
