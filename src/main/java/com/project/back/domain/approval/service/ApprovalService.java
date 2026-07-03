@@ -11,11 +11,8 @@ import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.entity.QuoteItem;
 import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
-<<<<<<< HEAD
 import com.project.back.domain.quote.service.ApprovalCheckService;
-=======
 import com.project.back.domain.training.service.TrainingService;
->>>>>>> 7cced150c0492d083564ef57910e0edd9e5001a1
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
@@ -58,12 +55,9 @@ public class ApprovalService {
     @Transactional
     public ApprovalRequest requestApproval(Long quoteId, Long requesterId, String requestMemo) {
 
-<<<<<<< HEAD
         // 교육 이수 체크는 QuoteService의 작성/제출 단계(validateTrainingCompleted)에서 이미 강제됨.
         // 승인 요청은 APPROVAL_PENDING 상태(= 작성 단계를 통과한 견적)에만 실행되므로 중복 체크 불필요.
 
-=======
->>>>>>> 7cced150c0492d083564ef57910e0edd9e5001a1
         // 이미 PENDING 상태 승인 요청이 있으면 중복 요청 방지
         if (approvalRequestRepository.existsByQuote_IdAndStatus(
                 quoteId, ApprovalRequest.ApprovalStatus.PENDING)) {

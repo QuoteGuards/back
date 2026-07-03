@@ -10,6 +10,7 @@ import com.project.back.domain.quote.entity.QuoteItem;
 import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.quote.service.ApprovalCheckService;
+import com.project.back.domain.training.service.TrainingService;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
@@ -48,6 +49,7 @@ class ApprovalServiceTest {
     private ApprovalCheckService approvalCheckService;
     private UserStatsUpdateService userStatsUpdateService;
     private ApplicationEventPublisher eventPublisher;
+    private TrainingService trainingService;
     private ApprovalService service;
 
     @BeforeEach
@@ -61,6 +63,9 @@ class ApprovalServiceTest {
         approvalCheckService = mock(ApprovalCheckService.class);
         userStatsUpdateService = mock(UserStatsUpdateService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
+        trainingService = mock(TrainingService.class);
+        // 교육 이수 게이트는 이 테스트 클래스의 관심사가 아니므로 기본은 통과로 설정
+        when(trainingService.canReviewApproval(any())).thenReturn(true);
         service = new ApprovalService(
                 approvalRequestRepository,
                 quoteApprovalReasonRepository,
@@ -70,7 +75,8 @@ class ApprovalServiceTest {
                 quoteItemRepository,
                 approvalCheckService,
                 userStatsUpdateService,
-                eventPublisher
+                eventPublisher,
+                trainingService
         );
     }
 
