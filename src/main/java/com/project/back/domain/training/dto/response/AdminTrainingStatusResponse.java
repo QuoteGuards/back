@@ -1,7 +1,7 @@
 package com.project.back.domain.training.dto.response;
 
 import com.project.back.domain.training.entity.TrainingContent;
-import com.project.back.domain.training.entity.UserTrainingProgress;
+import com.project.back.domain.training.service.TrainingService.CourseTrainingStatusResult;
 import com.project.back.domain.user.entity.User;
 import com.project.back.global.enums.TrainingStatus;
 
@@ -21,34 +21,15 @@ public record AdminTrainingStatusResponse(
         int lastWatchedSeconds,
         boolean guideConfirmed,
         boolean fullyCompleted,
+        int activeVideoCount,
+        int completedVideoCount,
         LocalDateTime completedAt
 ) {
     public static AdminTrainingStatusResponse from(
             User user,
             TrainingContent content,
-            UserTrainingProgress progress,
-            boolean guideConfirmed
+            CourseTrainingStatusResult result
     ) {
-        if (progress == null) {
-            return new AdminTrainingStatusResponse(
-                    user.getId(),
-                    user.getMemberNumber(),
-                    user.getName(),
-                    user.getEmail(),
-                    user.getDepartment(),
-                    content.getTitle(),
-                    TrainingStatus.NOT_STARTED,
-                    BigDecimal.ZERO,
-                    0,
-                    0,
-                    guideConfirmed,
-                    false,
-                    null
-            );
-        }
-
-        boolean fullyCompleted = progress.getStatus() == TrainingStatus.COMPLETED && guideConfirmed;
-
         return new AdminTrainingStatusResponse(
                 user.getId(),
                 user.getMemberNumber(),
@@ -56,13 +37,15 @@ public record AdminTrainingStatusResponse(
                 user.getEmail(),
                 user.getDepartment(),
                 content.getTitle(),
-                progress.getStatus(),
-                progress.getProgressRate(),
-                progress.getWatchedSeconds(),
-                progress.getLastWatchedSeconds(),
-                guideConfirmed,
-                fullyCompleted,
-                progress.getCompletedAt()
+                result.aggregateStatus(),
+                result.aggregateProgressRate(),
+                result.aggregateWatchedSeconds(),
+                result.aggregateLastWatchedSeconds(),
+                result.guideConfirmed(),
+                result.completed(),
+                result.activeVideoCount(),
+                result.completedVideoCount(),
+                result.completedAt()
         );
     }
 }

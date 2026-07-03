@@ -11,7 +11,11 @@ import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.entity.QuoteItem;
 import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
+<<<<<<< HEAD
 import com.project.back.domain.quote.service.ApprovalCheckService;
+=======
+import com.project.back.domain.training.service.TrainingService;
+>>>>>>> 7cced150c0492d083564ef57910e0edd9e5001a1
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
@@ -48,14 +52,18 @@ public class ApprovalService {
     private final ApprovalCheckService approvalCheckService;
     private final UserStatsUpdateService userStatsUpdateService;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
+    private final TrainingService trainingService;
 
     // ── 1. 승인 요청 ──
     @Transactional
     public ApprovalRequest requestApproval(Long quoteId, Long requesterId, String requestMemo) {
 
+<<<<<<< HEAD
         // 교육 이수 체크는 QuoteService의 작성/제출 단계(validateTrainingCompleted)에서 이미 강제됨.
         // 승인 요청은 APPROVAL_PENDING 상태(= 작성 단계를 통과한 견적)에만 실행되므로 중복 체크 불필요.
 
+=======
+>>>>>>> 7cced150c0492d083564ef57910e0edd9e5001a1
         // 이미 PENDING 상태 승인 요청이 있으면 중복 요청 방지
         if (approvalRequestRepository.existsByQuote_IdAndStatus(
                 quoteId, ApprovalRequest.ApprovalStatus.PENDING)) {
@@ -149,6 +157,7 @@ public class ApprovalService {
 
         // PENDING 상태만 승인 가능
         validatePendingStatus(approvalRequest);
+        validateApproverTraining(approver);
 
         ApprovalRequest.ApprovalStatus beforeStatus = approvalRequest.getStatus();
 
@@ -210,6 +219,7 @@ public class ApprovalService {
 
         // PENDING 상태만 반려 가능
         validatePendingStatus(approvalRequest);
+        validateApproverTraining(approver);
 
         ApprovalRequest.ApprovalStatus beforeStatus = approvalRequest.getStatus();
 
@@ -456,6 +466,12 @@ public class ApprovalService {
     private ApprovalRequest findApprovalRequestById(Long approvalRequestId) {
         return approvalRequestRepository.findByIdWithUsers(approvalRequestId)
                 .orElseThrow(() -> new CustomException(ErrorCode.APPROVAL_REQUEST_NOT_FOUND));
+    }
+
+    private void validateApproverTraining(User approver) {
+        if (!trainingService.canReviewApproval(approver)) {
+            throw new CustomException(ErrorCode.TRAINING_APPROVAL_NOT_COMPLETED);
+        }
     }
 
     private void validatePendingStatus(ApprovalRequest approvalRequest) {
