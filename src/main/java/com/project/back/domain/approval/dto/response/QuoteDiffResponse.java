@@ -29,28 +29,28 @@ public class QuoteDiffResponse {
 
     // before/after 두 스냅샷을 비교해 diff를 계산한다.
     // 품목은 productId로 매칭한다 (QuoteService.updateQuote가 품목을 교체할 때 쓰는 식별 기준과 동일).
-    // productId가 없는 품목(직접 입력한 품목 등)은 매칭 대상에서 제외한다.
+    // productId가 없는 품목(레거시 데이터 등)은 productName으로 대체 매칭한다.
     public static QuoteDiffResponse of(QuoteSnapshotDto before, QuoteSnapshotDto after) {
-        Map<Long, QuoteSnapshotDto.ItemSnapshot> beforeByProduct = toProductMap(before.getItems());
-        Map<Long, QuoteSnapshotDto.ItemSnapshot> afterByProduct = toProductMap(after.getItems());
+        Map<String, QuoteSnapshotDto.ItemSnapshot> beforeByKey = toKeyMap(before.getItems());
+        Map<String, QuoteSnapshotDto.ItemSnapshot> afterByKey = toKeyMap(after.getItems());
 
-        List<ItemChange> added = afterByProduct.entrySet().stream()
-                .filter(e -> !beforeByProduct.containsKey(e.getKey()))
+        List<ItemChange> added = afterByKey.entrySet().stream()
+                .filter(e -> !beforeByKey.containsKey(e.getKey()))
                 .map(e -> ItemChange.of(e.getValue()))
                 .toList();
 
-        List<ItemChange> removed = beforeByProduct.entrySet().stream()
-                .filter(e -> !afterByProduct.containsKey(e.getKey()))
+        List<ItemChange> removed = beforeByKey.entrySet().stream()
+                .filter(e -> !afterByKey.containsKey(e.getKey()))
                 .map(e -> ItemChange.of(e.getValue()))
                 .toList();
 
-        List<QuantityChange> quantityChanged = afterByProduct.entrySet().stream()
-                .filter(e -> beforeByProduct.containsKey(e.getKey()))
-                .filter(e -> beforeByProduct.get(e.getKey()).getQuantity()
+        List<QuantityChange> quantityChanged = afterByKey.entrySet().stream()
+                .filter(e -> beforeByKey.containsKey(e.getKey()))
+                .filter(e -> beforeByKey.get(e.getKey()).getQuantity()
                         .compareTo(e.getValue().getQuantity()) != 0)
                 .map(e -> new QuantityChange(
                         e.getValue().getProductName(),
-                        beforeByProduct.get(e.getKey()).getQuantity(),
+                        beforeByKey.get(e.getKey()).getQuantity(),
                         e.getValue().getQuantity()))
                 .toList();
 
@@ -67,11 +67,17 @@ public class QuoteDiffResponse {
                 .build();
     }
 
-    private static Map<Long, QuoteSnapshotDto.ItemSnapshot> toProductMap(List<QuoteSnapshotDto.ItemSnapshot> items) {
+    // productId가 있으면 productId로, 없으면(레거시 데이터 등) productName으로 매칭 키를 만든다.
+    private static String matchKey(QuoteSnapshotDto.ItemSnapshot item) {
+        return item.getProductId() != null
+                ? "id:" + item.getProductId()
+                : "name:" + item.getProductName();
+    }
+
+    private static Map<String, QuoteSnapshotDto.ItemSnapshot> toKeyMap(List<QuoteSnapshotDto.ItemSnapshot> items) {
         return items.stream()
-                .filter(item -> item.getProductId() != null)
                 .collect(Collectors.toMap(
-                        QuoteSnapshotDto.ItemSnapshot::getProductId, Function.identity(), (a, b) -> a));
+                        QuoteDiffResponse::matchKey, Function.identity(), (a, b) -> a));
     }
 
     @Getter

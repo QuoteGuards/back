@@ -111,8 +111,8 @@ class QuoteDiffResponseTest {
     }
 
     @Test
-    @DisplayName("productId가 없는 품목은 매칭 대상에서 제외한다 (항상 add/remove 후보에서도 제외)")
-    void of_ignoresItemsWithoutProductId() {
+    @DisplayName("productId가 없고 내용도 안 바뀐 품목은 변경 없음으로 처리한다")
+    void of_noChangeForUnchangedItemWithoutProductId() {
         QuoteSnapshotDto before = QuoteSnapshotDto.builder()
                 .totalAmount(BigDecimal.ZERO).profitRate(BigDecimal.ZERO).discountRate(BigDecimal.ZERO)
                 .items(List.of(item(null, "직접입력품목", 1, 5000)))
@@ -126,6 +126,47 @@ class QuoteDiffResponseTest {
 
         assertThat(diff.getAddedItems()).isEmpty();
         assertThat(diff.getRemovedItems()).isEmpty();
+        assertThat(diff.getQuantityChangedItems()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("productId가 없는 품목은 productName으로 대체 매칭해서 수량 변경을 감지한다")
+    void of_matchesByNameWhenProductIdMissing() {
+        QuoteSnapshotDto before = QuoteSnapshotDto.builder()
+                .totalAmount(BigDecimal.ZERO).profitRate(BigDecimal.ZERO).discountRate(BigDecimal.ZERO)
+                .items(List.of(item(null, "직접입력품목", 1, 5000)))
+                .build();
+        QuoteSnapshotDto after = QuoteSnapshotDto.builder()
+                .totalAmount(BigDecimal.ZERO).profitRate(BigDecimal.ZERO).discountRate(BigDecimal.ZERO)
+                .items(List.of(item(null, "직접입력품목", 3, 5000)))
+                .build();
+
+        QuoteDiffResponse diff = QuoteDiffResponse.of(before, after);
+
+        assertThat(diff.getQuantityChangedItems()).hasSize(1);
+        assertThat(diff.getQuantityChangedItems().get(0).getProductName()).isEqualTo("직접입력품목");
+        assertThat(diff.getQuantityChangedItems().get(0).getBefore()).isEqualByComparingTo(BigDecimal.valueOf(1));
+        assertThat(diff.getQuantityChangedItems().get(0).getAfter()).isEqualByComparingTo(BigDecimal.valueOf(3));
+        assertThat(diff.getAddedItems()).isEmpty();
+        assertThat(diff.getRemovedItems()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("productId가 없는 품목끼리는 이름이 다르면 서로 다른 품목(추가/삭제)으로 본다")
+    void of_treatsDifferentNamesAsAddedAndRemovedWhenProductIdMissing() {
+        QuoteSnapshotDto before = QuoteSnapshotDto.builder()
+                .totalAmount(BigDecimal.ZERO).profitRate(BigDecimal.ZERO).discountRate(BigDecimal.ZERO)
+                .items(List.of(item(null, "직접입력품목A", 1, 5000)))
+                .build();
+        QuoteSnapshotDto after = QuoteSnapshotDto.builder()
+                .totalAmount(BigDecimal.ZERO).profitRate(BigDecimal.ZERO).discountRate(BigDecimal.ZERO)
+                .items(List.of(item(null, "직접입력품목B", 1, 5000)))
+                .build();
+
+        QuoteDiffResponse diff = QuoteDiffResponse.of(before, after);
+
+        assertThat(diff.getAddedItems()).extracting("productName").containsExactly("직접입력품목B");
+        assertThat(diff.getRemovedItems()).extracting("productName").containsExactly("직접입력품목A");
         assertThat(diff.getQuantityChangedItems()).isEmpty();
     }
 }
