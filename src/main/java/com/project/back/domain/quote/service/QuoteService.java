@@ -94,11 +94,11 @@ public class QuoteService {
 
         //자사 정보 고정 스냅샷 생성
         QuoteCompany companySnapshot = QuoteCompany.builder()
-                .name("QuoteGuard 주식회사")
+                .name("QuoteGuard")
                 .businessNumber("123-45-67890")
-                .email("sales-support@quoteguard.com")
-                .phone("02-555-1234")
-                .address("서울특별시 소프트구 21길 4년제빌딩 3층")
+                .email("gurdians0708@gmail.com")
+                .phone("010-1234-5678")
+                .address("서울특별시 파이널구 21길 멋사빌딩 3층")
                 .build();
 
         Quote quote = Quote.builder()
