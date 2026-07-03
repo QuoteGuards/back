@@ -11,6 +11,7 @@ USE quoteguard;
 
 DROP TABLE IF EXISTS guide_confirmations;
 DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS quote_reminder_log;
 DROP TABLE IF EXISTS email_sends;
 DROP TABLE IF EXISTS quote_approval_histories;
 DROP TABLE IF EXISTS approval_requests;
@@ -594,6 +595,23 @@ CREATE TABLE email_sends (
 ) COMMENT = '승인된 견적서를 고객 이메일로 발송한 이력과 결과를 저장하는 테이블';
 
 
+CREATE TABLE quote_reminder_log (
+    id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '견적 리마인더 발송 이력 식별자',
+
+    quote_id BIGINT NOT NULL COMMENT '리마인더 대상 견적 ID',
+
+    trigger_type ENUM('WEEK', 'MONTH') NOT NULL COMMENT '리마인더 구분: WEEK=발송 후 1주, MONTH=발송 후 1개월',
+    customer_email VARCHAR(255) NULL COMMENT '리마인더 발송 당시 고객 이메일',
+    sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '리마인더 발송 일시',
+
+    CONSTRAINT uk_quote_reminder_log_quote_trigger UNIQUE (quote_id, trigger_type),
+
+    CONSTRAINT fk_quote_reminder_log_quote
+        FOREIGN KEY (quote_id)
+        REFERENCES quotes(id)
+        ON DELETE CASCADE
+) COMMENT = '견적 발송 후 1주·1개월 리마인더 메일 발송 이력. 동일 견적·구분별 중복 발송 방지';
+
 
 CREATE TABLE notifications (
     id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT '알림 식별자',
@@ -783,6 +801,11 @@ CREATE INDEX idx_quote_approval_histories_request ON quote_approval_histories (a
 -- quote_approval_histories 테이블의 actor_id 컬럼 조회 성능 개선용 인덱스
 CREATE INDEX idx_quote_approval_histories_actor ON quote_approval_histories (actor_id);
 
+
+
+-- quote_reminder_log 테이블 인덱스
+-- 견적별 리마인더 발송 이력 조회 시 quote_id 조건 검색 성능 개선용 인덱스
+CREATE INDEX idx_quote_reminder_log_quote ON quote_reminder_log (quote_id);
 
 
 -- email_sends 테이블 인덱스
