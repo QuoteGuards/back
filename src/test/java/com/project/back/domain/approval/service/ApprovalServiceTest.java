@@ -10,6 +10,7 @@ import com.project.back.domain.quote.entity.QuoteItem;
 import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.quote.service.ApprovalCheckService;
+import com.project.back.domain.training.service.TrainingService;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
@@ -48,6 +49,7 @@ class ApprovalServiceTest {
     private ApprovalCheckService approvalCheckService;
     private UserStatsUpdateService userStatsUpdateService;
     private ApplicationEventPublisher eventPublisher;
+    private TrainingService trainingService;
     private ApprovalService service;
 
     @BeforeEach
@@ -61,6 +63,9 @@ class ApprovalServiceTest {
         approvalCheckService = mock(ApprovalCheckService.class);
         userStatsUpdateService = mock(UserStatsUpdateService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
+        trainingService = mock(TrainingService.class);
+        // 교육 이수 게이트는 이 테스트 클래스의 관심사가 아니므로 기본은 통과로 설정
+        when(trainingService.canReviewApproval(any())).thenReturn(true);
         service = new ApprovalService(
                 approvalRequestRepository,
                 quoteApprovalReasonRepository,
@@ -70,7 +75,8 @@ class ApprovalServiceTest {
                 quoteItemRepository,
                 approvalCheckService,
                 userStatsUpdateService,
-                eventPublisher
+                eventPublisher,
+                trainingService
         );
     }
 
@@ -428,6 +434,99 @@ class ApprovalServiceTest {
 
             assertThat(result).containsExactly(pending);
             verify(approvalRequestRepository, never()).search(any(), any(), any(), any(), any());
+        }
+    }
+
+    @Nested
+    @DisplayName("notifySlaBreaches - SLA 초과 승인 요청 알림")
+    class NotifySlaBreachesTests {
+
+        @Test
+        @DisplayName("SLA를 초과한 건이 없으면 알림을 발행하지 않는다")
+        void notifySlaBreaches_noTargets_doesNothing() {
+            when(approvalRequestRepository.findPendingRequestedBefore(any())).thenReturn(List.of());
+
+            service.notifySlaBreaches(2);
+
+            verify(eventPublisher, never()).publishEvent(any());
+        }
+
+        @Test
+        @DisplayName("요청자가 SALES_STAFF면 같은 부서 SALES_MANAGER 전원 + 전체 SUPER_ADMIN에게 알림을 발행한다")
+        void notifySlaBreaches_staffRequester_notifiesDeptManagersAndAllAdmins() {
+            User staff = User.builder()
+                    .id(1L).name("홍길동").role(UserRole.SALES_STAFF).department("영업1팀")
+                    .build();
+            User manager = User.builder()
+                    .id(2L).name("김관리").role(UserRole.SALES_MANAGER).department("영업1팀")
+                    .build();
+            User admin = User.builder()
+                    .id(3L).name("박최고").role(UserRole.SUPER_ADMIN)
+                    .build();
+
+            Quote quote = mock(Quote.class);
+            when(quote.getQuoteNumber()).thenReturn("Q-2026-0001");
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L).quote(quote).requester(staff)
+                    .status(ApprovalRequest.ApprovalStatus.PENDING)
+                    .requestedAt(LocalDateTime.now().minusDays(5))
+                    .build();
+
+            when(approvalRequestRepository.findPendingRequestedBefore(any()))
+                    .thenReturn(List.of(approvalRequest));
+            when(userRepository.findByRoleAndStatus(UserRole.SUPER_ADMIN, UserStatus.ACTIVE))
+                    .thenReturn(List.of(admin));
+            when(userRepository.findByRoleAndDepartmentAndStatus(UserRole.SALES_MANAGER, "영업1팀", UserStatus.ACTIVE))
+                    .thenReturn(List.of(manager));
+
+            service.notifySlaBreaches(2);
+
+            ArgumentCaptor<NotificationCreateEvent> captor = ArgumentCaptor.forClass(NotificationCreateEvent.class);
+            verify(eventPublisher, times(2)).publishEvent(captor.capture());
+
+            List<Long> recipientIds = captor.getAllValues().stream()
+                    .map(NotificationCreateEvent::userId).toList();
+            assertThat(recipientIds).containsExactlyInAnyOrder(2L, 3L);
+
+            NotificationCreateEvent event = captor.getAllValues().get(0);
+            assertThat(event.type()).isEqualTo(com.project.back.notification.entity.NotificationType.APPROVAL_SLA_BREACH);
+            assertThat(event.relatedType()).isEqualTo(com.project.back.notification.entity.NotificationRelatedType.APPROVAL);
+            assertThat(event.relatedId()).isEqualTo(10L);
+            assertThat(event.message()).contains("Q-2026-0001").contains("5일째");
+        }
+
+        @Test
+        @DisplayName("요청자가 SALES_MANAGER면 전체 SUPER_ADMIN에게만 알림을 발행한다")
+        void notifySlaBreaches_managerRequester_notifiesOnlyAdmins() {
+            User managerRequester = User.builder()
+                    .id(4L).name("김관리").role(UserRole.SALES_MANAGER).department("영업1팀")
+                    .build();
+            User admin = User.builder()
+                    .id(3L).name("박최고").role(UserRole.SUPER_ADMIN)
+                    .build();
+
+            Quote quote = mock(Quote.class);
+            when(quote.getQuoteNumber()).thenReturn("Q-2026-0002");
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(11L).quote(quote).requester(managerRequester)
+                    .status(ApprovalRequest.ApprovalStatus.PENDING)
+                    .requestedAt(LocalDateTime.now().minusDays(3))
+                    .build();
+
+            when(approvalRequestRepository.findPendingRequestedBefore(any()))
+                    .thenReturn(List.of(approvalRequest));
+            when(userRepository.findByRoleAndStatus(UserRole.SUPER_ADMIN, UserStatus.ACTIVE))
+                    .thenReturn(List.of(admin));
+
+            service.notifySlaBreaches(2);
+
+            ArgumentCaptor<NotificationCreateEvent> captor = ArgumentCaptor.forClass(NotificationCreateEvent.class);
+            verify(eventPublisher, times(1)).publishEvent(captor.capture());
+            assertThat(captor.getValue().userId()).isEqualTo(3L);
+            verify(userRepository, never())
+                    .findByRoleAndDepartmentAndStatus(eq(UserRole.SALES_MANAGER), any(), any());
         }
     }
 }

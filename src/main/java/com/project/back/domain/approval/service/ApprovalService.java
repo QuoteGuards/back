@@ -11,11 +11,8 @@ import com.project.back.domain.quote.entity.Quote;
 import com.project.back.domain.quote.entity.QuoteItem;
 import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
-<<<<<<< HEAD
 import com.project.back.domain.quote.service.ApprovalCheckService;
-=======
 import com.project.back.domain.training.service.TrainingService;
->>>>>>> 7cced150c0492d083564ef57910e0edd9e5001a1
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
 import com.project.back.domain.user.entity.UserStatus;
@@ -29,6 +26,7 @@ import com.project.back.notification.entity.NotificationRelatedType;
 import com.project.back.notification.entity.NotificationType;
 import com.project.back.notification.event.NotificationCreateEvent;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,8 +34,10 @@ import com.project.back.domain.approval.dto.response.ApprovalMonthlyStatsRespons
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -58,12 +58,9 @@ public class ApprovalService {
     @Transactional
     public ApprovalRequest requestApproval(Long quoteId, Long requesterId, String requestMemo) {
 
-<<<<<<< HEAD
         // 교육 이수 체크는 QuoteService의 작성/제출 단계(validateTrainingCompleted)에서 이미 강제됨.
         // 승인 요청은 APPROVAL_PENDING 상태(= 작성 단계를 통과한 견적)에만 실행되므로 중복 체크 불필요.
 
-=======
->>>>>>> 7cced150c0492d083564ef57910e0edd9e5001a1
         // 이미 PENDING 상태 승인 요청이 있으면 중복 요청 방지
         if (approvalRequestRepository.existsByQuote_IdAndStatus(
                 quoteId, ApprovalRequest.ApprovalStatus.PENDING)) {
@@ -114,6 +111,27 @@ public class ApprovalService {
      * - 요청자가 영업관리자면: 전체 최고관리자
      */
     private void notifyApprovers(User requester, Quote quote, Long approvalRequestId) {
+        String title = "새 승인 요청";
+        String message = requester.getName() + "님이 견적 " + quote.getQuoteNumber() + " 승인을 요청했습니다.";
+
+        for (User approver : resolveApprovers(requester)) {
+            eventPublisher.publishEvent(new NotificationCreateEvent(
+                    approver.getId(),
+                    NotificationType.APPROVAL_REQUESTED,
+                    title,
+                    message,
+                    NotificationRelatedType.APPROVAL,
+                    approvalRequestId));
+        }
+    }
+
+    /**
+     * 승인 권한자(담당자) 목록을 결정한다.
+     * - 요청자가 SALES_STAFF: 같은 부서 SALES_MANAGER 전원 + 전체 SUPER_ADMIN
+     * - 요청자가 SALES_MANAGER: 전체 SUPER_ADMIN만
+     * - 요청자 본인은 결과에서 제외 (본인이 SUPER_ADMIN 등으로 포함될 수 있으므로)
+     */
+    private List<User> resolveApprovers(User requester) {
         List<User> approvers = new java.util.ArrayList<>(
                 userRepository.findByRoleAndStatus(UserRole.SUPER_ADMIN, UserStatus.ACTIVE));
 
@@ -122,21 +140,40 @@ public class ApprovalService {
                     UserRole.SALES_MANAGER, requester.getDepartment(), UserStatus.ACTIVE));
         }
 
-        String title = "새 승인 요청";
-        String message = requester.getName() + "님이 견적 " + quote.getQuoteNumber() + " 승인을 요청했습니다.";
+        approvers.removeIf(approver -> approver.getId().equals(requester.getId()));
+        return approvers;
+    }
 
-        for (User approver : approvers) {
-            // 요청자 본인(활성 SUPER_ADMIN 등)이 포함될 수 있으므로 자기 알림은 제외
-            if (approver.getId().equals(requester.getId())) {
-                continue;
+    // ── SLA 초과 승인 요청 알림 (스케줄러에서 매일 호출) ──
+    public void notifySlaBreaches(int slaDays) {
+        LocalDateTime threshold = LocalDateTime.now().minusDays(slaDays);
+        List<ApprovalRequest> breaches = approvalRequestRepository.findPendingRequestedBefore(threshold);
+
+        for (ApprovalRequest approvalRequest : breaches) {
+            try {
+                notifySlaBreach(approvalRequest);
+            } catch (Exception e) {
+                log.warn("SLA 초과 알림 생성 실패 - approvalRequestId={}", approvalRequest.getId(), e);
             }
+        }
+    }
+
+    private void notifySlaBreach(ApprovalRequest approvalRequest) {
+        User requester = approvalRequest.getRequester();
+        Quote quote = approvalRequest.getQuote();
+        long daysPending = ChronoUnit.DAYS.between(approvalRequest.getRequestedAt(), LocalDateTime.now());
+
+        String title = "승인 대기 SLA 초과";
+        String message = "견적 " + quote.getQuoteNumber() + " 승인 요청이 " + daysPending + "일째 대기 중입니다.";
+
+        for (User approver : resolveApprovers(requester)) {
             eventPublisher.publishEvent(new NotificationCreateEvent(
                     approver.getId(),
-                    NotificationType.APPROVAL_REQUESTED,
+                    NotificationType.APPROVAL_SLA_BREACH,
                     title,
                     message,
                     NotificationRelatedType.APPROVAL,
-                    approvalRequestId));
+                    approvalRequest.getId()));
         }
     }
 

@@ -95,4 +95,14 @@ public interface ApprovalRequestRepository extends JpaRepository<ApprovalRequest
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to
     );
+
+    // SLA 초과 대상 조회 — PENDING 상태이면서 요청일이 threshold 이전인 건 (스케줄러가 매일 호출)
+    @Query("""
+        SELECT ar FROM ApprovalRequest ar
+        JOIN FETCH ar.quote
+        JOIN FETCH ar.requester
+        WHERE ar.status = 'PENDING'
+        AND ar.requestedAt <= :threshold
+        """)
+    List<ApprovalRequest> findPendingRequestedBefore(@Param("threshold") LocalDateTime threshold);
 }
