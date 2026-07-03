@@ -389,6 +389,119 @@ class ApprovalServiceTest {
     }
 
     @Nested
+    @DisplayName("cancelRequest - 승인 요청 철회")
+    class CancelRequestTests {
+
+        @Test
+        @DisplayName("요청자 본인이 PENDING 건을 철회하면 CANCELLED로 전이되고, 견적은 DRAFT로 돌아가며, 이력이 남는다")
+        void cancelRequest_success() {
+            User requester = mock(User.class);
+            when(requester.getId()).thenReturn(1L);
+
+            Quote quote = mock(Quote.class);
+            when(quote.getId()).thenReturn(100L);
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L)
+                    .quote(quote)
+                    .requester(requester)
+                    .status(ApprovalRequest.ApprovalStatus.PENDING)
+                    .requestedAt(LocalDateTime.now())
+                    .build();
+
+            when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
+            when(quoteRepository.findById(100L)).thenReturn(Optional.of(quote));
+
+            ApprovalRequest result = service.cancelRequest(100L, 10L, 1L);
+
+            assertThat(result.getStatus()).isEqualTo(ApprovalRequest.ApprovalStatus.CANCELLED);
+            verify(quote, times(1)).saveAsDraft();
+
+            ArgumentCaptor<QuoteApprovalHistory> captor = ArgumentCaptor.forClass(QuoteApprovalHistory.class);
+            verify(quoteApprovalHistoryRepository).save(captor.capture());
+            assertThat(captor.getValue().getAction()).isEqualTo(QuoteApprovalHistory.ActionType.CANCELLED);
+        }
+
+        @Test
+        @DisplayName("본인 요청이 아니면 APPROVAL_ACCESS_DENIED 예외")
+        void cancelRequest_notOwner() {
+            User requester = mock(User.class);
+            when(requester.getId()).thenReturn(1L);
+
+            Quote quote = mock(Quote.class);
+            when(quote.getId()).thenReturn(100L);
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L)
+                    .quote(quote)
+                    .requester(requester)
+                    .status(ApprovalRequest.ApprovalStatus.PENDING)
+                    .requestedAt(LocalDateTime.now())
+                    .build();
+
+            when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
+
+            assertThatThrownBy(() -> service.cancelRequest(100L, 10L, 2L))
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.APPROVAL_ACCESS_DENIED);
+
+            verifyNoInteractions(quoteRepository);
+        }
+
+        @Test
+        @DisplayName("PENDING 상태가 아니면 APPROVAL_NOT_PENDING 예외")
+        void cancelRequest_notPending() {
+            User requester = mock(User.class);
+            when(requester.getId()).thenReturn(1L);
+
+            Quote quote = mock(Quote.class);
+            when(quote.getId()).thenReturn(100L);
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L)
+                    .quote(quote)
+                    .requester(requester)
+                    .status(ApprovalRequest.ApprovalStatus.APPROVED)
+                    .requestedAt(LocalDateTime.now())
+                    .build();
+
+            when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
+
+            assertThatThrownBy(() -> service.cancelRequest(100L, 10L, 1L))
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.APPROVAL_NOT_PENDING);
+
+            verifyNoInteractions(quoteRepository);
+        }
+
+        @Test
+        @DisplayName("경로의 quoteId와 승인 요청의 견적이 다르면 APPROVAL_QUOTE_MISMATCH 예외")
+        void cancelRequest_quoteMismatch() {
+            User requester = mock(User.class);
+            when(requester.getId()).thenReturn(1L);
+
+            Quote quote = mock(Quote.class);
+            when(quote.getId()).thenReturn(100L);
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L)
+                    .quote(quote)
+                    .requester(requester)
+                    .status(ApprovalRequest.ApprovalStatus.PENDING)
+                    .requestedAt(LocalDateTime.now())
+                    .build();
+
+            when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
+
+            assertThatThrownBy(() -> service.cancelRequest(999L, 10L, 1L))
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.APPROVAL_QUOTE_MISMATCH);
+
+            verifyNoInteractions(quoteRepository);
+        }
+    }
+
+    @Nested
     @DisplayName("getApprovalDetail - 승인 상세 조회 (견적 금액 요약)")
     class GetApprovalDetailTests {
 

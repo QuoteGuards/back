@@ -370,6 +370,41 @@ public class ApprovalService {
         return approvalRequest;
     }
 
+    // ── 4-1. 승인 요청 철회 (요청자 본인만, PENDING 상태만) ──
+    @Transactional
+    public ApprovalRequest cancelRequest(Long quoteId, Long approvalRequestId, Long requesterId) {
+
+        ApprovalRequest approvalRequest = findApprovalRequestById(approvalRequestId);
+        validateQuoteMatch(quoteId, approvalRequest);
+
+        if (!approvalRequest.getRequester().getId().equals(requesterId)) {
+            throw new CustomException(ErrorCode.APPROVAL_ACCESS_DENIED);
+        }
+
+        User requester = approvalRequest.getRequester();
+
+        // PENDING 상태만 철회 가능 (ApprovalRequest.cancel()이 검증)
+        approvalRequest.cancel();
+        approvalRequestRepository.save(approvalRequest);
+
+        // [견적 파트 오케스트레이션 연동]: 승인 요청 없이 다시 편집할 수 있도록 DRAFT로 되돌림
+        Quote quote = quoteRepository.findById(approvalRequest.getQuote().getId())
+                .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
+        quote.saveAsDraft();
+
+        // 철회 이력 저장
+        saveHistory(
+                approvalRequest,
+                requester,
+                QuoteApprovalHistory.ActionType.CANCELLED,
+                ApprovalRequest.ApprovalStatus.PENDING,
+                ApprovalRequest.ApprovalStatus.CANCELLED,
+                null
+        );
+
+        return approvalRequest;
+    }
+
     // ── 5. 승인 요청 메모 수정 ──
     @Transactional
     public void updateMemo(Long approvalRequestId, Long requesterId, String newMemo) {
