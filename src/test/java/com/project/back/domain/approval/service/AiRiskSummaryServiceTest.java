@@ -11,6 +11,7 @@ import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.repository.UserRepository;
 import com.project.back.global.client.GeminiClient;
+import com.project.back.global.client.GroqClient;
 import com.project.back.global.exception.CustomException;
 import com.project.back.global.exception.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +38,7 @@ class AiRiskSummaryServiceTest {
     private QuoteApprovalReasonRepository quoteApprovalReasonRepository;
     private UserRepository userRepository;
     private GeminiClient geminiClient;
+    private GroqClient groqClient;
     private AiRiskSummaryService service;
 
     @BeforeEach
@@ -46,12 +48,14 @@ class AiRiskSummaryServiceTest {
         quoteApprovalReasonRepository = mock(QuoteApprovalReasonRepository.class);
         userRepository = mock(UserRepository.class);
         geminiClient = mock(GeminiClient.class);
+        groqClient = mock(GroqClient.class);
         service = new AiRiskSummaryService(
                 approvalRequestRepository,
                 quoteItemRepository,
                 quoteApprovalReasonRepository,
                 userRepository,
-                geminiClient
+                geminiClient,
+                groqClient
         );
     }
 
@@ -68,6 +72,7 @@ class AiRiskSummaryServiceTest {
         when(request.getId()).thenReturn(1L);
         when(request.getAiRiskSummary()).thenReturn(existingSummary);
         when(request.getQuote()).thenReturn(quote);
+        when(request.getHistories()).thenReturn(List.of());
 
         return request;
     }

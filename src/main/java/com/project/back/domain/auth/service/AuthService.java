@@ -110,6 +110,7 @@ public class AuthService {
 
     private String issueRefreshToken(Long userId) {
         refreshTokenRepository.deleteByUserId(userId);
+        refreshTokenRepository.flush();
 
         String rawToken = UUID.randomUUID().toString();
         String hashedToken = hashToken(rawToken);
