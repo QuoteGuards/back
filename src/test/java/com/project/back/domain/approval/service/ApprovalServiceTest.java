@@ -1,7 +1,9 @@
 package com.project.back.domain.approval.service;
 
+import com.project.back.domain.approval.dto.QuoteSnapshotDto;
 import com.project.back.domain.approval.dto.response.ApprovalRequestDetailResponse;
 import com.project.back.domain.approval.entity.ApprovalRequest;
+import com.project.back.domain.approval.entity.QuoteApprovalHistory;
 import com.project.back.domain.approval.repository.ApprovalRequestRepository;
 import com.project.back.domain.approval.repository.QuoteApprovalHistoryRepository;
 import com.project.back.domain.approval.repository.QuoteApprovalReasonRepository;
@@ -25,6 +27,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
+import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -50,6 +53,7 @@ class ApprovalServiceTest {
     private UserStatsUpdateService userStatsUpdateService;
     private ApplicationEventPublisher eventPublisher;
     private TrainingService trainingService;
+    private ObjectMapper objectMapper;
     private ApprovalService service;
 
     @BeforeEach
@@ -64,6 +68,8 @@ class ApprovalServiceTest {
         userStatsUpdateService = mock(UserStatsUpdateService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
         trainingService = mock(TrainingService.class);
+        // 스냅샷 직렬화/역직렬화를 실제로 검증해야 하므로 목이 아닌 실제 ObjectMapper 사용
+        objectMapper = new ObjectMapper();
         // 교육 이수 게이트는 이 테스트 클래스의 관심사가 아니므로 기본은 통과로 설정
         when(trainingService.canReviewApproval(any())).thenReturn(true);
         service = new ApprovalService(
@@ -76,7 +82,8 @@ class ApprovalServiceTest {
                 approvalCheckService,
                 userStatsUpdateService,
                 eventPublisher,
-                trainingService
+                trainingService,
+                objectMapper
         );
     }
 
@@ -136,6 +143,54 @@ class ApprovalServiceTest {
             verifyNoInteractions(userRepository);
             verifyNoInteractions(quoteRepository);
         }
+
+        @Test
+        @DisplayName("반려 성공 시 그 시점 견적 스냅샷을 이력에 저장한다")
+        void reject_success_savesQuoteSnapshot() {
+            User requester = mock(User.class);
+            when(requester.getId()).thenReturn(1L);
+
+            User approver = mock(User.class);
+            when(approver.getId()).thenReturn(2L);
+            when(approver.getRole()).thenReturn(UserRole.SUPER_ADMIN);
+
+            QuoteItem item = mock(QuoteItem.class);
+            when(item.getProductId()).thenReturn(1L);
+            when(item.getProductName()).thenReturn("노트북");
+            when(item.getQuantity()).thenReturn(BigDecimal.valueOf(2));
+            when(item.getUnitPrice()).thenReturn(BigDecimal.valueOf(1_000_000));
+
+            Quote quote = mock(Quote.class);
+            when(quote.getId()).thenReturn(100L);
+            when(quote.getQuoteNumber()).thenReturn("Q-2026-001");
+            when(quote.getTotalAmount()).thenReturn(BigDecimal.valueOf(2_000_000));
+            when(quote.getProfitRate()).thenReturn(BigDecimal.valueOf(20.0));
+            when(quote.getSubtotal()).thenReturn(BigDecimal.valueOf(2_000_000));
+            when(quote.getDiscountAmount()).thenReturn(BigDecimal.ZERO);
+            when(quote.getCreatedBy()).thenReturn(requester);
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L)
+                    .quote(quote)
+                    .requester(requester)
+                    .status(ApprovalRequest.ApprovalStatus.PENDING)
+                    .requestedAt(LocalDateTime.now())
+                    .build();
+
+            when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
+            when(userRepository.findById(2L)).thenReturn(Optional.of(approver));
+            when(quoteRepository.findById(100L)).thenReturn(Optional.of(quote));
+            when(quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(100L)).thenReturn(List.of(item));
+
+            service.reject(100L, 10L, 2L, "금액 오류");
+
+            ArgumentCaptor<QuoteApprovalHistory> captor = ArgumentCaptor.forClass(QuoteApprovalHistory.class);
+            verify(quoteApprovalHistoryRepository).save(captor.capture());
+
+            QuoteApprovalHistory saved = captor.getValue();
+            assertThat(saved.getAction()).isEqualTo(QuoteApprovalHistory.ActionType.REJECTED);
+            assertThat(saved.getQuoteSnapshot()).isNotNull().contains("2000000").contains("노트북");
+        }
     }
 
     @Nested
@@ -193,6 +248,59 @@ class ApprovalServiceTest {
             verify(quote, times(1)).complete(true);
             verify(quoteApprovalReasonRepository, times(1)).saveAll(anyList());
             verify(eventPublisher, times(1)).publishEvent(any(NotificationCreateEvent.class));
+        }
+
+        @Test
+        @DisplayName("재요청 성공 시 그 시점 견적 스냅샷을 이력에 저장한다")
+        void reRequest_success_savesQuoteSnapshot() {
+            User requester = mock(User.class);
+            when(requester.getId()).thenReturn(1L);
+            when(requester.getRole()).thenReturn(UserRole.SALES_STAFF);
+            when(requester.getDepartment()).thenReturn("영업1팀");
+            when(requester.getName()).thenReturn("홍길동");
+
+            QuoteItem item = mock(QuoteItem.class);
+            when(item.getProductId()).thenReturn(1L);
+            when(item.getProductName()).thenReturn("노트북");
+            when(item.getQuantity()).thenReturn(BigDecimal.valueOf(3));
+            when(item.getUnitPrice()).thenReturn(BigDecimal.valueOf(1_000_000));
+
+            Quote quote = mock(Quote.class);
+            when(quote.getId()).thenReturn(100L);
+            when(quote.getQuoteNumber()).thenReturn("Q-2026-001");
+            when(quote.getApprovalReasons()).thenReturn(new java.util.ArrayList<>());
+            when(quote.getTotalAmount()).thenReturn(BigDecimal.valueOf(3_000_000));
+            when(quote.getProfitRate()).thenReturn(BigDecimal.valueOf(22.0));
+            when(quote.getSubtotal()).thenReturn(BigDecimal.valueOf(3_000_000));
+            when(quote.getDiscountAmount()).thenReturn(BigDecimal.ZERO);
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L)
+                    .quote(quote)
+                    .requester(requester)
+                    .status(ApprovalRequest.ApprovalStatus.REJECTED)
+                    .requestCount(1)
+                    .requestedAt(LocalDateTime.now().minusDays(1))
+                    .build();
+
+            when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
+            when(userRepository.findById(1L)).thenReturn(Optional.of(requester));
+            when(quoteRepository.findById(100L)).thenReturn(Optional.of(quote));
+            when(userRepository.findByRoleAndStatus(UserRole.SUPER_ADMIN, UserStatus.ACTIVE))
+                    .thenReturn(List.of());
+            when(userRepository.findByRoleAndDepartmentAndStatus(UserRole.SALES_MANAGER, "영업1팀", UserStatus.ACTIVE))
+                    .thenReturn(List.of());
+            when(quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(100L)).thenReturn(List.of(item));
+            when(approvalCheckService.check(any(), any(), any(), any())).thenReturn(List.of());
+
+            service.reRequest(100L, 10L, 1L, "수정 완료했습니다");
+
+            ArgumentCaptor<QuoteApprovalHistory> captor = ArgumentCaptor.forClass(QuoteApprovalHistory.class);
+            verify(quoteApprovalHistoryRepository).save(captor.capture());
+
+            QuoteApprovalHistory saved = captor.getValue();
+            assertThat(saved.getAction()).isEqualTo(QuoteApprovalHistory.ActionType.RE_REQUESTED);
+            assertThat(saved.getQuoteSnapshot()).isNotNull().contains("3000000").contains("노트북");
         }
 
         @Test
@@ -328,6 +436,140 @@ class ApprovalServiceTest {
             assertThat(result.getItems()).hasSize(1);
             assertThat(result.getItems().get(0).getProductName()).isEqualTo("노트북");
             assertThat(result.getItems().get(0).getLineTotal()).isEqualByComparingTo(BigDecimal.valueOf(2_000_000));
+        }
+
+        @Test
+        @DisplayName("반려 이력이 없으면 quoteDiff는 null이다")
+        void getApprovalDetail_noRejectionHistory_quoteDiffIsNull() {
+            User requester = mock(User.class);
+            when(requester.getId()).thenReturn(1L);
+            when(requester.getName()).thenReturn("홍길동");
+
+            Quote quote = mock(Quote.class);
+            when(quote.getId()).thenReturn(100L);
+            when(quote.getItems()).thenReturn(List.of());
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L).quote(quote).requester(requester)
+                    .status(ApprovalRequest.ApprovalStatus.PENDING)
+                    .requestCount(1).requestedAt(LocalDateTime.now())
+                    .build();
+
+            QuoteApprovalHistory requested = QuoteApprovalHistory.builder()
+                    .id(1L).approvalRequest(approvalRequest).actor(requester)
+                    .action(QuoteApprovalHistory.ActionType.REQUESTED)
+                    .afterStatus(ApprovalRequest.ApprovalStatus.PENDING)
+                    .actedAt(LocalDateTime.now())
+                    .build();
+
+            when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
+            when(quoteRepository.findByIdWithDetails(100L)).thenReturn(Optional.of(quote));
+            when(quoteApprovalReasonRepository.findByQuote_Id(100L)).thenReturn(List.of());
+            when(quoteApprovalHistoryRepository.findByApprovalRequestIdOrderByActedAtAsc(10L))
+                    .thenReturn(List.of(requested));
+
+            ApprovalRequestDetailResponse result = service.getApprovalDetail(10L);
+
+            assertThat(result.getQuoteDiff()).isNull();
+        }
+
+        @Test
+        @DisplayName("반려는 됐지만 아직 재요청 전이면 quoteDiff는 null이다")
+        void getApprovalDetail_rejectedNotYetReRequested_quoteDiffIsNull() {
+            User requester = mock(User.class);
+            when(requester.getId()).thenReturn(1L);
+            when(requester.getName()).thenReturn("홍길동");
+
+            Quote quote = mock(Quote.class);
+            when(quote.getId()).thenReturn(100L);
+            when(quote.getItems()).thenReturn(List.of());
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L).quote(quote).requester(requester)
+                    .status(ApprovalRequest.ApprovalStatus.REJECTED)
+                    .requestCount(1).requestedAt(LocalDateTime.now())
+                    .build();
+
+            QuoteApprovalHistory rejected = QuoteApprovalHistory.builder()
+                    .id(2L).approvalRequest(approvalRequest).actor(requester)
+                    .action(QuoteApprovalHistory.ActionType.REJECTED)
+                    .quoteSnapshot("{\"totalAmount\":1000000}")
+                    .actedAt(LocalDateTime.now())
+                    .build();
+
+            when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
+            when(quoteRepository.findByIdWithDetails(100L)).thenReturn(Optional.of(quote));
+            when(quoteApprovalReasonRepository.findByQuote_Id(100L)).thenReturn(List.of());
+            when(quoteApprovalHistoryRepository.findByApprovalRequestIdOrderByActedAtAsc(10L))
+                    .thenReturn(List.of(rejected));
+
+            ApprovalRequestDetailResponse result = service.getApprovalDetail(10L);
+
+            assertThat(result.getQuoteDiff()).isNull();
+        }
+
+        @Test
+        @DisplayName("반려 후 재요청되면 두 시점 스냅샷을 비교한 quoteDiff를 반환한다")
+        void getApprovalDetail_rejectedThenReRequested_returnsQuoteDiff() {
+            User requester = mock(User.class);
+            when(requester.getId()).thenReturn(1L);
+            when(requester.getName()).thenReturn("홍길동");
+
+            Quote quote = mock(Quote.class);
+            when(quote.getId()).thenReturn(100L);
+            when(quote.getItems()).thenReturn(List.of());
+
+            ApprovalRequest approvalRequest = ApprovalRequest.builder()
+                    .id(10L).quote(quote).requester(requester)
+                    .status(ApprovalRequest.ApprovalStatus.PENDING)
+                    .requestCount(2).requestedAt(LocalDateTime.now())
+                    .build();
+
+            QuoteSnapshotDto beforeSnapshot = QuoteSnapshotDto.builder()
+                    .totalAmount(BigDecimal.valueOf(1_000_000))
+                    .profitRate(BigDecimal.valueOf(10))
+                    .discountRate(BigDecimal.ZERO)
+                    .items(List.of(QuoteSnapshotDto.ItemSnapshot.builder()
+                            .productId(1L).productName("노트북")
+                            .quantity(BigDecimal.ONE).unitPrice(BigDecimal.valueOf(1_000_000))
+                            .build()))
+                    .build();
+            QuoteSnapshotDto afterSnapshot = QuoteSnapshotDto.builder()
+                    .totalAmount(BigDecimal.valueOf(2_000_000))
+                    .profitRate(BigDecimal.valueOf(15))
+                    .discountRate(BigDecimal.ZERO)
+                    .items(List.of(QuoteSnapshotDto.ItemSnapshot.builder()
+                            .productId(1L).productName("노트북")
+                            .quantity(BigDecimal.valueOf(2)).unitPrice(BigDecimal.valueOf(1_000_000))
+                            .build()))
+                    .build();
+
+            QuoteApprovalHistory rejected = QuoteApprovalHistory.builder()
+                    .id(2L).approvalRequest(approvalRequest).actor(requester)
+                    .action(QuoteApprovalHistory.ActionType.REJECTED)
+                    .quoteSnapshot(objectMapper.writeValueAsString(beforeSnapshot))
+                    .actedAt(LocalDateTime.now().minusHours(2))
+                    .build();
+            QuoteApprovalHistory reRequested = QuoteApprovalHistory.builder()
+                    .id(3L).approvalRequest(approvalRequest).actor(requester)
+                    .action(QuoteApprovalHistory.ActionType.RE_REQUESTED)
+                    .quoteSnapshot(objectMapper.writeValueAsString(afterSnapshot))
+                    .actedAt(LocalDateTime.now().minusHours(1))
+                    .build();
+
+            when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
+            when(quoteRepository.findByIdWithDetails(100L)).thenReturn(Optional.of(quote));
+            when(quoteApprovalReasonRepository.findByQuote_Id(100L)).thenReturn(List.of());
+            when(quoteApprovalHistoryRepository.findByApprovalRequestIdOrderByActedAtAsc(10L))
+                    .thenReturn(List.of(rejected, reRequested));
+
+            ApprovalRequestDetailResponse result = service.getApprovalDetail(10L);
+
+            assertThat(result.getQuoteDiff()).isNotNull();
+            assertThat(result.getQuoteDiff().getTotalAmountBefore()).isEqualByComparingTo(BigDecimal.valueOf(1_000_000));
+            assertThat(result.getQuoteDiff().getTotalAmountAfter()).isEqualByComparingTo(BigDecimal.valueOf(2_000_000));
+            assertThat(result.getQuoteDiff().getQuantityChangedItems()).hasSize(1);
+            assertThat(result.getQuoteDiff().getQuantityChangedItems().get(0).getProductName()).isEqualTo("노트북");
         }
     }
 

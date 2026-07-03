@@ -49,11 +49,15 @@ public class ApprovalRequestDetailResponse {
     // 승인 이력 목록
     private List<ApprovalHistoryResponse> histories;
 
+    // 재요청 시 변경 내역 (반려 이력이 없거나 아직 재요청 전이면 null)
+    private QuoteDiffResponse quoteDiff;
+
     public static ApprovalRequestDetailResponse from(
             ApprovalRequest entity,
             Quote quote,
             List<QuoteApprovalReason> reasons,
-            List<QuoteApprovalHistory> histories
+            List<QuoteApprovalHistory> histories,
+            QuoteDiffResponse quoteDiff
     ) {
         return ApprovalRequestDetailResponse.builder()
                 .id(entity.getId())
@@ -84,6 +88,7 @@ public class ApprovalRequestDetailResponse {
                 .histories(histories.stream()
                         .map(ApprovalHistoryResponse::from)
                         .toList())
+                .quoteDiff(quoteDiff)
                 .build();
     }
 

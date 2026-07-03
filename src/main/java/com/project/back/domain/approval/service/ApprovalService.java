@@ -1,6 +1,8 @@
 package com.project.back.domain.approval.service;
 
+import com.project.back.domain.approval.dto.QuoteSnapshotDto;
 import com.project.back.domain.approval.dto.response.ApprovalRequestDetailResponse;
+import com.project.back.domain.approval.dto.response.QuoteDiffResponse;
 import com.project.back.domain.approval.entity.ApprovalRequest;
 import com.project.back.domain.approval.entity.QuoteApprovalHistory;
 import com.project.back.domain.approval.entity.QuoteApprovalReason;
@@ -29,9 +31,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 import com.project.back.domain.approval.dto.response.ApprovalMonthlyStatsResponse;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -53,6 +58,7 @@ public class ApprovalService {
     private final UserStatsUpdateService userStatsUpdateService;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final TrainingService trainingService;
+    private final ObjectMapper objectMapper;
 
     // ── 1. 승인 요청 ──
     @Transactional
@@ -270,6 +276,10 @@ public class ApprovalService {
 
         quote.startRevising(); //변경 감지 메서드 호출
 
+        // 반려 시점 견적 스냅샷 (재요청 시 변경 내역 비교용)
+        List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quote.getId());
+        String quoteSnapshot = captureSnapshot(quote, items);
+
         // 반려 이력 저장
         saveHistory(
                 approvalRequest,
@@ -277,7 +287,8 @@ public class ApprovalService {
                 QuoteApprovalHistory.ActionType.REJECTED,
                 beforeStatus,
                 ApprovalRequest.ApprovalStatus.REJECTED,
-                rejectReason
+                rejectReason,
+                quoteSnapshot
         );
 
         // 견적 작성자 통계 갱신 (반려 카운트 반영) - 커밋 이후 재집계
@@ -339,6 +350,9 @@ public class ApprovalService {
 
         quote.complete(true);
 
+        // 재요청 시점 견적 스냅샷 (반려 시점과 비교할 변경 내역 계산용)
+        String quoteSnapshot = captureSnapshot(quote, items);
+
         // 재요청 이력 저장
         saveHistory(
                 approvalRequest,
@@ -346,7 +360,8 @@ public class ApprovalService {
                 QuoteApprovalHistory.ActionType.RE_REQUESTED,
                 beforeStatus,
                 ApprovalRequest.ApprovalStatus.PENDING,
-                requestMemo
+                requestMemo,
+                quoteSnapshot
         );
 
         // 승인 권한자에게 알림 발송
@@ -557,7 +572,8 @@ public class ApprovalService {
                 quoteApprovalHistoryRepository
                         .findByApprovalRequestIdOrderByActedAtAsc(approvalRequestId);
 
-        return ApprovalRequestDetailResponse.from(approvalRequest, quote, reasons, histories);
+        QuoteDiffResponse quoteDiff = computeQuoteDiff(histories);
+        return ApprovalRequestDetailResponse.from(approvalRequest, quote, reasons, histories, quoteDiff);
     }
 
     // ── 승인 상세 조회 (SALES_STAFF - 본인 요청건만) ──
@@ -578,7 +594,8 @@ public class ApprovalService {
                 quoteApprovalHistoryRepository
                         .findByApprovalRequestIdOrderByActedAtAsc(approvalRequestId);
 
-        return ApprovalRequestDetailResponse.from(approvalRequest, quote, reasons, histories);
+        QuoteDiffResponse quoteDiff = computeQuoteDiff(histories);
+        return ApprovalRequestDetailResponse.from(approvalRequest, quote, reasons, histories, quoteDiff);
     }
 
     // ── 승인 상세 조회 (SALES_MANAGER - 동일 부서 영업사원만) ──
@@ -605,7 +622,8 @@ public class ApprovalService {
                 quoteApprovalHistoryRepository
                         .findByApprovalRequestIdOrderByActedAtAsc(approvalRequestId);
 
-        return ApprovalRequestDetailResponse.from(approvalRequest, quote, reasons, histories);
+        QuoteDiffResponse quoteDiff = computeQuoteDiff(histories);
+        return ApprovalRequestDetailResponse.from(approvalRequest, quote, reasons, histories, quoteDiff);
     }
 
     private Quote getQuoteWithItems(Long quoteId) {
@@ -621,17 +639,104 @@ public class ApprovalService {
             ApprovalRequest.ApprovalStatus afterStatus,
             String memo
     ) {
+        saveHistory(approvalRequest, actor, action, beforeStatus, afterStatus, memo, null);
+    }
+
+    private void saveHistory(
+            ApprovalRequest approvalRequest,
+            User actor,
+            QuoteApprovalHistory.ActionType action,
+            ApprovalRequest.ApprovalStatus beforeStatus,
+            ApprovalRequest.ApprovalStatus afterStatus,
+            String memo,
+            String quoteSnapshot
+    ) {
         QuoteApprovalHistory history = QuoteApprovalHistory.of(
                 approvalRequest,
                 actor,
                 action,
                 beforeStatus,
                 afterStatus,
-                memo
+                memo,
+                quoteSnapshot
         );
         quoteApprovalHistoryRepository.save(history);
+    }
 
+    // 반려/재요청 시점의 견적 상태를 JSON 스냅샷으로 직렬화한다.
+    // 실패해도 반려/재요청 처리 자체는 계속돼야 하므로 예외를 삼키고 null을 반환한다.
+    private String captureSnapshot(Quote quote, List<QuoteItem> items) {
+        try {
+            BigDecimal discountRate = (quote.getSubtotal() != null
+                    && quote.getSubtotal().compareTo(BigDecimal.ZERO) > 0)
+                    ? quote.getDiscountAmount()
+                            .divide(quote.getSubtotal(), 4, RoundingMode.HALF_UP)
+                            .multiply(BigDecimal.valueOf(100))
+                    : BigDecimal.ZERO;
 
+            QuoteSnapshotDto snapshot = QuoteSnapshotDto.builder()
+                    .totalAmount(quote.getTotalAmount())
+                    .profitRate(quote.getProfitRate())
+                    .discountRate(discountRate)
+                    .items(items.stream()
+                            .map(item -> QuoteSnapshotDto.ItemSnapshot.builder()
+                                    .productId(item.getProductId())
+                                    .productName(item.getProductName())
+                                    .quantity(item.getQuantity())
+                                    .unitPrice(item.getUnitPrice())
+                                    .build())
+                            .toList())
+                    .build();
+
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (Exception e) {
+            log.warn("견적 스냅샷 생성 실패 - quoteId={}", quote.getId(), e);
+            return null;
+        }
+    }
+
+    // 재요청 시 변경 내역(diff)을 계산한다.
+    // "가장 최근 REJECTED" 이력과 그 다음에 온 "RE_REQUESTED" 이력의 스냅샷을 비교한다.
+    // 반려된 적이 없거나, 반려는 됐지만 아직 재요청 전이면 null을 반환한다.
+    private QuoteDiffResponse computeQuoteDiff(List<QuoteApprovalHistory> histories) {
+        int lastRejectedIndex = -1;
+        for (int i = 0; i < histories.size(); i++) {
+            if (histories.get(i).getAction() == QuoteApprovalHistory.ActionType.REJECTED) {
+                lastRejectedIndex = i;
+            }
+        }
+        if (lastRejectedIndex == -1) {
+            return null;
+        }
+
+        QuoteApprovalHistory rejected = histories.get(lastRejectedIndex);
+        QuoteApprovalHistory reRequested = null;
+        for (int i = lastRejectedIndex + 1; i < histories.size(); i++) {
+            if (histories.get(i).getAction() == QuoteApprovalHistory.ActionType.RE_REQUESTED) {
+                reRequested = histories.get(i);
+                break;
+            }
+        }
+        if (reRequested == null) {
+            return null;
+        }
+
+        return buildDiff(rejected, reRequested);
+    }
+
+    private QuoteDiffResponse buildDiff(QuoteApprovalHistory rejected, QuoteApprovalHistory reRequested) {
+        if (rejected.getQuoteSnapshot() == null || reRequested.getQuoteSnapshot() == null) {
+            return null;
+        }
+        try {
+            QuoteSnapshotDto before = objectMapper.readValue(rejected.getQuoteSnapshot(), QuoteSnapshotDto.class);
+            QuoteSnapshotDto after = objectMapper.readValue(reRequested.getQuoteSnapshot(), QuoteSnapshotDto.class);
+            return QuoteDiffResponse.of(before, after);
+        } catch (Exception e) {
+            log.warn("견적 변경 내역(diff) 계산 실패 - approvalRequestId={}",
+                    rejected.getApprovalRequest().getId(), e);
+            return null;
+        }
     }
 
 }
