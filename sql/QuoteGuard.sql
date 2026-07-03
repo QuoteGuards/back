@@ -550,6 +550,7 @@ CREATE TABLE quote_approval_histories (
     after_status ENUM('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED') NULL COMMENT '처리 후 승인 요청 상태',
 
     memo TEXT NULL COMMENT '요청 메모, 승인 메모, 반려 사유, 재요청 사유',
+    quote_snapshot TEXT NULL COMMENT '반려/재요청 시점의 견적 스냅샷(JSON) - 재요청 시 변경 항목(총액/이익률/할인율/품목 증감) 비교용. action이 REJECTED/RE_REQUESTED일 때만 값이 채워짐',
     acted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '승인 이력이 발생한 일시',
 
     CONSTRAINT fk_quote_approval_histories_request
