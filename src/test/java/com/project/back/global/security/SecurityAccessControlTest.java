@@ -19,6 +19,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -30,6 +31,7 @@ import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -47,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(controllers = {AuthController.class, AdminUserController.class, ApprovalController.class})
 @Import({SecurityConfig.class, JwtAuthenticationEntryPoint.class, JwtAccessDeniedHandler.class, SecurityErrorResponseWriter.class})
+@TestPropertySource(properties = "cors.allowed-origin=https://quoteguard.n-e.kr,https://www.quoteguard.n-e.kr")
 class SecurityAccessControlTest {
 
     @Autowired
@@ -115,6 +118,47 @@ class SecurityAccessControlTest {
                         assertThat(status).as("login should not return 401").isNotEqualTo(401);
                         assertThat(status).as("login should not return 403").isNotEqualTo(403);
                     });
+        }
+    }
+
+    // ============================================================
+    // 1-1. CORS - 콤마로 구분된 여러 origin 허용 (www 서브도메인 403 회귀 방지)
+    // ============================================================
+
+    @Nested
+    @DisplayName("CORS - cors.allowed-origin 다중 origin 지원")
+    class CorsMultipleOrigins {
+
+        @Test
+        @DisplayName("apex 도메인 Origin으로 로그인 요청 → CORS 허용")
+        void login_apexOrigin_corsAllowed() throws Exception {
+            mockMvc.perform(post("/api/auth/login")
+                            .header("Origin", "https://quoteguard.n-e.kr"))
+                    .andExpect(header().string("Access-Control-Allow-Origin", "https://quoteguard.n-e.kr"))
+                    .andExpect(result -> {
+                        int status = result.getResponse().getStatus();
+                        assertThat(status).as("허용된 origin은 CORS 차단(403)되지 않아야 함").isNotEqualTo(403);
+                    });
+        }
+
+        @Test
+        @DisplayName("www 서브도메인 Origin으로 로그인 요청 → CORS 허용 (Invalid CORS request 403 회귀 방지)")
+        void login_wwwOrigin_corsAllowed() throws Exception {
+            mockMvc.perform(post("/api/auth/login")
+                            .header("Origin", "https://www.quoteguard.n-e.kr"))
+                    .andExpect(header().string("Access-Control-Allow-Origin", "https://www.quoteguard.n-e.kr"))
+                    .andExpect(result -> {
+                        int status = result.getResponse().getStatus();
+                        assertThat(status).as("허용된 origin은 CORS 차단(403)되지 않아야 함").isNotEqualTo(403);
+                    });
+        }
+
+        @Test
+        @DisplayName("허용 목록에 없는 origin → CORS 차단 403")
+        void login_unknownOrigin_corsRejected() throws Exception {
+            mockMvc.perform(post("/api/auth/login")
+                            .header("Origin", "https://evil.example.com"))
+                    .andExpect(status().isForbidden());
         }
     }
 
