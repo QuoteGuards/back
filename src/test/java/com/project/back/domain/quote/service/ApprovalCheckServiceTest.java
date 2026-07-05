@@ -39,6 +39,11 @@ class ApprovalCheckServiceTest {
         QuoteItem item = mock(QuoteItem.class);
         when(item.getDiscountRate()).thenReturn(new BigDecimal(discountRate));
         when(item.getDiscountPolicy()).thenReturn(policy);
+        if (policy != null) {
+            when(item.getEffectiveMaxDiscountRate()).thenAnswer(inv -> policy.getMaxDiscountRate());
+            when(item.getEffectiveMinProfitRate()).thenAnswer(inv -> policy.getMinProfitRate());
+            when(item.getEffectiveApprovalThresholdAmount()).thenAnswer(inv -> policy.getApprovalThresholdAmount());
+        }
         return item;
     }
 
@@ -213,6 +218,33 @@ class ApprovalCheckServiceTest {
             );
 
             assertThat(result).doesNotContain(ApprovalReasonType.HIGH_AMOUNT);
+        }
+    }
+
+    @Nested
+    @DisplayName("스냅샷 우선 검증")
+    class SnapshotTests {
+
+        @Test
+        @DisplayName("마스터 policy가 변경되어도 저장된 스냅샷 수치로 승인 판단")
+        void usesSnapshotOverLivePolicy() {
+            DiscountPolicy livePolicy = mock(DiscountPolicy.class);
+            when(livePolicy.getMaxDiscountRate()).thenReturn(new BigDecimal("20"));
+
+            QuoteItem item = mock(QuoteItem.class);
+            when(item.getDiscountRate()).thenReturn(new BigDecimal("12"));
+            when(item.getDiscountPolicy()).thenReturn(livePolicy);
+            when(item.getEffectiveMaxDiscountRate()).thenReturn(new BigDecimal("10"));
+            when(item.getEffectiveMinProfitRate()).thenReturn(new BigDecimal("15"));
+            when(item.getEffectiveApprovalThresholdAmount()).thenReturn(new BigDecimal("100000000"));
+
+            List<ApprovalReasonType> result = approvalCheckService.check(
+                    List.of(item),
+                    new BigDecimal("1000000"),
+                    new BigDecimal("20")
+            );
+
+            assertThat(result).contains(ApprovalReasonType.DISCOUNT_EXCEEDED);
         }
     }
 

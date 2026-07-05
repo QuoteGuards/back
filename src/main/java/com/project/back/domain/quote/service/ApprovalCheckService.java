@@ -1,6 +1,5 @@
 package com.project.back.domain.quote.service;
 
-import com.project.back.domain.discount.entity.DiscountPolicy;
 import com.project.back.global.enums.ApprovalReasonType;
 import com.project.back.domain.quote.entity.QuoteItem;
 import org.springframework.stereotype.Service;
@@ -51,22 +50,20 @@ public class ApprovalCheckService {
     }
 
     private boolean isItemDiscountExceeded(QuoteItem item) {
-        DiscountPolicy policy = item.getDiscountPolicy();
-        if (policy == null || policy.getMaxDiscountRate() == null) {
+        BigDecimal maxDiscountRate = item.getEffectiveMaxDiscountRate();
+        if (maxDiscountRate == null) {
             return false;
         }
         BigDecimal rate = item.getDiscountRate();
         if (rate == null) {
             return false;
         }
-        return rate.compareTo(policy.getMaxDiscountRate()) > 0;
+        return rate.compareTo(maxDiscountRate) > 0;
     }
 
     private BigDecimal resolveStrictestMinProfitRate(List<QuoteItem> items) {
         return items.stream()
-                .map(QuoteItem::getDiscountPolicy)
-                .filter(Objects::nonNull)
-                .map(DiscountPolicy::getMinProfitRate)
+                .map(QuoteItem::getEffectiveMinProfitRate)
                 .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .orElse(null);
@@ -74,9 +71,7 @@ public class ApprovalCheckService {
 
     private BigDecimal resolveStrictestApprovalThreshold(List<QuoteItem> items) {
         return items.stream()
-                .map(QuoteItem::getDiscountPolicy)
-                .filter(Objects::nonNull)
-                .map(DiscountPolicy::getApprovalThresholdAmount)
+                .map(QuoteItem::getEffectiveApprovalThresholdAmount)
                 .filter(Objects::nonNull)
                 .min(Comparator.naturalOrder())
                 .orElse(null);

@@ -44,8 +44,8 @@ public record QuoteItemResponse(
                 item.getSortOrder(),
                 item.getDiscountReason(),
                 policy != null ? policy.getId() : null,
-                policy != null ? policy.getMaxDiscountRate() : null,
-                policy != null ? policy.getMinProfitRate() : null
+                item.getEffectiveMaxDiscountRate(),
+                item.getEffectiveMinProfitRate()
         );
     }
 }

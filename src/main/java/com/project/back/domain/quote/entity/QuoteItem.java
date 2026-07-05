@@ -32,6 +32,18 @@ public class QuoteItem {
     @JoinColumn(name = "discount_policy_id")
     private DiscountPolicy discountPolicy;
 
+    /** 견적 작성 당시 policy.maxDiscountRate 스냅샷 (마스터 변경·삭제와 무관하게 검증·감사) */
+    @Column(name = "policy_max_discount_rate", precision = 5, scale = 2)
+    private BigDecimal policyMaxDiscountRate;
+
+    /** 견적 작성 당시 policy.minProfitRate 스냅샷 */
+    @Column(name = "policy_min_profit_rate", precision = 5, scale = 2)
+    private BigDecimal policyMinProfitRate;
+
+    /** 견적 작성 당시 policy.approvalThresholdAmount 스냅샷 */
+    @Column(name = "policy_approval_threshold_amount", precision = 18, scale = 2)
+    private BigDecimal policyApprovalThresholdAmount;
+
     @Column(name = "product_name", nullable = false, length = 255)
     private String productName;
 
@@ -111,5 +123,36 @@ public class QuoteItem {
 
     public void assignDiscountPolicy(DiscountPolicy discountPolicy) {
         this.discountPolicy = discountPolicy;
+        if (discountPolicy != null) {
+            this.policyMaxDiscountRate = discountPolicy.getMaxDiscountRate();
+            this.policyMinProfitRate = discountPolicy.getMinProfitRate();
+            this.policyApprovalThresholdAmount = discountPolicy.getApprovalThresholdAmount();
+        } else {
+            this.policyMaxDiscountRate = null;
+            this.policyMinProfitRate = null;
+            this.policyApprovalThresholdAmount = null;
+        }
+    }
+
+    /** 스냅샷 우선, 구 데이터는 FK policy로 폴백 */
+    public BigDecimal getEffectiveMaxDiscountRate() {
+        if (policyMaxDiscountRate != null) {
+            return policyMaxDiscountRate;
+        }
+        return discountPolicy != null ? discountPolicy.getMaxDiscountRate() : null;
+    }
+
+    public BigDecimal getEffectiveMinProfitRate() {
+        if (policyMinProfitRate != null) {
+            return policyMinProfitRate;
+        }
+        return discountPolicy != null ? discountPolicy.getMinProfitRate() : null;
+    }
+
+    public BigDecimal getEffectiveApprovalThresholdAmount() {
+        if (policyApprovalThresholdAmount != null) {
+            return policyApprovalThresholdAmount;
+        }
+        return discountPolicy != null ? discountPolicy.getApprovalThresholdAmount() : null;
     }
 }

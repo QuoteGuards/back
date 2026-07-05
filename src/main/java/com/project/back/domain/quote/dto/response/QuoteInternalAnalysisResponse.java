@@ -97,9 +97,7 @@ public record QuoteInternalAnalysisResponse(
 
     private static BigDecimal resolveStrictestMinProfitRate(List<QuoteItem> items) {
         return items.stream()
-                .map(QuoteItem::getDiscountPolicy)
-                .filter(Objects::nonNull)
-                .map(DiscountPolicy::getMinProfitRate)
+                .map(QuoteItem::getEffectiveMinProfitRate)
                 .filter(Objects::nonNull)
                 .max(Comparator.naturalOrder())
                 .orElse(null);
@@ -119,7 +117,6 @@ public record QuoteInternalAnalysisResponse(
             BigDecimal minProfitRate
     ) {
         public static QuoteItemInternalResponse from(QuoteItem item) {
-            DiscountPolicy policy = item.getDiscountPolicy();
             return new QuoteItemInternalResponse(
                     item.getId(),
                     item.getProductName(),
@@ -130,8 +127,8 @@ public record QuoteInternalAnalysisResponse(
                     item.getLineSupplyAmount(),
                     item.getLineTotal(),
                     item.getDiscountReason(),
-                    policy != null ? policy.getMaxDiscountRate() : null,
-                    policy != null ? policy.getMinProfitRate() : null
+                    item.getEffectiveMaxDiscountRate(),
+                    item.getEffectiveMinProfitRate()
             );
         }
     }

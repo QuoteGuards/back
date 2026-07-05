@@ -132,7 +132,7 @@ public class QuoteService {
         validateEditable(quote);
         validateQuoteDates(quote.getIssuedDate(), quote.getValidUntil());
 
-        List<QuoteItem> items = quoteItemRepository.findByQuoteIdWithDiscountPolicyOrderBySortOrderAsc(quoteId);
+        List<QuoteItem> items = loadItemsForPolicyCheck(quoteId);
         List<ApprovalReasonType> reasons = approvalCheckService.check(
                 items, quote.getTotalAmount(), quote.getProfitRate());
 
@@ -279,8 +279,7 @@ public class QuoteService {
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateQuoteReadAccess(quote, requester);
 
-        List<QuoteItem> items = quoteItemRepository.findByQuoteIdWithDiscountPolicyOrderBySortOrderAsc(quoteId);
-        resolveMissingItemPolicies(items);
+        List<QuoteItem> items = loadItemsForPolicyCheck(quoteId);
 
         List<ApprovalReasonType> reasons = approvalCheckService.check(
                 items, quote.getTotalAmount(), quote.getProfitRate());
@@ -288,16 +287,30 @@ public class QuoteService {
         return new InternalAnalysisResult(quote, !reasons.isEmpty(), reasons, items);
     }
 
+    /** 승인·내부분석용 — policy FK fetch + 구 데이터 policy 보강 */
+    @Transactional(readOnly = true)
+    public List<QuoteItem> loadItemsForPolicyCheck(Long quoteId) {
+        List<QuoteItem> items = quoteItemRepository.findByQuoteIdWithDiscountPolicyOrderBySortOrderAsc(quoteId);
+        resolveMissingItemPolicies(items);
+        return items;
+    }
+
     /** DB 스냅샷이 없는 품목(구 견적)은 product 기준으로 policy 표시·검증용 보강 */
     private void resolveMissingItemPolicies(List<QuoteItem> items) {
         for (QuoteItem item : items) {
-            if (item.getDiscountPolicy() != null || item.getProductId() == null) {
+            if (item.getProductId() == null) {
                 continue;
             }
-            productRepository.findById(item.getProductId())
-                    .filter(Product::isActive)
-                    .map(this::resolveApplicablePolicy)
-                    .ifPresent(item::assignDiscountPolicy);
+            if (item.getDiscountPolicy() == null) {
+                productRepository.findById(item.getProductId())
+                        .filter(Product::isActive)
+                        .map(this::resolveApplicablePolicy)
+                        .ifPresent(item::assignDiscountPolicy);
+            } else if (item.getPolicyMaxDiscountRate() == null
+                    && item.getPolicyMinProfitRate() == null
+                    && item.getPolicyApprovalThresholdAmount() == null) {
+                item.assignDiscountPolicy(item.getDiscountPolicy());
+            }
         }
     }
 
@@ -595,7 +608,7 @@ public class QuoteService {
                 .comparing(DiscountPolicy::getMinProfitRate, Comparator.nullsFirst(Comparator.naturalOrder()))
                 .thenComparing(
                         DiscountPolicy::getApprovalThresholdAmount,
-                        Comparator.nullsLast(Comparator.reverseOrder()));
+                        Comparator.nullsFirst(Comparator.reverseOrder()));
     }
 
     private List<QuoteItem> buildItems(Quote quote,
@@ -618,7 +631,6 @@ public class QuoteService {
                     QuoteItem item = QuoteItem.builder()
                             .quote(quote)
                             .productId(product.getId())
-                            .discountPolicy(itemPolicy)
                             .productName(product.getName())
                             .productCode(product.getCode())
                             .spec(product.getSpec())
@@ -630,6 +642,7 @@ public class QuoteService {
                             .vatApplicable(cmd.vatApplicable() != null ? cmd.vatApplicable() : true)
                             .sortOrder(order[0]++)
                             .build();
+                    item.assignDiscountPolicy(itemPolicy);
 
                     quote.addItem(item);
                     return item;
@@ -724,7 +737,6 @@ public class QuoteService {
                      QuoteItem item = QuoteItem.builder()
                              .quote(newQuote)
                              .productId(src.getProductId())
-                             .discountPolicy(itemPolicy)
                              .productName(currentProduct != null ? currentProduct.getName() : src.getProductName())
                              .productCode(currentProduct != null ? currentProduct.getCode() : src.getProductCode())
                              .spec(currentProduct != null ? currentProduct.getSpec() : src.getSpec())
@@ -736,6 +748,7 @@ public class QuoteService {
                              .vatApplicable(src.getVatApplicable())
                              .sortOrder(order[0]++)
                              .build();
+                     item.assignDiscountPolicy(itemPolicy);
 
                      newQuote.addItem(item);
                      return item;
