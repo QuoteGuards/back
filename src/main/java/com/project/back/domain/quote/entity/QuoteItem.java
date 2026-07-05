@@ -1,5 +1,6 @@
 package com.project.back.domain.quote.entity;
 
+import com.project.back.domain.discount.entity.DiscountPolicy;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -26,6 +27,10 @@ public class QuoteItem {
 
     @Column(name = "product_id")
     private Long productId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "discount_policy_id")
+    private DiscountPolicy discountPolicy;
 
     @Column(name = "product_name", nullable = false, length = 255)
     private String productName;
@@ -102,5 +107,9 @@ public class QuoteItem {
 
     public void assignQuote(Quote quote) {
         this.quote = quote;
+    }
+
+    public void assignDiscountPolicy(DiscountPolicy discountPolicy) {
+        this.discountPolicy = discountPolicy;
     }
 }

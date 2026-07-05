@@ -180,7 +180,7 @@ class ApprovalServiceTest {
             when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
             when(userRepository.findById(2L)).thenReturn(Optional.of(approver));
             when(quoteRepository.findById(100L)).thenReturn(Optional.of(quote));
-            when(quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(100L)).thenReturn(List.of(item));
+            when(quoteItemRepository.findByQuoteIdWithDiscountPolicyOrderBySortOrderAsc(100L)).thenReturn(List.of(item));
 
             service.reject(100L, 10L, 2L, "금액 오류");
 
@@ -232,8 +232,8 @@ class ApprovalServiceTest {
                     .thenReturn(List.of());
             when(userRepository.findByRoleAndDepartmentAndStatus(UserRole.SALES_MANAGER, "영업1팀", UserStatus.ACTIVE))
                     .thenReturn(List.of(manager));
-            when(quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(100L)).thenReturn(List.of());
-            when(approvalCheckService.check(any(), any(), any(), any()))
+            when(quoteItemRepository.findByQuoteIdWithDiscountPolicyOrderBySortOrderAsc(100L)).thenReturn(List.of());
+            when(approvalCheckService.check(any(), any(), any()))
                     .thenReturn(List.of(com.project.back.global.enums.ApprovalReasonType.HIGH_AMOUNT));
 
             LocalDateTime before = LocalDateTime.now();
@@ -290,8 +290,8 @@ class ApprovalServiceTest {
                     .thenReturn(List.of());
             when(userRepository.findByRoleAndDepartmentAndStatus(UserRole.SALES_MANAGER, "영업1팀", UserStatus.ACTIVE))
                     .thenReturn(List.of());
-            when(quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(100L)).thenReturn(List.of(item));
-            when(approvalCheckService.check(any(), any(), any(), any())).thenReturn(List.of());
+            when(quoteItemRepository.findByQuoteIdWithDiscountPolicyOrderBySortOrderAsc(100L)).thenReturn(List.of(item));
+            when(approvalCheckService.check(any(), any(), any())).thenReturn(List.of());
 
             service.reRequest(100L, 10L, 1L, "수정 완료했습니다");
 
