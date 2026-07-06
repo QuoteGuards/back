@@ -13,6 +13,7 @@ public record QuoteCreateRequest(
         @NotNull(message = "고객 정보는 필수입니다.")
         Long customerId,
 
+        /** 하위 호환용. 서버는 품목별 resolveApplicablePolicy로 policy를 결정하며 이 값은 사용하지 않음. */
         Long discountPolicyId,
 
         @NotNull(message = "발행일은 필수입니다.")

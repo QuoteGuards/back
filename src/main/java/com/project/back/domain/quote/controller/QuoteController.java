@@ -40,7 +40,6 @@ public class QuoteController {
         Quote quote = quoteService.saveDraft(
                 getUser(userId),
                 request.customerId(),
-                request.discountPolicyId(),
                 request.internalMemo(),
                 request.issuedDate(),       // 추가
                 request.validUntil(),
@@ -133,7 +132,8 @@ public class QuoteController {
 
         QuoteService.InternalAnalysisResult result = quoteService.getInternalAnalysis(quoteId, getUser(userId));
         return ResponseEntity.ok(ApiResponse.success(
-                QuoteInternalAnalysisResponse.from(result.quote(), result.approvalRequired(), result.reasons())));
+                QuoteInternalAnalysisResponse.from(
+                        result.quote(), result.items(), result.approvalRequired(), result.reasons())));
     }
 
     // 최근 견적 재사용

@@ -442,6 +442,10 @@ CREATE TABLE quote_items (
     quote_id BIGINT NOT NULL COMMENT '소속 견적 ID',
 
     product_id BIGINT NULL COMMENT '선택한 제품 ID. 수동 입력 항목이면 NULL 가능',
+    discount_policy_id BIGINT NULL COMMENT '견적 작성 당시 적용된 할인 정책 ID (품목별 스냅샷)',
+    policy_max_discount_rate DECIMAL(5, 2) NULL COMMENT '견적 작성 당시 policy.maxDiscountRate 스냅샷',
+    policy_min_profit_rate DECIMAL(5, 2) NULL COMMENT '견적 작성 당시 policy.minProfitRate 스냅샷',
+    policy_approval_threshold_amount DECIMAL(18, 2) NULL COMMENT '견적 작성 당시 policy.approvalThresholdAmount 스냅샷',
     product_name VARCHAR(255) NOT NULL COMMENT '견적 작성 당시 제품명 스냅샷. 제품명이 변경되어도 견적서는 유지됨',
     product_code VARCHAR(100) NULL COMMENT '견적 작성 당시 제품 코드 스냅샷',
     spec VARCHAR(200) NULL COMMENT '제품 규격/스펙',
@@ -475,7 +479,12 @@ CREATE TABLE quote_items (
     CONSTRAINT fk_quote_items_product
         FOREIGN KEY (product_id)
         REFERENCES products(id)
-        ON DELETE SET NULL
+        ON DELETE SET NULL,
+
+    CONSTRAINT fk_quote_items_discount_policy
+        FOREIGN KEY (discount_policy_id)
+        REFERENCES discount_policies(id)
+        ON DELETE RESTRICT
 ) COMMENT = '견적서에 포함되는 제품 항목, 수량, 단가, 할인, VAT, 항목별 금액을 저장하는 테이블';
 
 
