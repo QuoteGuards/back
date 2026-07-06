@@ -182,23 +182,7 @@ npm run dev
 ---
 
 ## 패키지 구조
-src/main/java/com/project/back/
-├── domain/
-│   ├── auth/          # 인증
-│   ├── quote/         # 견적·금액 계산
-│   ├── approval/      # 승인
-│   ├── product/       # 제품
-│   ├── category/      # 카테고리
-│   ├── discount/      # 할인 정책
-│   ├── customer/      # 거래처
-│   ├── training/      # 교육
-│   ├── email/         # 이메일
-│   ├── document/      # PDF
-│   ├── user/          # 사용자
-│   └── dashboard/     # 대시보드
-├── notification/      # 인앱 알림
-├── ai/                # AI 리스크 요약
-└── global/            # 보안·예외·공통
+
 
 ---
 
