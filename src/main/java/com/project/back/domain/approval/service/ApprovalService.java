@@ -340,6 +340,8 @@ public class ApprovalService {
         List<ApprovalReasonType> reasons = approvalCheckService.check(
                 quote.getDiscountPolicy(), items, quote.getTotalAmount(), quote.getProfitRate());
 
+        // findById만으로는 approvalReasons 컬렉션이 로드되지 않아 clear()만으로 DB 행이 삭제되지 않음 → UK 중복
+        quoteApprovalReasonRepository.deleteByQuote_Id(quote.getId());
         quote.getApprovalReasons().clear();
         if (!reasons.isEmpty()) {
             List<QuoteApprovalReason> reasonEntities = reasons.stream()

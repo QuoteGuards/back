@@ -18,6 +18,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Configuration
@@ -30,6 +31,10 @@ public class SecurityConfig {
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
 
+    // 프론트가 apex(quoteguard.n-e.kr)와 www(www.quoteguard.n-e.kr) 두 호스트 모두에서
+    // 서비스되므로, 콤마로 구분된 여러 origin을 허용해야 한다. Spring의 CORS 필터는
+    // Origin 헤더가 있는 모든 요청을 CORS 요청으로 간주해 이 목록과 대조하므로,
+    // 목록에 없는 origin은 리버스 프록시를 거친 동일 서비스 도메인이어도 403(Invalid CORS request)으로 차단된다.
     @Value("${cors.allowed-origin:http://localhost:5173}")
     private String allowedOrigin;
 
@@ -113,8 +118,13 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        List<String> allowedOrigins = Arrays.stream(allowedOrigin.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList();
+
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(allowedOrigin));
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);

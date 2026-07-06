@@ -3,6 +3,7 @@ package com.project.back.notification.sse;
 import org.springframework.stereotype.Repository;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,5 +34,19 @@ public class SseEmitterRepository {
         if (userEmitters.isEmpty()) {
             emitters.remove(userId);
         }
+    }
+
+    /**
+     * 하트비트 전송 등 전체 연결을 순회해야 할 때 사용. userId-emitter 쌍을 평탄화해 반환한다.
+     * (CopyOnWriteArrayList 기반이라 순회 중 remove가 발생해도 안전하다.)
+     */
+    public List<Map.Entry<Long, SseEmitter>> getAllEntries() {
+        List<Map.Entry<Long, SseEmitter>> result = new ArrayList<>();
+        for (Map.Entry<Long, List<SseEmitter>> entry : emitters.entrySet()) {
+            for (SseEmitter emitter : entry.getValue()) {
+                result.add(Map.entry(entry.getKey(), emitter));
+            }
+        }
+        return result;
     }
 }

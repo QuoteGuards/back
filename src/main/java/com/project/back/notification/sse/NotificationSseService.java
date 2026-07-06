@@ -3,10 +3,12 @@ package com.project.back.notification.sse;
 import com.project.back.notification.dto.response.NotificationResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -34,6 +36,15 @@ public class NotificationSseService {
     public void sendNotification(Long userId, NotificationResponse notification) {
         for (SseEmitter emitter : emitterRepository.get(userId)) {
             send(emitter, userId, "notification", notification);
+        }
+    }
+
+    // 리버스 프록시(nginx/Caddy 등)의 idle 타임아웃으로 연결이 끊기지 않도록
+    // 실제 알림이 없는 동안에도 주기적으로 더미 이벤트를 보내 연결을 유지한다.
+    @Scheduled(fixedRate = 20_000)
+    public void sendHeartbeat() {
+        for (Map.Entry<Long, SseEmitter> entry : emitterRepository.getAllEntries()) {
+            send(entry.getValue(), entry.getKey(), "heartbeat", "ping");
         }
     }
 
