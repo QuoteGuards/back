@@ -44,6 +44,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -70,7 +71,6 @@ public class QuoteService {
     @Transactional
     public Quote saveDraft(User createdBy,
                            Long customerId,
-                           Long discountPolicyId,
                            String internalMemo,
                            LocalDate issuedDate,
                            LocalDate validUntil,
@@ -81,7 +81,6 @@ public class QuoteService {
         validateTrainingCompleted(createdBy);
         validateQuoteDates(issuedDate, validUntil);
         Customer customer = getCustomerOrThrow(customerId, createdBy.getId());
-        DiscountPolicy policy = resolveDiscountPolicy(discountPolicyId);
 
         //원본 고객 엔티티 데이터 복사 후 발행 시점 박제용 스냅샷 생성
         QuoteCustomer customerSnapshot = QuoteCustomer.builder()
@@ -104,7 +103,6 @@ public class QuoteService {
         Quote quote = Quote.builder()
                 .createdBy(createdBy)
                 .customer(customer)
-                .discountPolicy(policy)
                 .quoteNumber(generateQuoteNumber())
                 .internalMemo(internalMemo)
                 .issuedDate(issuedDate)
@@ -117,7 +115,8 @@ public class QuoteService {
 
         quoteRepository.save(quote);
 
-        List<QuoteItem> items = buildItems(quote, itemCommands, policy, null);
+        List<QuoteItem> items = buildItems(quote, itemCommands, null);
+        assignStrictestDiscountPolicy(quote, items);
         quoteItemRepository.saveAll(items);
         calculationService.calculate(quote, items);
 
@@ -133,9 +132,9 @@ public class QuoteService {
         validateEditable(quote);
         validateQuoteDates(quote.getIssuedDate(), quote.getValidUntil());
 
-        List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quoteId);
+        List<QuoteItem> items = loadItemsForPolicyCheck(quoteId);
         List<ApprovalReasonType> reasons = approvalCheckService.check(
-                quote.getDiscountPolicy(), items, quote.getTotalAmount(), quote.getProfitRate());
+                items, quote.getTotalAmount(), quote.getProfitRate());
 
         boolean approvalRequired = !reasons.isEmpty();
 
@@ -203,10 +202,11 @@ public class QuoteService {
                 .filter(item -> item.getProductId() != null)
                 .collect(Collectors.toMap(QuoteItem::getProductId, Function.identity(), (a, b) -> a));
 
-        List<QuoteItem> newItems = buildItems(quote, itemCommands, quote.getDiscountPolicy(), existingByProductId);
+        List<QuoteItem> newItems = buildItems(quote, itemCommands, existingByProductId);
 
         // 엔티티 내부에서 클리어하고 새로 추가
         quote.replaceItems(newItems);
+        assignStrictestDiscountPolicy(quote, newItems);
 
         // 상태를 REVISING으로 명시하여 수정 중임을 확실히 함
         quote.startRevising();
@@ -268,17 +268,50 @@ public class QuoteService {
         return quote;
     }
 
-    public record InternalAnalysisResult(Quote quote, boolean approvalRequired, List<ApprovalReasonType> reasons) {}
+    public record InternalAnalysisResult(
+            Quote quote,
+            boolean approvalRequired,
+            List<ApprovalReasonType> reasons,
+            List<QuoteItem> items
+    ) {}
 
     public InternalAnalysisResult getInternalAnalysis(Long quoteId, User requester) {
         Quote quote = getQuoteWithDetailsOrThrow(quoteId);
         validateQuoteReadAccess(quote, requester);
 
-        List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quoteId);
-        List<ApprovalReasonType> reasons = approvalCheckService.check(
-                quote.getDiscountPolicy(), items, quote.getTotalAmount(), quote.getProfitRate());
+        List<QuoteItem> items = loadItemsForPolicyCheck(quoteId);
 
-        return new InternalAnalysisResult(quote, !reasons.isEmpty(), reasons);
+        List<ApprovalReasonType> reasons = approvalCheckService.check(
+                items, quote.getTotalAmount(), quote.getProfitRate());
+
+        return new InternalAnalysisResult(quote, !reasons.isEmpty(), reasons, items);
+    }
+
+    /** 승인·내부분석용 — policy FK fetch + 구 데이터 policy 보강 */
+    @Transactional(readOnly = true)
+    public List<QuoteItem> loadItemsForPolicyCheck(Long quoteId) {
+        List<QuoteItem> items = quoteItemRepository.findByQuoteIdWithDiscountPolicyOrderBySortOrderAsc(quoteId);
+        resolveMissingItemPolicies(items);
+        return items;
+    }
+
+    /** DB 스냅샷이 없는 품목(구 견적)은 product 기준으로 policy 표시·검증용 보강 */
+    private void resolveMissingItemPolicies(List<QuoteItem> items) {
+        for (QuoteItem item : items) {
+            if (item.getProductId() == null) {
+                continue;
+            }
+            if (item.getDiscountPolicy() == null) {
+                productRepository.findById(item.getProductId())
+                        .filter(Product::isActive)
+                        .map(this::resolveApplicablePolicy)
+                        .ifPresent(item::assignDiscountPolicy);
+            } else if (item.getPolicyMaxDiscountRate() == null
+                    && item.getPolicyMinProfitRate() == null
+                    && item.getPolicyApprovalThresholdAmount() == null) {
+                item.assignDiscountPolicy(item.getDiscountPolicy());
+            }
+        }
     }
 
     @Transactional
@@ -291,7 +324,6 @@ public class QuoteService {
         Quote newQuote = Quote.builder()
                 .createdBy(requester)
                 .customer(source.getCustomer())
-                .discountPolicy(source.getDiscountPolicy())
                 .quoteNumber(generateQuoteNumber())
                 .internalMemo(source.getInternalMemo())
                 .issuedDate(LocalDate.now())
@@ -305,6 +337,7 @@ public class QuoteService {
         quoteRepository.save(newQuote);
         List<QuoteItem> sourceItems = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(sourceQuoteId);
         List<QuoteItem> rebuiltItems = rebuildItemsWithCurrentPrice(newQuote, sourceItems);
+        assignStrictestDiscountPolicy(newQuote, rebuiltItems);
         quoteItemRepository.saveAll(rebuiltItems);
         calculationService.calculate(newQuote, rebuiltItems);
 
@@ -334,7 +367,6 @@ public class QuoteService {
         Quote newQuote = Quote.builder()
                 .createdBy(requester)
                 .customer(expired.getCustomer())
-                .discountPolicy(expired.getDiscountPolicy())
                 .quoteNumber(generateQuoteNumber())
                 .internalMemo(expired.getInternalMemo())
                 .issuedDate(LocalDate.now())
@@ -351,6 +383,7 @@ public class QuoteService {
         quoteRepository.save(newQuote);
         List<QuoteItem> rebuiltItems = rebuildItemsWithCurrentPrice(newQuote,
                 quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(expiredQuoteId));
+        assignStrictestDiscountPolicy(newQuote, rebuiltItems);
         quoteItemRepository.saveAll(rebuiltItems);
         calculationService.calculate(newQuote, rebuiltItems);
 
@@ -557,17 +590,29 @@ public class QuoteService {
         return candidate;
     }
 
-    private DiscountPolicy resolveDiscountPolicy(Long policyId) {
-        if (policyId == null) {
-            return null;
-        }
-        return discountPolicyRepository.findById(policyId)
-                .orElseThrow(() -> new CustomException(ErrorCode.DISCOUNT_POLICY_NOT_FOUND));
+    /** 견적 헤더 discount_policy_id — 품목 policy 중 가장 보수적인 1개 (감사·표시용) */
+    private void assignStrictestDiscountPolicy(Quote quote, List<QuoteItem> items) {
+        quote.assignDiscountPolicy(pickStrictestPolicy(items));
+    }
+
+    private DiscountPolicy pickStrictestPolicy(List<QuoteItem> items) {
+        return items.stream()
+                .map(QuoteItem::getDiscountPolicy)
+                .filter(Objects::nonNull)
+                .max(strictestPolicyComparator())
+                .orElse(null);
+    }
+
+    private Comparator<DiscountPolicy> strictestPolicyComparator() {
+        return Comparator
+                .comparing(DiscountPolicy::getMinProfitRate, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(
+                        DiscountPolicy::getApprovalThresholdAmount,
+                        Comparator.nullsFirst(Comparator.reverseOrder()));
     }
 
     private List<QuoteItem> buildItems(Quote quote,
                                        List<QuoteItemCommand> commands,
-                                       DiscountPolicy policy,
                                        Map<Long, QuoteItem> existingByProductId) {
         int[] order = {0};
         return commands.stream()
@@ -577,9 +622,10 @@ public class QuoteService {
                     if (!product.isActive()) throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
 
                     ItemPriceSnapshot prices = resolveItemPrices(product, existingByProductId);
+                    DiscountPolicy itemPolicy = resolveApplicablePolicy(product);
 
                     validateDiscountReasonAgainstPolicy(
-                            policy, cmd.discountRate(), cmd.discountReason(), cmd.quantity(),
+                            itemPolicy, cmd.discountRate(), cmd.discountReason(), cmd.quantity(),
                             prices.unitPrice(), prices.costPrice());
 
                     QuoteItem item = QuoteItem.builder()
@@ -596,6 +642,7 @@ public class QuoteService {
                             .vatApplicable(cmd.vatApplicable() != null ? cmd.vatApplicable() : true)
                             .sortOrder(order[0]++)
                             .build();
+                    item.assignDiscountPolicy(itemPolicy);
 
                     quote.addItem(item);
                     return item;
@@ -672,12 +719,13 @@ public class QuoteService {
                          throw new CustomException(ErrorCode.PRODUCT_NOT_FOUND);
                      }
 
-                     //재작성 시에도 정책 검증 실시
+                     DiscountPolicy itemPolicy = null;
                      if (currentProduct != null) {
                          BigDecimal unitPrice = currentProduct.getUnitPrice();
                          BigDecimal costPrice = currentProduct.getCostPrice();
+                         itemPolicy = resolveApplicablePolicy(currentProduct);
                          validateDiscountReasonAgainstPolicy(
-                                 newQuote.getDiscountPolicy(),
+                                 itemPolicy,
                                  src.getDiscountRate(),
                                  src.getDiscountReason(),
                                  src.getQuantity(),
@@ -700,24 +748,13 @@ public class QuoteService {
                              .vatApplicable(src.getVatApplicable())
                              .sortOrder(order[0]++)
                              .build();
+                     item.assignDiscountPolicy(itemPolicy);
 
                      newQuote.addItem(item);
                      return item;
                  })
                  .toList();
      }
-
-    //전체 이익률 검증 메서드
-    //항목별 검증과 견적 합계 검증이 어긋나지 않게 제출 시점에 quote.getProfitRate()를 기준으로 승인 여부를 재확인하는 로직을 추가하거나
-    // validation 메서드를 통일
-    private void validateTotalProfitAgainstPolicy(DiscountPolicy policy, Quote quote) {
-        if (policy == null) return;
-
-        // 견적 합계 이익률과 정책의 최소 이익률 비교
-        if (quote.getProfitRate().compareTo(policy.getMinProfitRate()) < 0) {
-            // 필요시 로직 처리
-        }
-    }
 
     public record QuoteItemCommand(
             @NotNull(message = "제품 ID는 필수입니다.") Long productId,

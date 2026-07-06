@@ -12,6 +12,7 @@ import com.project.back.domain.quote.entity.QuoteItem;
 import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.quote.service.ApprovalCheckService;
+import com.project.back.domain.quote.service.QuoteService;
 import com.project.back.domain.training.service.TrainingService;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
@@ -50,6 +51,7 @@ class ApprovalServiceTest {
     private QuoteRepository quoteRepository;
     private QuoteItemRepository quoteItemRepository;
     private ApprovalCheckService approvalCheckService;
+    private QuoteService quoteService;
     private UserStatsUpdateService userStatsUpdateService;
     private ApplicationEventPublisher eventPublisher;
     private TrainingService trainingService;
@@ -65,6 +67,7 @@ class ApprovalServiceTest {
         quoteRepository = mock(QuoteRepository.class);
         quoteItemRepository = mock(QuoteItemRepository.class);
         approvalCheckService = mock(ApprovalCheckService.class);
+        quoteService = mock(QuoteService.class);
         userStatsUpdateService = mock(UserStatsUpdateService.class);
         eventPublisher = mock(ApplicationEventPublisher.class);
         trainingService = mock(TrainingService.class);
@@ -80,6 +83,7 @@ class ApprovalServiceTest {
                 quoteRepository,
                 quoteItemRepository,
                 approvalCheckService,
+                quoteService,
                 userStatsUpdateService,
                 eventPublisher,
                 trainingService,
@@ -180,7 +184,7 @@ class ApprovalServiceTest {
             when(approvalRequestRepository.findByIdWithUsers(10L)).thenReturn(Optional.of(approvalRequest));
             when(userRepository.findById(2L)).thenReturn(Optional.of(approver));
             when(quoteRepository.findById(100L)).thenReturn(Optional.of(quote));
-            when(quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(100L)).thenReturn(List.of(item));
+            when(quoteService.loadItemsForPolicyCheck(100L)).thenReturn(List.of(item));
 
             service.reject(100L, 10L, 2L, "금액 오류");
 
@@ -232,8 +236,8 @@ class ApprovalServiceTest {
                     .thenReturn(List.of());
             when(userRepository.findByRoleAndDepartmentAndStatus(UserRole.SALES_MANAGER, "영업1팀", UserStatus.ACTIVE))
                     .thenReturn(List.of(manager));
-            when(quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(100L)).thenReturn(List.of());
-            when(approvalCheckService.check(any(), any(), any(), any()))
+            when(quoteService.loadItemsForPolicyCheck(100L)).thenReturn(List.of());
+            when(approvalCheckService.check(any(), any(), any()))
                     .thenReturn(List.of(com.project.back.global.enums.ApprovalReasonType.HIGH_AMOUNT));
 
             LocalDateTime before = LocalDateTime.now();
@@ -290,8 +294,8 @@ class ApprovalServiceTest {
                     .thenReturn(List.of());
             when(userRepository.findByRoleAndDepartmentAndStatus(UserRole.SALES_MANAGER, "영업1팀", UserStatus.ACTIVE))
                     .thenReturn(List.of());
-            when(quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(100L)).thenReturn(List.of(item));
-            when(approvalCheckService.check(any(), any(), any(), any())).thenReturn(List.of());
+            when(quoteService.loadItemsForPolicyCheck(100L)).thenReturn(List.of(item));
+            when(approvalCheckService.check(any(), any(), any())).thenReturn(List.of());
 
             service.reRequest(100L, 10L, 1L, "수정 완료했습니다");
 

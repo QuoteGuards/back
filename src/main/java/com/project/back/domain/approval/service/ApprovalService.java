@@ -14,6 +14,7 @@ import com.project.back.domain.quote.entity.QuoteItem;
 import com.project.back.domain.quote.repository.QuoteItemRepository;
 import com.project.back.domain.quote.repository.QuoteRepository;
 import com.project.back.domain.quote.service.ApprovalCheckService;
+import com.project.back.domain.quote.service.QuoteService;
 import com.project.back.domain.training.service.TrainingService;
 import com.project.back.domain.user.entity.User;
 import com.project.back.domain.user.entity.UserRole;
@@ -55,6 +56,7 @@ public class ApprovalService {
     private final QuoteRepository quoteRepository;
     private final QuoteItemRepository quoteItemRepository;
     private final ApprovalCheckService approvalCheckService;
+    private final QuoteService quoteService;
     private final UserStatsUpdateService userStatsUpdateService;
     private final org.springframework.context.ApplicationEventPublisher eventPublisher;
     private final TrainingService trainingService;
@@ -277,7 +279,7 @@ public class ApprovalService {
         quote.startRevising(); //변경 감지 메서드 호출
 
         // 반려 시점 견적 스냅샷 (재요청 시 변경 내역 비교용)
-        List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quote.getId());
+        List<QuoteItem> items = quoteService.loadItemsForPolicyCheck(quote.getId());
         String quoteSnapshot = captureSnapshot(quote, items);
 
         // 반려 이력 저장
@@ -336,9 +338,9 @@ public class ApprovalService {
                 .orElseThrow(() -> new CustomException(ErrorCode.QUOTE_NOT_FOUND));
 
         // 반려 후 수정된 내용 기준으로 승인 사유를 다시 계산해 갱신 (수정 전 사유가 그대로 남는 것 방지)
-        List<QuoteItem> items = quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(quote.getId());
+        List<QuoteItem> items = quoteService.loadItemsForPolicyCheck(quote.getId());
         List<ApprovalReasonType> reasons = approvalCheckService.check(
-                quote.getDiscountPolicy(), items, quote.getTotalAmount(), quote.getProfitRate());
+                items, quote.getTotalAmount(), quote.getProfitRate());
 
         // findById만으로는 approvalReasons 컬렉션이 로드되지 않아 clear()만으로 DB 행이 삭제되지 않음 → UK 중복
         quoteApprovalReasonRepository.deleteByQuote_Id(quote.getId());

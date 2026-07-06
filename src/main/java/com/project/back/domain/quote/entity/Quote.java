@@ -173,6 +173,10 @@ public class Quote {
         this.profitRate = profitRate;
     }
 
+    public void assignDiscountPolicy(DiscountPolicy discountPolicy) {
+        this.discountPolicy = discountPolicy;
+    }
+
     public void updateInfo(Customer customer, QuoteCustomer snapshot, String internalMemo,
                            LocalDate issuedDate, LocalDate validUntil, String deliveryTerm) {
         this.customer = customer;
