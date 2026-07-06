@@ -42,6 +42,7 @@ out/
 .env
 application-local.yml
 application-secret.yml
+run_env.sh
 
 # ── 로컬 업로드 파일 (저장소: 로컬 디스크) ──
 uploads/
