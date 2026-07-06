@@ -46,12 +46,15 @@ public interface DashboardRepository extends JpaRepository<Quote, Long> {
             @Param("rejected") QuoteStatus rejected
     );
 
-    // 월별 추이: 연·월 단위로 견적 수 / 총액 집계 (데이터 있는 월만 반환)
+    // 월별 추이: 연·월 단위로 견적 수 / 상태별(승인·반려·발송) 건수 / 총액 집계 (데이터 있는 월만 반환)
     @Query("""
             SELECT new com.project.back.domain.dashboard.dto.MonthlyTrendRow(
                 YEAR(q.createdAt),
                 MONTH(q.createdAt),
                 COUNT(q),
+                SUM(CASE WHEN q.status = :approved THEN 1L ELSE 0L END),
+                SUM(CASE WHEN q.status = :rejected THEN 1L ELSE 0L END),
+                SUM(CASE WHEN q.sentAt IS NOT NULL THEN 1L ELSE 0L END),
                 SUM(q.totalAmount))
             FROM Quote q
             JOIN q.createdBy u
@@ -65,7 +68,9 @@ public interface DashboardRepository extends JpaRepository<Quote, Long> {
     List<MonthlyTrendRow> aggregateMonthlyTrend(
             @Param("from") LocalDateTime from,
             @Param("to") LocalDateTime to,
-            @Param("department") String department
+            @Param("department") String department,
+            @Param("approved") QuoteStatus approved,
+            @Param("rejected") QuoteStatus rejected
     );
 
     // 견적 상태별 건수 (데이터 있는 상태만 반환 → Service에서 전체 상태 0 보정)

@@ -7,5 +7,8 @@ public record MonthlyTrendRow(
         Integer year,
         Integer month,
         Long quoteCount,
+        Long approvedCount,
+        Long rejectedCount,
+        Long sentCount,
         BigDecimal totalAmount
 ) {}

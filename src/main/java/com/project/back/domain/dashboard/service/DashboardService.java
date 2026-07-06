@@ -154,25 +154,34 @@ public class DashboardService {
     public List<MonthlyTrendResponse> getMonthlyTrend(String period, LocalDate from, LocalDate to, String department) {
         PeriodRange range = PeriodRange.of(period, from, to);
 
-        List<MonthlyTrendResponse> data = dashboardRepository.aggregateMonthlyTrend(range.from(), range.to(), nb(department))
+        List<MonthlyTrendResponse> data = dashboardRepository.aggregateMonthlyTrend(
+                        range.from(), range.to(), nb(department), QuoteStatus.APPROVED, QuoteStatus.REJECTED)
                 .stream()
                 .map(this::toTrendResponse)
                 .toList();
 
-        // 기간이 정해진 경우(전체 제외) 데이터 없는 달을 0으로 채워 추이 연속성 확보
-        if (range.from() == null) return data;
-
         Map<String, MonthlyTrendResponse> byMonth = data.stream()
                 .collect(Collectors.toMap(MonthlyTrendResponse::getMonth, r -> r, (a, b) -> a, LinkedHashMap::new));
 
-        YearMonth start = YearMonth.from(range.from());
-        YearMonth end = range.to() != null ? YearMonth.from(range.to()) : YearMonth.now();
+        // 채울 범위: 기간이 있으면 그 범위, 전체(from=null)면 데이터 시작월 ~ 이번 달까지 0으로 채움
+        YearMonth start;
+        YearMonth end = YearMonth.now();
+        if (range.from() != null) {
+            start = YearMonth.from(range.from());
+            if (range.to() != null) end = YearMonth.from(range.to());
+        } else {
+            if (data.isEmpty()) return data;
+            start = YearMonth.parse(data.get(0).getMonth());          // ORDER BY로 오름차순 → 첫 게 최소 월
+            YearMonth lastData = YearMonth.parse(data.get(data.size() - 1).getMonth());
+            if (lastData.isAfter(end)) end = lastData;                // 안전: 미래 데이터가 있으면 그 달까지
+        }
 
         List<MonthlyTrendResponse> filled = new ArrayList<>();
         for (YearMonth m = start; !m.isAfter(end); m = m.plusMonths(1)) {
             String key = String.format("%04d-%02d", m.getYear(), m.getMonthValue());
             filled.add(byMonth.getOrDefault(key, MonthlyTrendResponse.builder()
-                    .month(key).quoteCount(0L).totalAmount(BigDecimal.ZERO).build()));
+                    .month(key).quoteCount(0L).approvedCount(0L).rejectedCount(0L).sentCount(0L)
+                    .totalAmount(BigDecimal.ZERO).build()));
         }
         return filled;
     }
@@ -181,6 +190,9 @@ public class DashboardService {
         return MonthlyTrendResponse.builder()
                 .month(String.format("%04d-%02d", row.year(), row.month()))
                 .quoteCount(nzL(row.quoteCount()))
+                .approvedCount(nzL(row.approvedCount()))
+                .rejectedCount(nzL(row.rejectedCount()))
+                .sentCount(nzL(row.sentCount()))
                 .totalAmount(nz(row.totalAmount()))
                 .build();
     }
