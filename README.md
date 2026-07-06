@@ -126,14 +126,17 @@ MySQL 접속 후 QuoteGuard.sql 실행
 # QuoteGuard 환경변수 템플릿
 
 ── Database ──
+
 DB_SCHEMA_NAME=quoteguard
 DB_USERNAME=
 DB_PASSWORD=
 
 ── JWT ── (512bit base64 문자열)
+
 JWT_SECRET=
 
 ── Mail (SMTP) ──
+
 MAIL_HOST=smtp.gmail.com
 MAIL_PORT=587
 MAIL_USERNAME=
@@ -142,6 +145,7 @@ MAIL_FROM=
 MAIL_FROM_NAME=QuoteGuard
 
 ── File Storage (local | s3) ──
+
 STORAGE_TYPE=local
 STORAGE_PUBLIC_BASE_URL=http://localhost:8080
 STORAGE_LOCAL_DIR=./uploads
@@ -153,9 +157,11 @@ AWS_SECRET_ACCESS_KEY=
 S3_PUBLIC_URL=
 
 ── Gemini (AI) ──
+
 GEMINI_API_KEY=
 
 ── Frontend ──
+
 APP_FRONTEND_URL=http://localhost:5173
 -프론트 빌드 시 API base URL (비워두면 상대경로 /api 사용, nginx가 BACKEND_HOST로 프록시)
 VITE_API_BASE_URL=
