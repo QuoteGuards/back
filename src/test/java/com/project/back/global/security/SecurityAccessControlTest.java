@@ -253,7 +253,7 @@ class SecurityAccessControlTest {
     // ============================================================
 
     @Nested
-    @DisplayName("/api/admin/approval-requests/** - SALES_MANAGER, SUPER_ADMIN 접근 가능")
+    @DisplayName("/api/admin/approval-requests/** - SUPER_ADMIN 전용 (SALES_MANAGER는 /api/manager/approval-requests 별도 사용)")
     class ApprovalRequestsAccess {
 
         @Test
@@ -267,15 +267,13 @@ class SecurityAccessControlTest {
         }
 
         @Test
-        @DisplayName("SALES_MANAGER가 /api/admin/approval-requests/** 접근 → 보안 통과")
-        void approvalRequests_salesManager_securityPassed() throws Exception {
+        @DisplayName("SALES_MANAGER가 /api/admin/approval-requests/** 접근 → 403 (부서 스코프가 없는 admin 전용 API라 매니저는 /api/manager/approval-requests를 대신 사용)")
+        void approvalRequests_salesManager_returns403() throws Exception {
             mockMvc.perform(get("/api/admin/approval-requests")
                             .with(asUser(1L, "SALES_MANAGER")))
-                    .andExpect(result -> {
-                        int status = result.getResponse().getStatus();
-                        assertThat(status).as("SALES_MANAGER should not get 401").isNotEqualTo(401);
-                        assertThat(status).as("SALES_MANAGER should not get 403").isNotEqualTo(403);
-                    });
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.status").value("fail"))
+                    .andExpect(jsonPath("$.code").value("AUTH_006"));
         }
 
         @Test
