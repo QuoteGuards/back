@@ -9,7 +9,7 @@
 - 역할 기반 접근 제어(`SUPER_ADMIN` / `SALES_MANAGER` / `SALES_STAFF`)
 - 계정은 관리자가 생성하며, 셀프 회원가입 API는 제공하지 않습니다.
 
-> 비즈니스 규칙 상세: 노션 링크
+> 프로젝트 기간: 
 
 ---
 
@@ -81,7 +81,6 @@
 | 자료 | 위치 |
 |------|------|
 | **DB 초기 스크립트 (DDL)** | [`sql/QuoteGuard.sql`](./sql/QuoteGuard.sql) |
-| **핵심 테이블 요약** | [SSOT §8 연관 테이블](./docs/QUOTE_BUSINESS_RULES_SSOT.md#8-연관-테이블-erd-핵심) |
 | **ERD 다이어그램 이미지** | _(팀 노션/위키 링크 또는 `docs/erd.png` 추가)_ |
 
 ---
@@ -121,50 +120,8 @@ cd front
 MySQL 접속 후 QuoteGuard.sql 실행
 
 ### 4. 백엔드 환경 설정 
-.env 파일 생성 후 아래 내용 복붙하여 입력 후 저장
+.env 파일 생성 
 
-# QuoteGuard 환경변수 템플릿
-
-── Database ──
-
-DB_SCHEMA_NAME=quoteguard
-DB_USERNAME=
-DB_PASSWORD=
-
-── JWT ── (512bit base64 문자열)
-
-JWT_SECRET=
-
-── Mail (SMTP) ──
-
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=
-MAIL_PASSWORD=
-MAIL_FROM=
-MAIL_FROM_NAME=QuoteGuard
-
-── File Storage (local | s3) ──
-
-STORAGE_TYPE=local
-STORAGE_PUBLIC_BASE_URL=http://localhost:8080
-STORAGE_LOCAL_DIR=./uploads
-STORAGE_TYPE=s3
-S3_BUCKET=
-S3_REGION=ap-northeast-2
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-S3_PUBLIC_URL=
-
-── Gemini (AI) ──
-
-GEMINI_API_KEY=
-
-── Frontend ──
-
-APP_FRONTEND_URL=http://localhost:5173
--프론트 빌드 시 API base URL (비워두면 상대경로 /api 사용, nginx가 BACKEND_HOST로 프록시)
-VITE_API_BASE_URL=
 
 ### 5. 백엔드 실행(API 기본 URL: http://localhost:8080)
 
