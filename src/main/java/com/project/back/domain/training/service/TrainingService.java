@@ -149,6 +149,19 @@ public class TrainingService {
         };
     }
 
+    /** 교육 이수 화면 탭·콘텐츠 조회용 (승인 게이트는 getRequiredCourses 유지) */
+    public List<TrainingType> getDisplayCourses(User user) {
+        if (user == null) {
+            return List.of();
+        }
+
+        return switch (user.getRole()) {
+            case SALES_STAFF -> List.of(TrainingType.QUOTE_WRITE);
+            case SALES_MANAGER -> List.of(TrainingType.QUOTE_WRITE, TrainingType.MANAGER_OPERATIONS);
+            default -> List.of();
+        };
+    }
+
     public boolean isCourseCompleted(User user, TrainingType trainingType) {
         if (user == null) {
             return false;
@@ -167,12 +180,12 @@ public class TrainingService {
     }
 
     public TrainingStatusResult getMyTrainingStatus(User user) {
-        List<TrainingType> requiredCourses = getRequiredCourses(user);
-        if (requiredCourses.isEmpty()) {
+        List<TrainingType> displayCourses = getDisplayCourses(user);
+        if (displayCourses.isEmpty()) {
             return TrainingStatusResult.notRequired();
         }
 
-        List<CourseTrainingStatusResult> courses = requiredCourses.stream()
+        List<CourseTrainingStatusResult> courses = displayCourses.stream()
                 .map(type -> buildCourseStatusResult(user.getId(), type))
                 .toList();
 
@@ -244,9 +257,16 @@ public class TrainingService {
         if (user.getRole() == UserRole.SUPER_ADMIN) {
             return;
         }
-        if (!getRequiredCourses(user).contains(trainingType)) {
+        if (!getAccessibleCourses(user).contains(trainingType)) {
             throw new CustomException(ErrorCode.ACCESS_DENIED);
         }
+    }
+
+    private List<TrainingType> getAccessibleCourses(User user) {
+        if (user.getRole() == UserRole.SALES_MANAGER) {
+            return getDisplayCourses(user);
+        }
+        return getRequiredCourses(user);
     }
 
     public TrainingContent getGuideContent(User user, TrainingType trainingType) {
