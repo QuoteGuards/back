@@ -138,6 +138,90 @@ class AiRiskSummaryServiceTest {
     }
 
     @Nested
+    @DisplayName("regenerateSummary - SUPER_ADMIN")
+    class RegenerateSummaryTests {
+
+        @Test
+        @DisplayName("이미 저장된 요약이 있어도 캐시를 무시하고 Gemini를 다시 호출해 덮어쓴다")
+        void regeneratesEvenWhenCached() {
+            ApprovalRequest request = mockApprovalRequest("- 기존 요약 내용");
+            when(approvalRequestRepository.findByIdWithUsers(1L)).thenReturn(Optional.of(request));
+            when(quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(1L)).thenReturn(List.of());
+            when(quoteApprovalReasonRepository.findByQuote_Id(1L)).thenReturn(List.of());
+            when(geminiClient.generateContent(anyString())).thenReturn("- 재생성된 요약");
+
+            AiRiskSummaryResponse result = service.regenerateSummary(1L);
+
+            assertThat(result.isCached()).isFalse();
+            assertThat(result.getAiRiskSummary()).isEqualTo("- 재생성된 요약");
+            verify(geminiClient, times(1)).generateContent(anyString());
+            verify(request, times(1)).updateAiRiskSummary("- 재생성된 요약");
+        }
+
+        @Test
+        @DisplayName("승인 요청이 없으면 APPROVAL_REQUEST_NOT_FOUND 예외")
+        void throwsWhenNotFound() {
+            when(approvalRequestRepository.findByIdWithUsers(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> service.regenerateSummary(99L))
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.APPROVAL_REQUEST_NOT_FOUND);
+        }
+    }
+
+    @Nested
+    @DisplayName("regenerateSummaryForManager - SALES_MANAGER")
+    class RegenerateSummaryForManagerTests {
+
+        @Test
+        @DisplayName("다른 부서 요청이면 APPROVAL_DEPT_MISMATCH 예외")
+        void throwsOnDeptMismatch() {
+            User manager = mock(User.class);
+            when(manager.getDepartment()).thenReturn("영업1팀");
+
+            User requester = mock(User.class);
+            when(requester.getDepartment()).thenReturn("영업2팀");
+
+            ApprovalRequest request = mockApprovalRequest("- 기존 요약 내용");
+            when(request.getRequester()).thenReturn(requester);
+
+            when(approvalRequestRepository.findByIdWithUsers(1L)).thenReturn(Optional.of(request));
+            when(userRepository.findById(10L)).thenReturn(Optional.of(manager));
+
+            assertThatThrownBy(() -> service.regenerateSummaryForManager(1L, 10L))
+                    .isInstanceOf(CustomException.class)
+                    .hasFieldOrPropertyWithValue("errorCode", ErrorCode.APPROVAL_DEPT_MISMATCH);
+
+            verify(geminiClient, never()).generateContent(anyString());
+        }
+
+        @Test
+        @DisplayName("동일 부서면 캐시를 무시하고 재생성한다")
+        void regeneratesWhenSameDept() {
+            User manager = mock(User.class);
+            when(manager.getDepartment()).thenReturn("영업1팀");
+
+            User requester = mock(User.class);
+            when(requester.getDepartment()).thenReturn("영업1팀");
+
+            ApprovalRequest request = mockApprovalRequest("- 기존 요약 내용");
+            when(request.getRequester()).thenReturn(requester);
+
+            when(approvalRequestRepository.findByIdWithUsers(1L)).thenReturn(Optional.of(request));
+            when(userRepository.findById(10L)).thenReturn(Optional.of(manager));
+            when(quoteItemRepository.findByQuoteIdOrderBySortOrderAsc(1L)).thenReturn(List.of());
+            when(quoteApprovalReasonRepository.findByQuote_Id(1L)).thenReturn(List.of());
+            when(geminiClient.generateContent(anyString())).thenReturn("- 재생성된 요약");
+
+            AiRiskSummaryResponse result = service.regenerateSummaryForManager(1L, 10L);
+
+            assertThat(result.isCached()).isFalse();
+            assertThat(result.getAiRiskSummary()).isEqualTo("- 재생성된 요약");
+            verify(geminiClient, times(1)).generateContent(anyString());
+        }
+    }
+
+    @Nested
     @DisplayName("getSummaryForManager - SALES_MANAGER")
     class GetSummaryForManagerTests {
 

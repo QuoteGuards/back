@@ -16,13 +16,16 @@ import org.springframework.web.client.RestClientException;
 public class GroqClient {
 
     private static final String BASE_URL = "https://api.groq.com/openai/v1/chat/completions";
-    private static final String MODEL = "llama-3.3-70b-versatile";
 
     private final RestClient restClient;
     private final String apiKey;
+    private final String model;
 
-    public GroqClient(@Value("${groq.api-key}") String apiKey) {
+    // llama-3.3-70b-versatile는 2026-08-16 종료 예정(Groq 공지)이라 고정하지 않고 설정으로 모델을 주입받는다.
+    public GroqClient(@Value("${groq.api-key}") String apiKey,
+                       @Value("${groq.model:openai/gpt-oss-120b}") String model) {
         this.apiKey = apiKey;
+        this.model = model;
         this.restClient = RestClient.create();
     }
 
@@ -32,7 +35,7 @@ public class GroqClient {
                     .uri(BASE_URL)
                     .header("Authorization", "Bearer " + apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(GroqRequest.of(MODEL, prompt))
+                    .body(GroqRequest.of(model, prompt))
                     .retrieve()
                     .body(GroqResponse.class);
 

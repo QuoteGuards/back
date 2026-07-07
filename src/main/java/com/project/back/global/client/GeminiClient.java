@@ -17,21 +17,28 @@ import org.springframework.web.client.RestClientResponseException;
 @Component
 public class GeminiClient {
 
-    private static final String BASE_URL =
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+    private static final String BASE_URL_TEMPLATE =
+            "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
 
     private final RestClient restClient;
     private final String apiKey;
+    private final String baseUrl;
 
-    public GeminiClient(@Value("${gemini.api-key}") String apiKey) {
+    // gemini-2.0-flash는 2026-06-01부로 종료(deprecated)되어 고정하지 않고 설정으로 모델을 주입받는다.
+    public GeminiClient(@Value("${gemini.api-key}") String apiKey,
+                         @Value("${gemini.model:gemini-2.5-flash}") String model) {
         this.apiKey = apiKey;
+        this.baseUrl = BASE_URL_TEMPLATE.formatted(model);
         this.restClient = RestClient.create();
     }
 
     public String generateContent(String prompt) {
         try {
+            // 최근 발급되는 AQ. 접두사 인증키는 ?key= 쿼리 파라미터 방식으로는 403이 발생하므로
+            // 구글 권장 방식인 x-goog-api-key 헤더로 전달한다 (기존 AIza 키와도 호환됨).
             GeminiResponse response = restClient.post()
-                    .uri(BASE_URL + "?key=" + apiKey)
+                    .uri(baseUrl)
+                    .header("x-goog-api-key", apiKey)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(GeminiRequest.of(prompt))
                     .retrieve()
@@ -52,7 +59,7 @@ public class GeminiClient {
             throw e;
         } catch (RestClientResponseException e) {
             HttpStatusCode status = e.getStatusCode();
-            log.error("Gemini API 호출 실패: status={}", status);
+            log.error("Gemini API 호출 실패: status={}, body={}", status, e.getResponseBodyAsString());
             if (status.value() == 429) {
                 throw new CustomException(ErrorCode.AI_SUMMARY_RATE_LIMITED);
             }

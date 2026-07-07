@@ -279,6 +279,29 @@ public class ApprovalController {
         return ResponseEntity.ok(result);
     }
 
+    // ── AI 리스크 요약 재생성 (SUPER_ADMIN - 전체) ──
+    // POST /api/admin/approval-requests/{approvalRequestId}/ai-summary/regenerate
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    @PostMapping("/admin/approval-requests/{approvalRequestId}/ai-summary/regenerate")
+    public ResponseEntity<AiRiskSummaryResponse> regenerateAiSummary(
+            @PathVariable Long approvalRequestId
+    ) {
+        AiRiskSummaryResponse result = aiRiskSummaryService.regenerateSummary(approvalRequestId);
+        return ResponseEntity.ok(result);
+    }
+
+    // ── AI 리스크 요약 재생성 (SALES_MANAGER - 동일 부서 영업사원만) ──
+    // POST /api/manager/approval-requests/{approvalRequestId}/ai-summary/regenerate
+    @PreAuthorize("hasRole('SALES_MANAGER')")
+    @PostMapping("/manager/approval-requests/{approvalRequestId}/ai-summary/regenerate")
+    public ResponseEntity<AiRiskSummaryResponse> regenerateAiSummaryForManager(
+            @PathVariable Long approvalRequestId,
+            @AuthenticationPrincipal Long userId
+    ) {
+        AiRiskSummaryResponse result = aiRiskSummaryService.regenerateSummaryForManager(approvalRequestId, userId);
+        return ResponseEntity.ok(result);
+    }
+
     // ── 8. 승인 필요 사유 조회 ──
     // GET /api/quotes/{quoteId}/approval-reasons
     @PreAuthorize("hasAnyRole('SALES_STAFF', 'SALES_MANAGER', 'SUPER_ADMIN')")
