@@ -101,9 +101,8 @@
 
 ## ERD
 
-- DB 스크립트 : [`sql/QuoteGuard.sql`](./sql/QuoteGuard.sql)
-- ERD 다이어그램 이미지
-  (./docs/QuoteGuard_architecture.png)
+- DB 스크립트: [`sql/QuoteGuard.sql`](./sql/QuoteGuard.sql)
+- ERD 다이어그램: ![ERD](./docs/QuoteGuard_architecture.png)
 
 ---
 
@@ -238,8 +237,7 @@ src/main/java/com/project/back/
 
 ## 아키텍처 개요
 
-![QuoteGuard 기술 아키텍처]
-(./docs/QuoteGuard_architecture.png)
+![QuoteGuard 기술 아키텍처](./docs/QuoteGuard_architecture.png)
 
 ---
 
