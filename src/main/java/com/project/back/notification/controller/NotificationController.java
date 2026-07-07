@@ -95,4 +95,18 @@ public class NotificationController {
                 null
         ));
     }
+
+    // 알림 삭제
+    @DeleteMapping("/{notificationId}")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long notificationId
+    ) {
+        notificationService.delete(notificationId, userId);
+
+        return ResponseEntity.ok(ApiResponse.success(
+                "알림 삭제 성공",
+                null
+        ));
+    }
 }
