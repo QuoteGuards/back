@@ -4,14 +4,15 @@ import com.project.back.ai.dto.request.ConsultationSummaryRequest;
 import com.project.back.ai.dto.request.ProposalMessageRequest;
 import com.project.back.ai.dto.response.ConsultationSummaryResponse;
 import com.project.back.ai.dto.response.ProposalMessageResponse;
+import com.project.back.global.client.GeminiClient;
+import com.project.back.global.client.GroqClient;
+import com.project.back.global.exception.CustomException;
+import com.project.back.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestClient;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 @Service
@@ -19,10 +20,8 @@ import java.util.Objects;
 @Transactional(readOnly = true)
 public class AiService {
 
-    private final RestClient restClient = RestClient.create();
-
-    @Value("${gemini.api-key}")
-    private String geminiApiKey;
+    private final GeminiClient geminiClient;
+    private final GroqClient groqClient;
 
     public ConsultationSummaryResponse summarizeConsultation(ConsultationSummaryRequest request) {
         String memo = request == null ? "" : safe(request.consultationMemo());
@@ -35,7 +34,7 @@ public class AiService {
                 %s
                 """.formatted(memo);
 
-        String summary = callGemini(prompt);
+        String summary = callAi(prompt);
 
         return ConsultationSummaryResponse.builder()
                 .originalMemo(memo)
@@ -67,7 +66,7 @@ public class AiService {
                 제품 목록: %s
                 """.formatted(customerName, customerCompany, memo, String.join(", ", productNames));
 
-        String message = callGemini(prompt);
+        String message = callAi(prompt);
 
         return ProposalMessageResponse.builder()
                 .customerName(customerName)
@@ -77,54 +76,21 @@ public class AiService {
                 .build();
     }
 
-    private String callGemini(String prompt) {
-        Map<String, Object> body = Map.of(
-                "contents", List.of(
-                        Map.of("parts", List.of(
-                                Map.of("text", prompt)
-                        ))
-                )
-        );
-
-        Map response = restClient.post()
-                .uri("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiApiKey)
-                .header("Content-Type", "application/json")
-                .body(body)
-                .retrieve()
-                .body(Map.class);
-
-        return extractText(response);
-    }
-
-    private String extractText(Map response) {
-        if (response == null) {
-            return "AI 응답을 생성하지 못했습니다.";
+    // Gemini 호출, 호출 한도 초과(429) 시 Groq로 대체 (AiRiskSummaryService와 동일한 폴백 정책)
+    // 최종 실패 시에는 approval 도메인 문구가 섞이지 않도록 AI 도메인 전용 오류로 변환해 던진다.
+    private String callAi(String prompt) {
+        try {
+            return geminiClient.generateContent(prompt);
+        } catch (CustomException e) {
+            if (e.getErrorCode() != ErrorCode.AI_SUMMARY_RATE_LIMITED) {
+                throw new CustomException(ErrorCode.AI_GENERATION_FAILED);
+            }
+            try {
+                return groqClient.generateContent(prompt);
+            } catch (CustomException fallbackError) {
+                throw new CustomException(ErrorCode.AI_GENERATION_FAILED);
+            }
         }
-
-        List candidates = (List) response.get("candidates");
-        if (candidates == null || candidates.isEmpty()) {
-            return "AI 응답을 생성하지 못했습니다.";
-        }
-
-        Map candidate = (Map) candidates.get(0);
-        if (candidate == null) {
-            return "AI 응답을 생성하지 못했습니다.";
-        }
-
-        Map content = (Map) candidate.get("content");
-        if (content == null) {
-            return "AI 응답을 생성하지 못했습니다.";
-        }
-
-        List parts = (List) content.get("parts");
-        if (parts == null || parts.isEmpty()) {
-            return "AI 응답을 생성하지 못했습니다.";
-        }
-
-        Map part = (Map) parts.get(0);
-        Object text = part.get("text");
-
-        return text == null ? "AI 응답을 생성하지 못했습니다." : text.toString().trim();
     }
 
     private String safe(String value) {

@@ -120,6 +120,9 @@ public enum ErrorCode {
     FILE_VIDEO_TOO_LARGE(HttpStatus.BAD_REQUEST, "FILE_005", "영상 파일 크기가 너무 큽니다. (최대 300MB)"),
     FILE_VIDEO_INVALID_TYPE(HttpStatus.BAD_REQUEST, "FILE_006", "MP4 영상 파일만 업로드할 수 있습니다."),
 
+    // AI (상담 메모 요약 / 고객 제안 문구 생성) — Gemini 실패 시 Groq로 폴백 후에도 실패한 경우
+    AI_GENERATION_FAILED(HttpStatus.SERVICE_UNAVAILABLE, "AI_001", "AI 응답 생성에 실패했습니다. 잠시 후 다시 시도해주세요."),
+
     // Common
     INVALID_INPUT(HttpStatus.BAD_REQUEST, "COMMON_001", "입력값이 유효하지 않습니다."),
     INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "COMMON_999", "서버 내부 오류가 발생했습니다.");
