@@ -87,6 +87,7 @@
 - Gemini / Groq (AI 리스크 요약)
 - spring-dotenv (`.env` 로컬 환경 변수)
 
+
 ## 시스템 구성 (전체)
 
 | 구분     | 기술                                                                             |
@@ -98,6 +99,7 @@
 | 외부     | AWS S3, SMTP, Gemini API                                                         |
 
 ---
+
 
 ## ERD
 
@@ -117,6 +119,7 @@
 | Node.js (프론트) | 18+  |
 | Git              | 최신 |
 
+
 ### 2. 저장소 클론
 
 ```bash
@@ -129,9 +132,11 @@ git clone https://github.com/QuoteGuards/front.git
 cd front
 ```
 
+
 ### 3. DB 준비
 
 MySQL 접속 후 QuoteGuard.sql 실행
+
 
 ### 4. 백엔드 환경 설정
 
@@ -172,19 +177,21 @@ GEMINI_API_KEY=
 
 ```
 
+
 ### 5. 백엔드 실행(API 기본 URL: http://localhost:8080)
 
-# Windows
+### Windows
 
 ```bash
 gradlew.bat bootRun
 ```
 
-# macOS / Linux
+### macOS / Linux
 
 ```bash
 ./gradlew bootRun
 ```
+
 
 ### 6. 프론트엔드 환경 설정/실행(프론트 기본 URL: http://localhost:5173)
 
@@ -242,7 +249,6 @@ src/main/java/com/project/back/
 ---
 
 ## 협업
-
-비즈니스 규칙 : 노션 링크
-코드 리뷰: CodeRabbit
-프론트 저장소: https://github.com/QuoteGuards/front
+- 비즈니스 규칙 : https://app.notion.com/p/df525e891fd68231bd8901734511bba2
+- 코드 리뷰: CodeRabbit
+- 프론트 저장소: https://github.com/QuoteGuards/front
