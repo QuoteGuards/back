@@ -102,7 +102,7 @@
 ## ERD
 
 - DB 스크립트: [`sql/QuoteGuard.sql`](./sql/QuoteGuard.sql)
-- ERD 다이어그램: ![ERD](./docs/QuoteGuard_architecture.png)
+- ERD 다이어그램: ![ERD](./docs/QuoteGuard_ERD.png)
 
 ---
 
