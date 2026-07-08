@@ -87,6 +87,8 @@ CREATE TABLE password_reset_tokens (
     used_at DATETIME NULL COMMENT '토큰 사용 완료 일시. NULL이면 미사용 상태',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '토큰 생성 일시',
 
+    CONSTRAINT uk_password_reset_tokens_token_hash UNIQUE (token_hash),
+
     CONSTRAINT fk_password_reset_tokens_user
         FOREIGN KEY (user_id)
         REFERENCES users(id)
@@ -407,6 +409,7 @@ CREATE TABLE quotes (
     approved_at DATETIME NULL COMMENT '견적 승인 완료 일시',
     sent_at DATETIME NULL COMMENT '견적서 이메일 발송 완료 일시',
     expired_at DATETIME NULL COMMENT '견적 만료 일시',
+    notified_expiring_at DATE NULL COMMENT '만료 임박 알림 발송일. 중복 발송 방지용',
 
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '견적 생성 일시',
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '견적 수정 일시',
@@ -700,8 +703,7 @@ CREATE INDEX idx_user_training_video_progress_video ON user_training_video_progr
 
 
 -- password_reset_tokens 테이블 인덱스
--- 비밀번호 재설정 확인 시 token_hash 조건으로 재설정 토큰을 빠르게 조회한다.
-CREATE INDEX idx_password_reset_tokens_token_hash ON password_reset_tokens (token_hash);
+-- token_hash는 uk_password_reset_tokens_token_hash UNIQUE 제약으로 조회·중복 방지 처리
 
 -- 특정 사용자의 토큰을 목적별로 조회하거나 기존 미사용 토큰을 만료 처리할 때 사용한다.
 CREATE INDEX idx_password_reset_tokens_user_purpose ON password_reset_tokens (user_id, purpose);
